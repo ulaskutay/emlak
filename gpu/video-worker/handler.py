@@ -45,11 +45,15 @@ ALLOW_DOWNLOAD = os.environ.get("ALLOW_DOWNLOAD", "0") == "1"
 # Model RAM'de kalır; diskten/internetten yeniden yükleme yoktur, yalnızca CPU<->GPU taşıması olur.
 CPU_OFFLOAD = os.environ.get("CPU_OFFLOAD", "auto")
 NUM_STEPS = int(os.environ.get("NUM_STEPS", "8"))
+# sage_hub: SageAttention (INT8/FP8 attention, Blackwell sm120 destekli, HF hub'dan hazır kernel).
+# native: PyTorch SDPA. İkisinde de Hunyuan'ın dolgu maskesi kaldırılır (bkz. install_maskless_attention).
+ATTENTION_BACKEND = os.environ.get("ATTENTION_BACKEND", "sage_hub")
 
 R2_BUCKET = os.environ.get("R2_BUCKET", "")
 R2_PUBLIC_BASE_URL = os.environ.get("R2_PUBLIC_BASE_URL", "").rstrip("/")
 
 T_START = time.time()
+ATTENTION_IN_USE = "native"
 
 
 def log(msg: str) -> None:
@@ -72,6 +76,44 @@ def resolve_model_path(model_id: str) -> str:
     )
 
 
+def install_maskless_attention() -> None:
+    """
+    Hunyuan 1.5 her attention çağrısına seq×seq boyutunda bir dolgu maskesi verir (yalnızca metin
+    token'larındaki padding için). Dolu maske SDPA'nın Flash yolunu kapatır, SageAttention ise maskeyi
+    hiç desteklemez. Batch 1'de (CFG kapalı) dolgu token'larını attention'dan çıkarıp maskesiz hesaplamak
+    geçerli token'lar için birebir aynı sonucu verir; dolgu satırları sıfır döner (zaten maskeli).
+    """
+    import diffusers.models.transformers.transformer_hunyuan_video15 as hv
+
+    original = hv.dispatch_attention_fn
+
+    def dispatch(query, key, value, attn_mask=None, **kwargs):
+        if attn_mask is None or query.shape[0] != 1:
+            return original(query, key, value, attn_mask=attn_mask, **kwargs)
+        valid = attn_mask[0, 0].any(dim=0)  # sütun j geçerliyse en az bir satırda True
+        if bool(valid.all()):
+            return original(query, key, value, attn_mask=None, **kwargs)
+        idx = valid.nonzero(as_tuple=True)[0]
+        out = query.new_zeros(query.shape[:3] + (value.shape[-1],))
+        out[:, idx] = original(query[:, idx], key[:, idx], value[:, idx], attn_mask=None, **kwargs)
+        return out
+
+    hv.dispatch_attention_fn = dispatch
+
+
+def set_attention_backend(pipe) -> str:
+    if ATTENTION_BACKEND == "native":
+        return "native"
+    try:
+        t0 = time.time()
+        pipe.transformer.set_attention_backend(ATTENTION_BACKEND)
+        log(f"attention backend: {ATTENTION_BACKEND} ({time.time() - t0:.1f}s)")
+        return ATTENTION_BACKEND
+    except Exception as e:  # kernel indirilemezse veya GPU desteklemezse hızlı yola düş
+        log(f"UYARI: {ATTENTION_BACKEND} kullanılamadı ({e}); native SDPA'ya dönülüyor")
+        return "native"
+
+
 def load_pipeline():
     path = resolve_model_path(MODEL_ID)
     t0 = time.time()
@@ -91,6 +133,10 @@ def load_pipeline():
     else:
         pipe.to("cuda")
     pipe.vae.enable_tiling()
+    global ATTENTION_IN_USE
+    if MODEL_FAMILY == "hunyuan15":
+        install_maskless_attention()
+        ATTENTION_IN_USE = set_attention_backend(pipe)
     log(f"GPU'ya hazırlandı: {time.time() - t1:.1f}s (vram={VRAM_GB:.0f}GB, cpu_offload={offload})")
     return pipe
 
@@ -202,6 +248,7 @@ def handler(job):
     return {
         **result,
         "gpu": GPU_NAME,
+        "attention": ATTENTION_IN_USE,
         "peak_vram_gb": round(torch.cuda.max_memory_allocated() / 1024**3, 1),
         "timings": {
             "boot_seconds": round(BOOT_SECONDS, 1),
