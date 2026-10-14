@@ -22,6 +22,9 @@ import tempfile
 import time
 from io import BytesIO
 
+# Bellek parçalanmasını azaltır; torch import edilmeden önce ayarlanmalı.
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 import boto3
 import requests
 import runpod
@@ -38,8 +41,9 @@ MODEL_ID = os.environ.get("MODEL_ID", DEFAULT_MODELS[MODEL_FAMILY])
 RUNPOD_HF_CACHE = os.environ.get("RUNPOD_HF_CACHE", "/runpod-volume/huggingface-cache/hub")
 # Önbellekte yoksa HF'den indirmeye izin ver (yalnızca geliştirme için; üretimde 0 olmalı).
 ALLOW_DOWNLOAD = os.environ.get("ALLOW_DOWNLOAD", "0") == "1"
-# Model GPU'ya sığmazsa açılır; sığıyorsa kapalı olmalı (her adımda CPU<->GPU taşıması yavaşlatır).
-CPU_OFFLOAD = os.environ.get("CPU_OFFLOAD", "0") == "1"
+# auto: 80 GB altı kartlarda bileşenleri (metin kodlayıcı, transformer, VAE) sırayla GPU'ya alır.
+# Model RAM'de kalır; diskten/internetten yeniden yükleme yoktur, yalnızca CPU<->GPU taşıması olur.
+CPU_OFFLOAD = os.environ.get("CPU_OFFLOAD", "auto")
 NUM_STEPS = int(os.environ.get("NUM_STEPS", "12"))
 
 R2_BUCKET = os.environ.get("R2_BUCKET", "")
@@ -81,12 +85,13 @@ def load_pipeline():
     log(f"ağırlıklar diskten okundu: {time.time() - t0:.1f}s")
 
     t1 = time.time()
-    if CPU_OFFLOAD:
+    offload = CPU_OFFLOAD == "1" or (CPU_OFFLOAD == "auto" and VRAM_GB < 70)
+    if offload:
         pipe.enable_model_cpu_offload()
     else:
         pipe.to("cuda")
     pipe.vae.enable_tiling()
-    log(f"GPU'ya taşındı: {time.time() - t1:.1f}s (cpu_offload={CPU_OFFLOAD})")
+    log(f"GPU'ya hazırlandı: {time.time() - t1:.1f}s (vram={VRAM_GB:.0f}GB, cpu_offload={offload})")
     return pipe
 
 
@@ -104,7 +109,9 @@ def r2_client():
     )
 
 
-log(f"açılış: family={MODEL_FAMILY} model={MODEL_ID} gpu={torch.cuda.get_device_name(0)}")
+GPU_NAME = torch.cuda.get_device_name(0)
+VRAM_GB = torch.cuda.get_device_properties(0).total_memory / 1024**3
+log(f"açılış: family={MODEL_FAMILY} model={MODEL_ID} gpu={GPU_NAME} vram={VRAM_GB:.0f}GB")
 PIPE = load_pipeline()
 S3 = r2_client()
 BOOT_SECONDS = time.time() - T_START
@@ -168,8 +175,9 @@ def generate(inp: dict) -> list:
 def handler(job):
     inp = job["input"]
     if inp.get("warmup"):
-        return {"warm": True, "boot_seconds": round(BOOT_SECONDS, 1)}
+        return {"warm": True, "boot_seconds": round(BOOT_SECONDS, 1), "gpu": GPU_NAME}
 
+    torch.cuda.reset_peak_memory_stats()
     t0 = time.time()
     frames = generate(inp)
     t_gen = time.time() - t0
@@ -193,6 +201,8 @@ def handler(job):
 
     return {
         **result,
+        "gpu": GPU_NAME,
+        "peak_vram_gb": round(torch.cuda.max_memory_allocated() / 1024**3, 1),
         "timings": {
             "boot_seconds": round(BOOT_SECONDS, 1),
             "generate_seconds": round(t_gen, 1),

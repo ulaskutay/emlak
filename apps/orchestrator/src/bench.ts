@@ -13,6 +13,8 @@ import { OutputFormat, RenderQuality, type AiScene } from "@arsa/shared";
 import { requireEnv } from "./env.js";
 
 const { values: args } = parseArgs({
+  // `pnpm bench -- --runs 1` çağrısında pnpm "--" ayracını da iletir; onu atla.
+  args: process.argv.slice(2).filter((a) => a !== "--"),
   options: {
     image: { type: "string", default: "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1600" },
     runs: { type: "string", default: "5" },
