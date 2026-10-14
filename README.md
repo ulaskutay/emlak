@@ -34,6 +34,9 @@ Serverless → New Endpoint → **Deploy from a GitHub repository** → `ulaskut
 - Active workers 0 · Max workers 3 · Idle timeout 60 sn · FlashBoot açık · Execution timeout 600 sn
 - Ortam değişkenleri: `MODEL_FAMILY=hunyuan15` (+ R2 kurulunca `R2_*`; kurulmadan video base64 döner)
 
+> **Önemli:** GitHub → Settings → Applications → **Runpod Inc.** → Repository access listesinde `ulaskutay/emlak` olmalı. Yoksa RunPod sadece ilk build'i yapar; sonraki push'lar build başlatmaz.
+> `.github/workflows/worker-release.yml` ayrıca worker kodu değişince otomatik release açar.
+
 ### 2. Ölç
 `.env` içinde `RUNPOD_API_KEY` ve `RUNPOD_VIDEO_ENDPOINT_ID`'yi doldurun, sonra:
 ```bash
