@@ -54,6 +54,7 @@ R2_PUBLIC_BASE_URL = os.environ.get("R2_PUBLIC_BASE_URL", "").rstrip("/")
 
 T_START = time.time()
 ATTENTION_IN_USE = "native"
+ATTENTION_ERROR = None
 
 
 def log(msg: str) -> None:
@@ -110,7 +111,9 @@ def set_attention_backend(pipe) -> str:
         log(f"attention backend: {ATTENTION_BACKEND} ({time.time() - t0:.1f}s)")
         return ATTENTION_BACKEND
     except Exception as e:  # kernel indirilemezse veya GPU desteklemezse hızlı yola düş
-        log(f"UYARI: {ATTENTION_BACKEND} kullanılamadı ({e}); native SDPA'ya dönülüyor")
+        global ATTENTION_ERROR
+        ATTENTION_ERROR = f"{type(e).__name__}: {e}"[:500]
+        log(f"UYARI: {ATTENTION_BACKEND} kullanılamadı ({ATTENTION_ERROR}); native SDPA'ya dönülüyor")
         return "native"
 
 
@@ -249,6 +252,7 @@ def handler(job):
         **result,
         "gpu": GPU_NAME,
         "attention": ATTENTION_IN_USE,
+        **({"attention_error": ATTENTION_ERROR} if ATTENTION_ERROR else {}),
         "peak_vram_gb": round(torch.cuda.max_memory_allocated() / 1024**3, 1),
         "timings": {
             "boot_seconds": round(BOOT_SECONDS, 1),
