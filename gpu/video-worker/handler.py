@@ -47,7 +47,9 @@ CPU_OFFLOAD = os.environ.get("CPU_OFFLOAD", "auto")
 NUM_STEPS = int(os.environ.get("NUM_STEPS", "8"))
 # sage_hub: SageAttention (INT8/FP8 attention, Blackwell sm120 destekli, HF hub'dan hazır kernel).
 # native: PyTorch SDPA. İkisinde de Hunyuan'ın dolgu maskesi kaldırılır (bkz. install_maskless_attention).
-ATTENTION_BACKEND = os.environ.get("ATTENTION_BACKEND", "sage_hub")
+# Varsayılan native: hub'daki Sage kernel'lerinde Blackwell (sm120) derlemesi yok (2026-10-14).
+# sm80/89/90 kartlarda (A100, L40S, H100) ATTENTION_BACKEND=sage_hub verilebilir.
+ATTENTION_BACKEND = os.environ.get("ATTENTION_BACKEND", "native")
 # diffusers 0.41 sage_hub için kernel v3 ister; v3'te yalnızca torch>=2.12 + CUDA 13 derlemeleri var.
 # v2'de torch 2.10/2.11 + CUDA 12.8 derlemesi bulunduğu için imaj torch 2.11-cu128 ve kernel v2 kullanır.
 SAGE_KERNEL_VERSION = int(os.environ.get("SAGE_KERNEL_VERSION", "2"))
@@ -143,12 +145,15 @@ def load_pipeline():
         pipe.enable_model_cpu_offload()
     else:
         pipe.to("cuda")
-    pipe.vae.enable_tiling()
+    # Tiling yalnızca bellek tasarrufu içindir; büyük kartta kapalıyken video tek parça çözümlenir
+    # (daha hızlı, dikiş izi riski yok).
+    if VRAM_GB < 70:
+        pipe.vae.enable_tiling()
     global ATTENTION_IN_USE
     if MODEL_FAMILY == "hunyuan15":
         install_maskless_attention()
         ATTENTION_IN_USE = set_attention_backend(pipe)
-    log(f"GPU'ya hazırlandı: {time.time() - t1:.1f}s (vram={VRAM_GB:.0f}GB, cpu_offload={offload})")
+    log(f"GPU'ya hazırlandı: {time.time() - t1:.1f}s (vram={VRAM_GB:.0f}GB, cpu_offload={offload}, vae_tiling={VRAM_GB < 70})")
     return pipe
 
 
