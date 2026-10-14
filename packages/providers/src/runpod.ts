@@ -79,7 +79,14 @@ export class RunpodClient {
     return this.request<{
       id: string;
       status: string;
-      output?: { video_url?: string; video_base64?: string; error?: string; timings?: Record<string, number> };
+      output?: {
+        video_url?: string;
+        video_base64?: string;
+        gpu?: string;
+        peak_vram_gb?: number;
+        error?: string;
+        timings?: Record<string, number>;
+      };
       error?: string;
       delayTime?: number;
       executionTime?: number;
@@ -93,7 +100,13 @@ export class RunpodClient {
   }
 
   /** Endpoint ayarlarını günceller (ör. mesai saatlerinde workersMin=1). Rolling release tetikler. */
-  updateEndpoint(patch: { workersMin?: number; workersMax?: number; idleTimeout?: number; flashboot?: boolean }) {
+  updateEndpoint(patch: {
+    workersMin?: number;
+    workersMax?: number;
+    idleTimeout?: number;
+    flashboot?: boolean;
+    gpuTypeIds?: string[];
+  }) {
     return this.request<{ id: string; workersMin: number; workersMax: number }>(
       `${RUNPOD_REST}/endpoints/${this.endpointId}/update`,
       { method: "POST", body: JSON.stringify(patch) },

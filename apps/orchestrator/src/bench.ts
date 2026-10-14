@@ -41,6 +41,8 @@ interface RunResult {
   queueSeconds?: number;
   executionSeconds?: number;
   workerTimings?: Record<string, number>;
+  gpu?: string;
+  peakVramGb?: number;
   videoUrl?: string;
   error?: string;
 }
@@ -81,6 +83,8 @@ async function runOne(i: number): Promise<RunResult> {
         queueSeconds: raw.delayTime !== undefined ? raw.delayTime / 1000 : undefined,
         executionSeconds: raw.executionTime !== undefined ? raw.executionTime / 1000 : undefined,
         workerTimings: raw.output?.timings,
+        gpu: raw.output?.gpu,
+        peakVramGb: raw.output?.peak_vram_gb,
         videoUrl,
         error: raw.error ?? raw.output?.error,
       };
@@ -110,7 +114,7 @@ for (let i = 0; i < runs; i += parallel) {
     results.push(r);
     console.log(
       `#${r.run} ${r.ok ? "OK " : "HATA"} toplam=${r.wallSeconds.toFixed(1)}s kuyruk=${r.queueSeconds?.toFixed(1)}s ` +
-        `gpu=${r.executionSeconds?.toFixed(1)}s ${r.workerTimings ? JSON.stringify(r.workerTimings) : ""} ${r.error ?? ""}`,
+        `gpu=${r.executionSeconds?.toFixed(1)}s [${r.gpu ?? "?"}, peak ${r.peakVramGb ?? "?"} GB] ${r.workerTimings ? JSON.stringify(r.workerTimings) : ""} ${r.error ?? ""}`,
     );
   }
 }
