@@ -32,6 +32,14 @@ if (!(MODEL_PROFILE in MODEL_PROFILES)) throw new Error(`Bilinmeyen RUNPOD_MODEL
 const client = new RunpodClient(requireEnv("RUNPOD_API_KEY"), requireEnv("RUNPOD_VIDEO_ENDPOINT_ID"));
 const provider = new RunpodVideoProvider(client, MODEL_PROFILE);
 const RESULTS_DIR = new URL("../../../bench/results/", import.meta.url);
+// Ctrl+C ile durdurulursa RunPod'da çalışan işler de iptal edilsin (yoksa GPU ücreti devam eder).
+const activeJobs = new Set<string>();
+process.on("SIGINT", async () => {
+  console.log(`\nDurduruldu, ${activeJobs.size} iş iptal ediliyor...`);
+  await Promise.allSettled([...activeJobs].map((id) => client.cancel(id)));
+  process.exit(130);
+});
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface RunResult {
@@ -64,10 +72,13 @@ async function runOne(i: number): Promise<RunResult> {
     quality: RenderQuality.parse(args.quality),
     seed: i,
   });
+  activeJobs.add(job.externalId);
+  console.log(`#${i} gönderildi: ${job.externalId}`);
   for (;;) {
     await sleep(1500);
     const raw = await client.status(job.externalId);
     if (["COMPLETED", "FAILED", "CANCELLED", "TIMED_OUT"].includes(raw.status)) {
+      activeJobs.delete(job.externalId);
       let videoUrl = raw.output?.video_url;
       if (raw.output?.video_base64) {
         // R2 kurulu değilken worker videoyu base64 döndürür; incelemek için diske yaz.

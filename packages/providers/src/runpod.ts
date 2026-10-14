@@ -93,6 +93,12 @@ export class RunpodClient {
     }>(`${RUNPOD_API}/${this.endpointId}/status/${jobId}`);
   }
 
+  cancel(jobId: string) {
+    return this.request<{ id: string; status: string }>(`${RUNPOD_API}/${this.endpointId}/cancel/${jobId}`, {
+      method: "POST",
+    });
+  }
+
   health() {
     return this.request<{ jobs: Record<string, number>; workers: Record<string, number> }>(
       `${RUNPOD_API}/${this.endpointId}/health`,
