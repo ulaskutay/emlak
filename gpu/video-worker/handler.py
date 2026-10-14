@@ -145,15 +145,12 @@ def load_pipeline():
         pipe.enable_model_cpu_offload()
     else:
         pipe.to("cuda")
-    # Tiling yalnızca bellek tasarrufu içindir; büyük kartta kapalıyken video tek parça çözümlenir
-    # (daha hızlı, dikiş izi riski yok).
-    if VRAM_GB < 70:
-        pipe.vae.enable_tiling()
+    # Tiling ayarı iş başına yapılır (bkz. configure_vae_tiling).
     global ATTENTION_IN_USE
     if MODEL_FAMILY == "hunyuan15":
         install_maskless_attention()
         ATTENTION_IN_USE = set_attention_backend(pipe)
-    log(f"GPU'ya hazırlandı: {time.time() - t1:.1f}s (vram={VRAM_GB:.0f}GB, cpu_offload={offload}, vae_tiling={VRAM_GB < 70})")
+    log(f"GPU'ya hazırlandı: {time.time() - t1:.1f}s (vram={VRAM_GB:.0f}GB, cpu_offload={offload})")
     return pipe
 
 
@@ -202,7 +199,24 @@ def load_image(url: str, width: int, height: int) -> Image.Image:
     return img.resize((width, height), Image.LANCZOS)
 
 
+# Tiling'siz VAE çözümlemesi 96 GB kartta 81 kare 848x480'de en yüksek ~88 GB kullanıyor (2026-10-14).
+# Bundan büyük işlerde (daha çok kare / çözünürlük) bellek taşmaması için tiling açılır.
+UNTILED_MAX_PIXELS = 81 * 848 * 480
+
+
+def configure_vae_tiling(inp: dict) -> bool:
+    """Tiling yalnızca bellek tasarrufu içindir; kapalıyken tek parça çözümleme hem daha hızlı hem dikişsiz."""
+    pixels = inp["num_frames"] * inp["width"] * inp["height"]
+    tiling = VRAM_GB < 70 or pixels > UNTILED_MAX_PIXELS
+    if tiling:
+        PIPE.vae.enable_tiling()
+    else:
+        PIPE.vae.disable_tiling()
+    return tiling
+
+
 def generate(inp: dict) -> list:
+    configure_vae_tiling(inp)
     image = load_image(inp["image_url"], inp["width"], inp["height"])
     generator = torch.Generator("cuda").manual_seed(int(inp.get("seed", 42)))
 
