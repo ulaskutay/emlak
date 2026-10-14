@@ -48,6 +48,9 @@ NUM_STEPS = int(os.environ.get("NUM_STEPS", "8"))
 # sage_hub: SageAttention (INT8/FP8 attention, Blackwell sm120 destekli, HF hub'dan hazır kernel).
 # native: PyTorch SDPA. İkisinde de Hunyuan'ın dolgu maskesi kaldırılır (bkz. install_maskless_attention).
 ATTENTION_BACKEND = os.environ.get("ATTENTION_BACKEND", "sage_hub")
+# diffusers 0.41 sage_hub için kernel v3 ister; v3'te yalnızca torch>=2.12 + CUDA 13 derlemeleri var.
+# v2'de torch 2.10/2.11 + CUDA 12.8 derlemesi bulunduğu için imaj torch 2.11-cu128 ve kernel v2 kullanır.
+SAGE_KERNEL_VERSION = int(os.environ.get("SAGE_KERNEL_VERSION", "2"))
 
 R2_BUCKET = os.environ.get("R2_BUCKET", "")
 R2_PUBLIC_BASE_URL = os.environ.get("R2_PUBLIC_BASE_URL", "").rstrip("/")
@@ -107,6 +110,11 @@ def set_attention_backend(pipe) -> str:
         return "native"
     try:
         t0 = time.time()
+        from diffusers.models.attention_dispatch import _HUB_KERNELS_REGISTRY, AttentionBackendName
+
+        hub_cfg = _HUB_KERNELS_REGISTRY.get(AttentionBackendName(ATTENTION_BACKEND))
+        if hub_cfg is not None and ATTENTION_BACKEND == "sage_hub":
+            hub_cfg.version = SAGE_KERNEL_VERSION
         pipe.transformer.set_attention_backend(ATTENTION_BACKEND)
         log(f"attention backend: {ATTENTION_BACKEND} ({time.time() - t0:.1f}s)")
         return ATTENTION_BACKEND
