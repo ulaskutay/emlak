@@ -8,7 +8,7 @@
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
-import { RunpodClient, RunpodLtxProvider } from "@arsa/providers";
+import { MODEL_PROFILES, RunpodClient, RunpodVideoProvider, type ModelProfile } from "@arsa/providers";
 import { OutputFormat, RenderQuality, type AiScene } from "@arsa/shared";
 import { requireEnv } from "./env.js";
 
@@ -24,8 +24,12 @@ const { values: args } = parseArgs({
   },
 });
 
-const client = new RunpodClient(requireEnv("RUNPOD_API_KEY"), requireEnv("RUNPOD_LTX_ENDPOINT_ID"));
-const provider = new RunpodLtxProvider(client);
+const MODEL_PROFILE = (process.env.RUNPOD_MODEL_PROFILE ?? "hunyuan15_480p") as ModelProfile;
+if (!(MODEL_PROFILE in MODEL_PROFILES)) throw new Error(`Bilinmeyen RUNPOD_MODEL_PROFILE: ${MODEL_PROFILE}`);
+
+const client = new RunpodClient(requireEnv("RUNPOD_API_KEY"), requireEnv("RUNPOD_VIDEO_ENDPOINT_ID"));
+const provider = new RunpodVideoProvider(client, MODEL_PROFILE);
+const RESULTS_DIR = new URL("../../../bench/results/", import.meta.url);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface RunResult {
@@ -60,6 +64,14 @@ async function runOne(i: number): Promise<RunResult> {
     await sleep(1500);
     const raw = await client.status(job.externalId);
     if (["COMPLETED", "FAILED", "CANCELLED", "TIMED_OUT"].includes(raw.status)) {
+      let videoUrl = raw.output?.video_url;
+      if (raw.output?.video_base64) {
+        // R2 kurulu değilken worker videoyu base64 döndürür; incelemek için diske yaz.
+        await mkdir(RESULTS_DIR, { recursive: true });
+        const file = new URL(`${scene.id}.mp4`, RESULTS_DIR);
+        await writeFile(file, Buffer.from(raw.output.video_base64, "base64"));
+        videoUrl = file.pathname;
+      }
       return {
         run: i,
         ok: raw.status === "COMPLETED",
@@ -67,7 +79,7 @@ async function runOne(i: number): Promise<RunResult> {
         queueSeconds: raw.delayTime !== undefined ? raw.delayTime / 1000 : undefined,
         executionSeconds: raw.executionTime !== undefined ? raw.executionTime / 1000 : undefined,
         workerTimings: raw.output?.timings,
-        videoUrl: raw.output?.video_url,
+        videoUrl,
         error: raw.error ?? raw.output?.error,
       };
     }
@@ -112,6 +124,5 @@ const summary = {
 };
 console.log("\nÖzet:", JSON.stringify(summary, null, 2));
 
-const dir = new URL("../../../bench/results/", import.meta.url);
-await mkdir(dir, { recursive: true });
-await writeFile(new URL(`bench-${Date.now()}.json`, dir), JSON.stringify({ summary, results }, null, 2));
+await mkdir(RESULTS_DIR, { recursive: true });
+await writeFile(new URL(`bench-${Date.now()}.json`, RESULTS_DIR), JSON.stringify({ summary, results }, null, 2));

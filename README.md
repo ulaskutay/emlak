@@ -10,48 +10,45 @@ Emlakçıların ilan fotoğrafı + konum/parsel bilgisinden çok sahneli tanıt�
 |---|---|---|
 | `packages/shared` | Storyboard/ilan şeması (zod), sahne tipleri, emlak prompt'ları | ✅ |
 | `packages/providers` | `VideoProvider` arayüzü: RunPod LTX + Seedance (premium) | ✅ |
-| `gpu/ltx-worker` | RunPod Serverless worker (model imaja gömülü, sıcak süreç, R2'ye yükleme) | ✅ (Faz 0'da GPU üzerinde doğrulanacak) |
+| `gpu/video-worker` | RunPod Serverless worker: Hunyuan 1.5 / LTX-2, model RunPod önbelleğinden, sıcak süreç, adım adım süre logu | ✅ (GPU'da doğrulanacak) |
 | `apps/orchestrator` | Mesai saati scaler'ı + benchmark aracı | ✅ (kuyruk/webhook Faz 2) |
 | `apps/renderer` | Remotion şablonları | Faz 2 |
 | `apps/web` | Next.js panel | Faz 3 |
 
 ## Hız stratejisi
-1. **Cold start:** Model imajın içinde (`HF_HUB_OFFLINE=1`) + FlashBoot + mesai saatlerinde `workersMin=1` (`pnpm scaler`).
-2. **Model yükleme:** `handler.py` modeli süreç açılışında bir kez yükler, işler sıcak süreçte işlenir.
-3. **Üretim:** Distilled sigma takvimi (CFG yok, ~8 adım). Önizleme 448×768, final 704×1280.
-4. **Panel:** Senkron bekleme yok. RunPod webhook + SSE (Faz 2–3).
+1. **Model indirme yok:** Ağırlıklar RunPod **cached models** önbelleğinden okunur (`/runpod-volume/huggingface-cache`). İndirme süresi faturalanmaz, imaj küçük kalır.
+2. **Model bir kez yüklenir:** `handler.py` modeli süreç açılışında GPU'ya yükler, işler sıcak süreçte işlenir. Açılışın her adımı süresiyle loglanır.
+3. **Worker kapanmaz:** Idle timeout 60 sn + FlashBoot + mesai saatlerinde `workersMin=1` (`pnpm scaler`).
+4. **Ucuz GPU:** Varsayılan model HunyuanVideo 1.5 480p step-distilled (8B), 48 GB GPU'ya ($1.22/saat, bol arz) sığar.
+5. **Panel beklemez:** RunPod webhook + SSE (Faz 2–3).
 
-## Faz 0 — Benchmark (ilk yapılacak iş)
+> **Ders (2026-10-14):** RunPod'un hazır vLLM-Omni endpoint'i (Hunyuan 1.5) ilk testte 19 dk çıktı vermeden çalıştı ve log üretmedi. Kara kutu worker'ı bırakıp kendi worker'ımıza geçtik.
 
-### 1. Worker imajını derle ve yükle
+## Faz 0 — Benchmark
+
+### 1. RunPod'da endpoint oluştur (GitHub'dan)
+Serverless → New Endpoint → **Deploy from a GitHub repository** → `ulaskutay/emlak`
+- Branch `main`, Dockerfile `gpu/video-worker/Dockerfile`, build context `gpu/video-worker`
+- **Model alanı:** `hunyuanvideo-community/HunyuanVideo-1.5-Diffusers-480p_i2v_step_distilled` (cached models'i açar)
+- GPU: 48 GB (1.), 48 GB PRO (2.) — A40/A6000 gibi eski kartlar yavaş, mümkünse L40S/Ada tercih edin
+- Active workers 0 · Max workers 3 · Idle timeout 60 sn · FlashBoot açık · Execution timeout 600 sn
+- Ortam değişkenleri: `MODEL_FAMILY=hunyuan15` (+ R2 kurulunca `R2_*`; kurulmadan video base64 döner)
+
+### 2. Ölç
+`.env` içinde `RUNPOD_API_KEY` ve `RUNPOD_VIDEO_ENDPOINT_ID`'yi doldurun, sonra:
 ```bash
-cd gpu/ltx-worker
-docker buildx build --platform linux/amd64 --secret id=hf_token,env=HF_TOKEN -t <dockerhub-kullanıcı>/arsa-ltx-worker:0.1 --push .
+pnpm bench -- --runs 1 --format youtube_16x9          # soğuk başlangıç
+pnpm bench -- --runs 3 --format youtube_16x9          # sıcak, art arda
+pnpm bench -- --runs 3 --parallel 3                   # 3 sahne paralel
 ```
+Sonuçlar ve videolar `bench/results/` altına yazılır. Açılış adımlarının süreleri endpoint loglarında `[worker +…s]` satırlarındadır.
 
-### 2. RunPod'da Serverless endpoint oluştur
-- Container image: yukarıdaki imaj
-- GPU: önce **H100 80GB**, sonra **L40S 48GB** (`CPU_OFFLOAD=1` ile) karşılaştırılacak
-- FlashBoot: açık · Max workers: 8 · Idle timeout: 60 sn · Execution timeout: 600 sn
-- Ortam değişkenleri: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_BASE_URL`
-
-### 3. Ölç
-```bash
-cp .env.example .env   # RUNPOD_API_KEY ve RUNPOD_LTX_ENDPOINT_ID'yi doldurun
-pnpm install
-pnpm bench -- --runs 1                          # soğuk başlangıç (worker 0'dayken)
-pnpm bench -- --runs 5                          # sıcak, art arda
-pnpm bench -- --runs 5 --parallel 5             # 5 sahne paralel (gerçek proje senaryosu)
-pnpm bench -- --runs 3 --quality final --format youtube_16x9
-```
-Sonuçlar `bench/results/` altına JSON olarak yazılır. **Hedef:** sıcak worker'da 5 sn'lik önizleme klibi < 40 sn.
-
-### Faz 0'da doğrulanması gerekenler
-- `LTX2ImageToVideoPipeline` + `Lightricks/LTX-2.5-Diffusers` + `DISTILLED_SIGMA_VALUES` kombinasyonu. Olmazsa `MODEL_ID` ve `USE_DISTILLED_SIGMAS=0` ile alternatifler denenir.
-- Gerçek arsa fotoğraflarında halüsinasyon (bina/yol ekliyor mu?).
-- İmaj boyutunun cold start'a etkisi. Çok büyükse RunPod "cached models" özelliği ile karşılaştırılır.
+### Doğrulanacaklar
+- Worker loglarında "model önbellekte bulundu" satırı (görünmüyorsa Model alanı yanlış).
+- 48 GB'da `CPU_OFFLOAD=0` ile bellek yetiyor mu? Yetmezse `CPU_OFFLOAD=1`.
+- Arsa fotoğraflarında halüsinasyon (bina/yol ekliyor mu?).
+- LTX-2 (`MODEL_FAMILY=ltx2`, 80 GB) ile kalite/hız karşılaştırması.
 - Seedance API alan adları (`packages/providers/src/seedance.ts`).
-- İki aşamalı (yarı çözünürlük + latent upsampler) final üretim: hız kazancı ölçülecek.
 
 ## Mesai saati scaler'ı
 ```bash

@@ -29,7 +29,7 @@ function scalerConfig() {
 
 export async function reconcile(): Promise<void> {
   const apiKey = requireEnv("RUNPOD_API_KEY");
-  const client = new RunpodClient(apiKey, requireEnv("RUNPOD_LTX_ENDPOINT_ID"));
+  const client = new RunpodClient(apiKey, requireEnv("RUNPOD_VIDEO_ENDPOINT_ID"));
   const cfg = scalerConfig();
   const hour = hourIn(cfg.timeZone);
   const want = desiredActiveWorkers(hour, cfg);

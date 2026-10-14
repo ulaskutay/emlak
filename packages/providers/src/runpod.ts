@@ -5,21 +5,34 @@ const RUNPOD_API = "https://api.runpod.ai/v2";
 const RUNPOD_REST = "https://rest.runpod.io/v1";
 const FPS = 24;
 
+type Size = { width: number; height: number };
+type Orientation = "portrait" | "landscape";
+
 /**
- * AI klip çözünürlükleri (64'e bölünebilir).
+ * Model profilleri: her modelin kendi çözünürlük ızgarası var.
  * Final klip Remotion'da hedef formata (1080x1920 / 1920x1080) ölçeklenir.
  */
-const CLIP_SIZES: Record<RenderQuality, Record<"portrait" | "landscape", { width: number; height: number }>> = {
-  preview: { portrait: { width: 448, height: 768 }, landscape: { width: 768, height: 448 } },
-  final: { portrait: { width: 704, height: 1280 }, landscape: { width: 1280, height: 704 } },
-};
+export const MODEL_PROFILES = {
+  /** HunyuanVideo 1.5 480p step-distilled — 48 GB GPU, ucuz. Önizleme ve final aynı çözünürlükte. */
+  hunyuan15_480p: {
+    preview: { portrait: { width: 480, height: 848 }, landscape: { width: 848, height: 480 } },
+    final: { portrait: { width: 480, height: 848 }, landscape: { width: 848, height: 480 } },
+  },
+  /** LTX-2.x distilled — 80 GB GPU. 64'e bölünebilir boyutlar. */
+  ltx2: {
+    preview: { portrait: { width: 448, height: 768 }, landscape: { width: 768, height: 448 } },
+    final: { portrait: { width: 704, height: 1280 }, landscape: { width: 1280, height: 704 } },
+  },
+} satisfies Record<string, Record<RenderQuality, Record<Orientation, Size>>>;
 
-export function clipSize(format: OutputFormat, quality: RenderQuality) {
-  return CLIP_SIZES[quality][format === "reels_9x16" ? "portrait" : "landscape"];
+export type ModelProfile = keyof typeof MODEL_PROFILES;
+
+export function clipSize(profile: ModelProfile, format: OutputFormat, quality: RenderQuality): Size {
+  return MODEL_PROFILES[profile][quality][format === "reels_9x16" ? "portrait" : "landscape"];
 }
 
-/** RunPod worker'ının beklediği input (gpu/ltx-worker/handler.py ile birebir aynı tutulmalı). */
-export interface LtxWorkerInput {
+/** RunPod worker'ının beklediği input (gpu/video-worker/handler.py ile birebir aynı tutulmalı). */
+export interface VideoWorkerInput {
   image_url: string;
   prompt: string;
   negative_prompt: string;
@@ -66,7 +79,7 @@ export class RunpodClient {
     return this.request<{
       id: string;
       status: string;
-      output?: { video_url?: string; error?: string; timings?: Record<string, number> };
+      output?: { video_url?: string; video_base64?: string; error?: string; timings?: Record<string, number> };
       error?: string;
       delayTime?: number;
       executionTime?: number;
@@ -93,13 +106,16 @@ export class RunpodClient {
   }
 }
 
-export class RunpodLtxProvider implements VideoProvider {
-  readonly id = "runpod_ltx" as const;
+export class RunpodVideoProvider implements VideoProvider {
+  readonly id = "runpod_video" as const;
 
-  constructor(private readonly client: RunpodClient) {}
+  constructor(
+    private readonly client: RunpodClient,
+    readonly profile: ModelProfile = "hunyuan15_480p",
+  ) {}
 
-  buildInput(input: VideoJobInput): LtxWorkerInput {
-    const { width, height } = clipSize(input.format, input.quality);
+  buildInput(input: VideoJobInput): VideoWorkerInput {
+    const { width, height } = clipSize(this.profile, input.format, input.quality);
     const { prompt, negativePrompt } = buildRealEstatePrompt(input.scene);
     return {
       image_url: input.scene.photoUrl,

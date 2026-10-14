@@ -1,6 +1,6 @@
 import type { AiScene, OutputFormat, RenderQuality } from "@arsa/shared";
 
-export type ProviderId = "runpod_ltx" | "seedance";
+export type ProviderId = "runpod_video" | "seedance";
 
 export interface VideoJobInput {
   projectId: string;
@@ -27,7 +27,7 @@ export interface JobStatus {
   executionMs?: number;
 }
 
-/** Tak-çıkar video modeli arayüzü. Paket bazında provider seçilir (Standart = LTX, Premium = Seedance). */
+/** Tak-çıkar video modeli arayüzü. Paket bazında provider seçilir (Standart = RunPod açık model, Premium = Seedance). */
 export interface VideoProvider {
   readonly id: ProviderId;
   submit(input: VideoJobInput, opts?: { webhookUrl?: string }): Promise<SubmittedJob>;

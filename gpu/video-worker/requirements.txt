@@ -8,4 +8,3 @@ requests
 pillow
 imageio
 imageio-ffmpeg
-huggingface_hub[hf_transfer]
