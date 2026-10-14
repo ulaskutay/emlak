@@ -1,0 +1,16 @@
+{
+  "name": "@arsa/orchestrator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "scaler": "tsx --env-file-if-exists=../../.env src/scaler.ts",
+    "bench": "tsx --env-file-if-exists=../../.env src/bench.ts"
+  },
+  "dependencies": {
+    "@arsa/providers": "workspace:*",
+    "@arsa/shared": "workspace:*"
+  },
+  "devDependencies": { "typescript": "^5.9.0", "tsx": "^4.20.0", "@types/node": "^24.0.0" }
+}

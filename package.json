@@ -1,0 +1,16 @@
+{
+  "name": "arsa-video",
+  "private": true,
+  "packageManager": "pnpm@10.20.0",
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "dev": "turbo run dev",
+    "scaler": "pnpm --filter @arsa/orchestrator scaler",
+    "bench": "pnpm --filter @arsa/orchestrator bench"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0",
+    "typescript": "^5.9.0"
+  }
+}

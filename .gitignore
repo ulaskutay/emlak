@@ -1,0 +1,7 @@
+node_modules
+dist
+.env
+.turbo
+bench/results
+*.mp4
+__pycache__
