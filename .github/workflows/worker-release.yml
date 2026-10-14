@@ -1,0 +1,30 @@
+# RunPod, GitHub entegrasyonunda yeni build'i push ile değil, GitHub release ile başlatır.
+# Bu workflow, GPU worker kodu değiştiğinde main'e yapılan her push için otomatik release açar.
+name: Worker release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "gpu/video-worker/**"
+      - ".github/workflows/worker-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Release oluştur
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="worker-$(date -u +%Y%m%d-%H%M%S)-${GITHUB_SHA::7}"
+          MSG=$(gh api "repos/${{ github.repository }}/commits/${GITHUB_SHA}" --jq '.commit.message | split("\n")[0]')
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            --target "$GITHUB_SHA" \
+            --title "$TAG" \
+            --notes "Otomatik worker release: ${MSG}"
