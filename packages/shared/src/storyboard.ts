@@ -63,6 +63,8 @@ export const Scene = z.discriminatedUnion("type", [
     type: z.literal("ai_photo_motion"),
     photoUrl: z.string().url(),
     camera: CameraMove,
+    /** İç mekânda bitki/rüzgâr hareketi yerine ışık ve kamera hareketi istenir. */
+    setting: z.enum(["exterior", "interior"]).default("exterior"),
     prompt: z.string(), // sahne açıklaması (ışık, atmosfer) — yapı eklememeli
   }),
   /** Uydu haritası + parsel sınırı animasyonu (CPU / Remotion). */

@@ -15,12 +15,17 @@ const CAMERA_PROMPTS: Record<CameraMove, string> = {
  * yeni yapı/yol/insan eklenmemeli, sadece kamera ve doğal ortam hareketi olmalı.
  */
 export function buildRealEstatePrompt(scene: AiScene): { prompt: string; negativePrompt: string } {
+  const interior = scene.setting === "interior";
   return {
     prompt: [
       scene.prompt,
       CAMERA_PROMPTS[scene.camera],
-      "The land, terrain and surroundings stay exactly as in the photo.",
-      "Only subtle natural motion: grass and trees swaying gently in the wind, soft moving clouds, natural daylight.",
+      interior
+        ? "The room, furniture, materials and layout stay exactly as in the photo."
+        : "The land, terrain and surroundings stay exactly as in the photo.",
+      interior
+        ? "Only subtle motion: soft sunlight shifting through the windows, gentle reflections on the floor."
+        : "Only subtle natural motion: grass and trees swaying gently in the wind, soft moving clouds, natural daylight.",
       "Photorealistic real estate footage, stable, no cuts.",
     ].join(" "),
     negativePrompt:

@@ -23,6 +23,7 @@ const { values: args } = parseArgs({
     format: { type: "string", default: "reels_9x16" },
     duration: { type: "string", default: "5" },
     warmup: { type: "boolean", default: false },
+    steps: { type: "string" },
   },
 });
 
@@ -62,6 +63,7 @@ async function runOne(i: number): Promise<RunResult> {
     durationSec: Number(args.duration),
     photoUrl: args.image!,
     camera: "slow_push_in",
+    setting: "exterior",
     prompt: "A wide open plot of land under a clear sky at golden hour.",
   };
   const t0 = Date.now();
@@ -71,6 +73,7 @@ async function runOne(i: number): Promise<RunResult> {
     format: OutputFormat.parse(args.format),
     quality: RenderQuality.parse(args.quality),
     seed: i,
+    numSteps: args.steps ? Number(args.steps) : undefined,
   });
   activeJobs.add(job.externalId);
   console.log(`#${i} gönderildi: ${job.externalId}`);

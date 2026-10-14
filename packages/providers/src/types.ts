@@ -8,6 +8,8 @@ export interface VideoJobInput {
   format: OutputFormat;
   quality: RenderQuality;
   seed?: number;
+  /** Difüzyon adım sayısı; verilmezse worker varsayılanı (NUM_STEPS, 12). */
+  numSteps?: number;
 }
 
 export interface SubmittedJob {

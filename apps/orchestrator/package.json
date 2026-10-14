@@ -6,11 +6,17 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "scaler": "tsx --env-file-if-exists=../../.env src/scaler.ts",
-    "bench": "tsx --env-file-if-exists=../../.env src/bench.ts"
+    "bench": "tsx --env-file-if-exists=../../.env src/bench.ts",
+    "listing-video": "tsx --env-file-if-exists=../../.env src/listing-video.ts"
   },
   "dependencies": {
     "@arsa/providers": "workspace:*",
-    "@arsa/shared": "workspace:*"
+    "@arsa/shared": "workspace:*",
+    "zod": "^3.25.0"
   },
-  "devDependencies": { "typescript": "^5.9.0", "tsx": "^4.20.0", "@types/node": "^24.0.0" }
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "tsx": "^4.20.0",
+    "@types/node": "^24.0.0"
+  }
 }

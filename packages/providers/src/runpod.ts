@@ -42,6 +42,7 @@ export interface VideoWorkerInput {
   frame_rate: number;
   seed: number;
   output_key: string;
+  num_steps?: number;
 }
 
 const STATE_MAP: Record<string, JobState> = {
@@ -146,6 +147,7 @@ export class RunpodVideoProvider implements VideoProvider {
       frame_rate: FPS,
       seed: input.seed ?? 42,
       output_key: `projects/${input.projectId}/scenes/${input.scene.id}-${input.quality}.mp4`,
+      ...(input.numSteps ? { num_steps: input.numSteps } : {}),
     };
   }
 

@@ -7,7 +7,8 @@
     "typecheck": "turbo run typecheck",
     "dev": "turbo run dev",
     "scaler": "pnpm --filter @arsa/orchestrator scaler",
-    "bench": "pnpm --filter @arsa/orchestrator bench"
+    "bench": "pnpm --filter @arsa/orchestrator bench",
+    "listing-video": "pnpm --filter @arsa/orchestrator listing-video"
   },
   "devDependencies": {
     "turbo": "^2.5.0",
