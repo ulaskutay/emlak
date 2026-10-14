@@ -8,7 +8,7 @@ export interface VideoJobInput {
   format: OutputFormat;
   quality: RenderQuality;
   seed?: number;
-  /** Difüzyon adım sayısı; verilmezse worker varsayılanı (NUM_STEPS, 12). */
+  /** Difüzyon adım sayısı; verilmezse profil varsayılanı (DEFAULT_STEPS). */
   numSteps?: number;
 }
 

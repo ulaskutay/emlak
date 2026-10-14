@@ -44,7 +44,7 @@ ALLOW_DOWNLOAD = os.environ.get("ALLOW_DOWNLOAD", "0") == "1"
 # auto: 80 GB altı kartlarda bileşenleri (metin kodlayıcı, transformer, VAE) sırayla GPU'ya alır.
 # Model RAM'de kalır; diskten/internetten yeniden yükleme yoktur, yalnızca CPU<->GPU taşıması olur.
 CPU_OFFLOAD = os.environ.get("CPU_OFFLOAD", "auto")
-NUM_STEPS = int(os.environ.get("NUM_STEPS", "12"))
+NUM_STEPS = int(os.environ.get("NUM_STEPS", "8"))
 
 R2_BUCKET = os.environ.get("R2_BUCKET", "")
 R2_PUBLIC_BASE_URL = os.environ.get("R2_PUBLIC_BASE_URL", "").rstrip("/")

@@ -27,6 +27,12 @@ export const MODEL_PROFILES = {
 
 export type ModelProfile = keyof typeof MODEL_PROFILES;
 
+/**
+ * Varsayılan difüzyon adımı. Hunyuan step-distilled'da 8 adım 12'ye göre %30 hızlı,
+ * kalite farkı gözle seçilmedi (bench 2026-10-14).
+ */
+export const DEFAULT_STEPS: Record<ModelProfile, number> = { hunyuan15_480p: 8, ltx2: 8 };
+
 export function clipSize(profile: ModelProfile, format: OutputFormat, quality: RenderQuality): Size {
   return MODEL_PROFILES[profile][quality][format === "reels_9x16" ? "portrait" : "landscape"];
 }
@@ -42,7 +48,7 @@ export interface VideoWorkerInput {
   frame_rate: number;
   seed: number;
   output_key: string;
-  num_steps?: number;
+  num_steps: number;
 }
 
 const STATE_MAP: Record<string, JobState> = {
@@ -147,7 +153,7 @@ export class RunpodVideoProvider implements VideoProvider {
       frame_rate: FPS,
       seed: input.seed ?? 42,
       output_key: `projects/${input.projectId}/scenes/${input.scene.id}-${input.quality}.mp4`,
-      ...(input.numSteps ? { num_steps: input.numSteps } : {}),
+      num_steps: input.numSteps ?? DEFAULT_STEPS[this.profile],
     };
   }
 
