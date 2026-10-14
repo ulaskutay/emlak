@@ -5,6 +5,8 @@ FROM pytorch/pytorch:2.11.0-cuda12.8-cudnn9-runtime
 
 ENV PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
+    # torch 2.11 imajı Python'u PEP 668 ile "harici yönetilen" işaretliyor; container içinde pip'e izin ver.
+    PIP_BREAK_SYSTEM_PACKAGES=1 \
     # SageAttention kernel'i HF hub'dan (kernels-community) gelir; diffusers'ın uzak kernel güvenlik
     # kontrolü için açık izin. Kernel build sırasında indirilir, çalışma anında internet gerekmez.
     DIFFUSERS_TRUST_REMOTE_KERNELS=true
