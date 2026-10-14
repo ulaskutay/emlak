@@ -90,6 +90,7 @@ export class RunpodClient {
         video_url?: string;
         video_base64?: string;
         gpu?: string;
+        attention?: string;
         peak_vram_gb?: number;
         error?: string;
         timings?: Record<string, number>;
