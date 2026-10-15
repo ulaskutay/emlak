@@ -10,6 +10,8 @@ export interface VideoJobInput {
   seed?: number;
   /** Difüzyon adım sayısı; verilmezse profil varsayılanı (DEFAULT_STEPS). */
   numSteps?: number;
+  /** Real-ESRGAN ile hedef formata (ör. 1080x1920) büyüt. Varsayılan true. */
+  upscale?: boolean;
 }
 
 export interface SubmittedJob {

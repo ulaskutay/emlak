@@ -9,3 +9,4 @@ pillow
 imageio
 imageio-ffmpeg
 kernels==0.17.2
+spandrel==0.4.2

@@ -25,11 +25,12 @@ from io import BytesIO
 # Bellek parçalanmasını azaltır; torch import edilmeden önce ayarlanmalı.
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
+import subprocess
+
 import boto3
 import requests
 import runpod
 import torch
-from diffusers.utils import export_to_video
 from PIL import Image
 
 MODEL_FAMILY = os.environ.get("MODEL_FAMILY", "hunyuan15")
@@ -53,6 +54,11 @@ ATTENTION_BACKEND = os.environ.get("ATTENTION_BACKEND", "native")
 # diffusers 0.41 sage_hub için kernel v3 ister; v3'te yalnızca torch>=2.12 + CUDA 13 derlemeleri var.
 # v2'de torch 2.10/2.11 + CUDA 12.8 derlemesi bulunduğu için imaj torch 2.11-cu128 ve kernel v2 kullanır.
 SAGE_KERNEL_VERSION = int(os.environ.get("SAGE_KERNEL_VERSION", "2"))
+
+# Real-ESRGAN (general x4v3, 5 MB) — 480p klibi hedef çözünürlüğe keskin şekilde büyütür.
+# Ağırlık build sırasında imaja indirilir (Dockerfile, sha256 doğrulamalı).
+UPSCALER_PATH = os.environ.get("UPSCALER_PATH", "/app/models/realesr-general-x4v3.pth")
+UPSCALE_BATCH = int(os.environ.get("UPSCALE_BATCH", "8"))
 
 R2_BUCKET = os.environ.get("R2_BUCKET", "")
 R2_PUBLIC_BASE_URL = os.environ.get("R2_PUBLIC_BASE_URL", "").rstrip("/")
@@ -154,6 +160,19 @@ def load_pipeline():
     return pipe
 
 
+def load_upscaler():
+    if not os.path.exists(UPSCALER_PATH):
+        log(f"UYARI: upscaler ağırlığı yok ({UPSCALER_PATH}); videolar üretim çözünürlüğünde döner")
+        return None
+    from spandrel import ModelLoader
+
+    model = ModelLoader().load_from_file(UPSCALER_PATH).to("cuda").eval()
+    if model.supports_half:
+        model = model.half()
+    log(f"upscaler hazır: {model.architecture.name} x{model.scale}")
+    return model
+
+
 def r2_client():
     account = os.environ.get("R2_ACCOUNT_ID")
     if not account:
@@ -172,6 +191,7 @@ GPU_NAME = torch.cuda.get_device_name(0)
 VRAM_GB = torch.cuda.get_device_properties(0).total_memory / 1024**3
 log(f"açılış: family={MODEL_FAMILY} model={MODEL_ID} gpu={GPU_NAME} vram={VRAM_GB:.0f}GB")
 PIPE = load_pipeline()
+UPSCALER = load_upscaler()
 S3 = r2_client()
 BOOT_SECONDS = time.time() - T_START
 log(f"hazır, toplam açılış {BOOT_SECONDS:.1f}s")
@@ -248,6 +268,51 @@ def generate(inp: dict) -> list:
     return list(video[0])
 
 
+def frames_to_tensor(frames) -> torch.Tensor:
+    """Pipeline çıktısını (np dizi, np listesi veya PIL listesi) [F,3,H,W] float 0..1 tensöre çevirir."""
+    import numpy as np
+
+    if isinstance(frames, np.ndarray):
+        arr = frames
+    else:
+        arr = np.stack([np.asarray(f) for f in frames])
+    t = torch.from_numpy(arr)
+    if t.dtype == torch.uint8:
+        t = t.float().div(255)
+    return t.permute(0, 3, 1, 2).float().clamp(0, 1)
+
+
+def fit_to(x: torch.Tensor, out_w: int, out_h: int) -> torch.Tensor:
+    """Kenarları kaplayacak şekilde ölçekler, fazlasını ortadan kırpar (germe yok)."""
+    _, _, h, w = x.shape
+    scale = max(out_w / w, out_h / h)
+    nh, nw = max(out_h, round(h * scale)), max(out_w, round(w * scale))
+    x = torch.nn.functional.interpolate(x, size=(nh, nw), mode="bicubic", antialias=True, align_corners=False)
+    top, left = (nh - out_h) // 2, (nw - out_w) // 2
+    return x[:, :, top : top + out_h, left : left + out_w].clamp(0, 1)
+
+
+def encode_video(frames: torch.Tensor, path: str, fps: int, out_w: int, out_h: int, upscale: bool) -> None:
+    """Kareleri (gerekirse Real-ESRGAN ile büyütüp) ffmpeg'e akıtarak yüksek kaliteli H.264 yazar."""
+    enc = subprocess.Popen(
+        ["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{out_w}x{out_h}",
+         "-r", str(fps), "-i", "-", "-c:v", "libx264", "-preset", "fast", "-crf", "16",
+         "-pix_fmt", "yuv420p", "-movflags", "+faststart", path],
+        stdin=subprocess.PIPE,
+    )
+    dtype = torch.float16 if UPSCALER is not None and UPSCALER.supports_half else torch.float32
+    with torch.inference_mode():
+        for i in range(0, frames.shape[0], UPSCALE_BATCH):
+            x = frames[i : i + UPSCALE_BATCH].to("cuda")
+            if upscale:
+                x = UPSCALER(x.to(dtype)).float()
+            y = fit_to(x, out_w, out_h)
+            enc.stdin.write(y.mul(255).round().byte().permute(0, 2, 3, 1).contiguous().cpu().numpy().tobytes())
+    enc.stdin.close()
+    if enc.wait() != 0:
+        raise RuntimeError("ffmpeg kodlama hatası")
+
+
 def handler(job):
     inp = job["input"]
     if inp.get("warmup"):
@@ -259,9 +324,17 @@ def handler(job):
     t_gen = time.time() - t0
     log(f"üretim {t_gen:.1f}s ({inp['num_frames']} kare)")
 
+    t_up = time.time()
+    frames_t = frames_to_tensor(frames)
+    _, _, src_h, src_w = frames_t.shape
+    out_w = int(inp.get("output_width") or src_w)
+    out_h = int(inp.get("output_height") or src_h)
+    upscale = UPSCALER is not None and (out_w > src_w or out_h > src_h)
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
         path = f.name
-    export_to_video(frames, path, fps=int(inp.get("frame_rate", 24)))
+    encode_video(frames_t, path, int(inp.get("frame_rate", 24)), out_w, out_h, upscale)
+    t_up = time.time() - t_up
+    log(f"kodlama {t_up:.1f}s ({src_w}x{src_h} -> {out_w}x{out_h}, upscale={upscale})")
 
     t1 = time.time()
     if S3 is not None:
@@ -278,12 +351,15 @@ def handler(job):
     return {
         **result,
         "gpu": GPU_NAME,
+        "resolution": f"{out_w}x{out_h}",
+        "upscaled": upscale,
         "attention": ATTENTION_IN_USE,
         **({"attention_error": ATTENTION_ERROR} if ATTENTION_ERROR else {}),
         "peak_vram_gb": round(torch.cuda.max_memory_allocated() / 1024**3, 1),
         "timings": {
             "boot_seconds": round(BOOT_SECONDS, 1),
             "generate_seconds": round(t_gen, 1),
+            "upscale_encode_seconds": round(t_up, 1),
             "upload_seconds": round(time.time() - t1, 1),
         },
     }

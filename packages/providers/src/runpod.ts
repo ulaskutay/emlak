@@ -1,4 +1,4 @@
-import { buildRealEstatePrompt, type OutputFormat, type RenderQuality } from "@arsa/shared";
+import { buildRealEstatePrompt, FORMAT_SPECS, type OutputFormat, type RenderQuality } from "@arsa/shared";
 import { framesFor, type JobState, type JobStatus, type SubmittedJob, type VideoJobInput, type VideoProvider } from "./types.js";
 
 const RUNPOD_API = "https://api.runpod.ai/v2";
@@ -49,6 +49,9 @@ export interface VideoWorkerInput {
   seed: number;
   output_key: string;
   num_steps: number;
+  /** Verilirse worker Real-ESRGAN ile bu çözünürlüğe büyütür (en-boy farkı ortadan kırpılır). */
+  output_width?: number;
+  output_height?: number;
 }
 
 const STATE_MAP: Record<string, JobState> = {
@@ -156,6 +159,9 @@ export class RunpodVideoProvider implements VideoProvider {
       seed: input.seed ?? 42,
       output_key: `projects/${input.projectId}/scenes/${input.scene.id}-${input.quality}.mp4`,
       num_steps: input.numSteps ?? DEFAULT_STEPS[this.profile],
+      ...(input.upscale === false
+        ? {}
+        : { output_width: FORMAT_SPECS[input.format].width, output_height: FORMAT_SPECS[input.format].height }),
     };
   }
 

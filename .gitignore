@@ -6,3 +6,4 @@ bench/results
 *.mp4
 __pycache__
 assets/
+bench/compare
