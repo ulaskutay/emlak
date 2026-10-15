@@ -10,7 +10,8 @@
     "bench": "pnpm --filter @arsa/orchestrator bench",
     "listing-video": "pnpm --filter @arsa/orchestrator listing-video",
     "drone": "pnpm --filter @arsa/drone-studio record",
-    "drone:dev": "pnpm --filter @arsa/drone-studio dev"
+    "drone:dev": "pnpm --filter @arsa/drone-studio dev",
+    "construction": "pnpm --filter @arsa/orchestrator construction"
   },
   "devDependencies": {
     "turbo": "^2.5.0",
