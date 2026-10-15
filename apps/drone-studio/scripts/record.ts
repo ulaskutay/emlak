@@ -6,11 +6,11 @@
  * Gerçek zamanlı ekran kaydı yerine her karede sahneyi kurar ve harita karoları tamamen yüklenene
  * kadar bekler; böylece hiçbir karede bulanık/yüklenmemiş bölge kalmaz.
  *
- * Kurgu (~13 sn):
- *   0.0–3.2  Tanıtım: geniş açı, parsel neon çizilir, parselden çevre noktalarına çizgiler, mesafe etiketleri
- *   3.2–6.5  Dalış: kamera parsele alçalır, çevre çizgileri söner
- *   6.5–10.5 Tur: parselin etrafında yay; m² sayacı ve konum
- *   10.5–13  Final: yavaşlayıp sabitlenir (inşaat sahnesinin başlangıç karesi)
+ * Kurgu (~20 sn):
+ *   Açılış (2,5 sn)   parselin üstü, neon kontur çizilir
+ *   Çevre turu        en önemli 3 yer için: parselden yere uçuş (bağlantı çizgisi kamerayla uzar, Google
+ *                     yer etiketleri açık), yerin üstünde kısa duruş + büyük kart, parsele dönüş (liste etiketi)
+ *   Final (6,5 sn)    parsele dalış, etrafında tur, m² sayacı ve konum; sabitlenen son kare inşaatın başlangıcı
  *
  * Çıktılar (assets/parcels/<dosya adı>/): drone.mp4, keyframe-neon.png, keyframe-clean.png, parcel.json
  */
@@ -38,65 +38,112 @@ if (!file) throw new Error("--parcel assets/parcels/<dosya>.geojson (veya .kml) 
 const ROOT = resolve(import.meta.dirname, "../../..");
 const APP = resolve(import.meta.dirname, "..");
 const fps = args.preview ? 10 : Number(args.fps);
-const DURATION = 13;
-const totalFrames = Math.round(DURATION * fps);
 const outDir = join(ROOT, "assets/parcels", basename(file, extname(file)));
 await mkdir(outDir, { recursive: true });
 
 const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
 /** t'nin [a, b] aralığındaki ilerlemesi (0..1). */
 const span = (t: number, a: number, b: number) => clamp01((t - a) / (b - a));
-
-/**
- * Anahtar karelerden geçen pürüzsüz kamera yolu (Catmull-Rom). Mesafe (range) logaritmik
- * uzayda yorumlanır: geniş açıdan yakına dalışta hız algısı doğal kalır.
- */
-function catmull(p0: number, p1: number, p2: number, p3: number, t: number) {
-  const t2 = t * t;
-  const t3 = t2 * t;
-  return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
-}
-type Key = { t: number; range: number; tilt: number; heading: number };
-function cameraPath(keys: Key[], t: number) {
-  let i = keys.findIndex((k, j) => j < keys.length - 1 && t >= k.t && t <= keys[j + 1]!.t);
-  if (i < 0) i = t < keys[0]!.t ? 0 : keys.length - 2;
-  const k0 = keys[Math.max(0, i - 1)]!;
-  const k1 = keys[i]!;
-  const k2 = keys[i + 1]!;
-  const k3 = keys[Math.min(keys.length - 1, i + 2)]!;
-  const u = span(t, k1.t, k2.t);
-  const pick = (f: (k: Key) => number) => catmull(f(k0), f(k1), f(k2), f(k3), u);
-  return { range: Math.exp(pick((k) => Math.log(k.range))), tilt: pick((k) => k.tilt), heading: pick((k) => k.heading) };
+const smooth = (u: number) => u * u * (3 - 2 * u);
+const lerp = (a: number, b: number, u: number) => a + (b - a) * u;
+/** En kısa yönden açı geçişi (359° → 1° arası 2°). */
+const lerpAngle = (a: number, b: number, u: number) => a + ((((b - a) % 360) + 540) % 360 - 180) * u;
+function bearing(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const k = Math.cos((a.lat * Math.PI) / 180);
+  return ((Math.atan2((b.lng - a.lng) * k, b.lat - a.lat) * 180) / Math.PI + 360) % 360;
 }
 
-function frameState(i: number, p: ParcelInfo): FrameState {
-  const t = (i / Math.max(1, totalFrames - 1)) * DURATION;
+/** Kamera anahtar karesi. arc: bu kareye giderken kamera yükselip alçalır (iki uç birlikte görünsün). */
+type Key = { t: number; lat: number; lng: number; range: number; tilt: number; heading: number; arc?: number };
+
+function cameraAt(keys: Key[], t: number) {
+  let i = keys.findIndex((k, j) => j < keys.length - 1 && t <= keys[j + 1]!.t);
+  if (i < 0) i = keys.length - 2;
+  const a = keys[i]!;
+  const b = keys[i + 1]!;
+  const u = smooth(span(t, a.t, b.t));
+  return {
+    lat: lerp(a.lat, b.lat, u),
+    lng: lerp(a.lng, b.lng, u),
+    // Mesafe logaritmik uzayda: geniş açıdan yakına geçiş doğal; arc ile yolun ortasında yükselme.
+    range: Math.exp(lerp(Math.log(a.range), Math.log(b.range), u)) + (b.arc ?? 0) * Math.sin(Math.PI * u),
+    tilt: lerp(a.tilt, b.tilt, u),
+    heading: lerpAngle(a.heading, b.heading, u),
+  };
+}
+
+/** Zaman çizelgesi parsel ve çevre bilgisine göre bir kez kurulur. */
+function buildTimeline(p: ParcelInfo) {
   const r = Math.max(25, p.radiusM);
-  // Geniş açı yalnızca haritada çizgiyle gösterilen (≤6 km) noktaları kadraja almalı.
-  const maxPoi = Math.max(0, ...p.pois.map((x) => x.distanceM).filter((d) => d <= 6000));
-  // Tanıtım açısı tüm çevre noktalarını kadraja alacak kadar geniş (dikey kadrajda yatay görüş dar).
-  const wide = Math.min(7000, Math.max(r * 25, maxPoi * 2.8, 1200));
+  const P = p.centroid;
   const h0 = (p.longestEdgeHeading + 25) % 360;
+  const Rp = Math.max(r * 12, 900); // çevre turunda parselin görüldüğü mesafe
+
+  // En önemli 3 yer (öncelik sırası API'den gelir); çok uzaktakiler uçuşu uzatır.
+  const tour = p.pois.map((poi, index) => ({ poi, index })).filter(({ poi }) => poi.distanceM <= 20000).slice(0, 3);
+
+  const INTRO = 2.5;
+  const OUT = 1.7;
+  const HOLD = 0.9;
+  const BACK = 1.2;
+  const LEG = OUT + HOLD + BACK;
+  const tourEnd = INTRO + tour.length * LEG;
+  const FINAL = 6.5;
+  const duration = tourEnd + FINAL;
 
   const keys: Key[] = [
-    { t: 0, range: wide * 1.15, tilt: 28, heading: h0 - 75 },
-    { t: 3.2, range: wide, tilt: 38, heading: h0 - 45 },
-    { t: 6.5, range: r * 7.5, tilt: 52, heading: h0 - 5 },
-    { t: 10.5, range: r * 6.2, tilt: 56, heading: h0 + 95 },
-    { t: 13, range: r * 6.0, tilt: 57, heading: h0 + 110 },
+    { t: 0, ...P, range: Rp * 1.25, tilt: 30, heading: h0 - 40 },
+    { t: INTRO, ...P, range: Rp, tilt: 42, heading: h0 - 20 },
   ];
+  let heading = h0 - 20;
+  tour.forEach(({ poi }, k) => {
+    const T = INTRO + k * LEG;
+    const dir = bearing(P, poi.position);
+    // Uçuş yönüne bak: hedef ekranın üst tarafında, bağlantı çizgisi ekranda dikey uzanır.
+    const Rpoi = Math.min(1600, Math.max(450, poi.distanceM * 0.25));
+    const arc = poi.distanceM * 0.9;
+    keys.push({ t: T + OUT, ...poi.position, range: Rpoi, tilt: 50, heading: dir, arc });
+    keys.push({ t: T + OUT + HOLD, ...poi.position, range: Rpoi * 0.92, tilt: 52, heading: dir + 8 });
+    heading = dir + 8;
+    keys.push({ t: T + LEG, ...P, range: Rp, tilt: 42, heading, arc });
+  });
+  keys.push(
+    { t: tourEnd + 2.0, ...P, range: r * 7.5, tilt: 52, heading: heading + 20 },
+    { t: tourEnd + 5.5, ...P, range: r * 6.2, tilt: 56, heading: heading + 115 },
+    { t: duration, ...P, range: r * 6.0, tilt: 57, heading: heading + 130 },
+  );
 
-  return {
-    camera: { lat: p.centroid.lat, lng: p.centroid.lng, altitude: p.elevation ?? 0, ...cameraPath(keys, t) },
-    neon: span(t, 0.2, 1.4),
-    fill: span(t, 0.8, 1.8),
-    poiLines: t < 4.6 ? span(t, 1.1, 2.4) : 0,
-    // Etiketler sırayla girer, dalışın sonunda birlikte çıkar.
-    pills: p.pois.map((_, k) => (t < 5.6 ? span(t, 1.4 + k * 0.32, 1.9 + k * 0.32) : 1 - span(t, 5.6, 6.2))),
-    title: span(t, 6.2, 6.8),
-    counter: span(t, 6.3, 8.0),
-    location: span(t, 7.2, 7.8),
-  };
+  function frameState(t: number): FrameState {
+    const lines = p.pois.map(() => 0);
+    const markers = p.pois.map(() => 0);
+    const pills = p.pois.map(() => 0);
+    let card: FrameState["card"] = null;
+    tour.forEach(({ index }, k) => {
+      const T = INTRO + k * LEG;
+      // Çizgi kameranın merkeziyle aynı eğriyle uzar: ekranda hedefe "çekiliyormuş" gibi görünür.
+      lines[index] = t < tourEnd + 1.6 ? smooth(span(t, T, T + OUT)) : 0;
+      markers[index] = t >= T + OUT * 0.6 && t < tourEnd + 1.6 ? 1 : 0;
+      if (t >= T + OUT - 0.15 && t <= T + OUT + HOLD + 0.3) {
+        card = { index, progress: Math.min(span(t, T + OUT - 0.15, T + OUT + 0.25), 1 - span(t, T + OUT + HOLD, T + OUT + HOLD + 0.3)) };
+      }
+      // Ziyaret edilen yer dönüşte soldaki listeye eklenir; finalde liste çekilir.
+      pills[index] = Math.min(span(t, T + OUT + HOLD + 0.1, T + OUT + HOLD + 0.5), 1 - span(t, tourEnd + 1.0, tourEnd + 1.6));
+    });
+    return {
+      camera: { ...cameraAt(keys, t), altitude: p.elevation ?? 0 },
+      mode: t > INTRO - 0.3 && t < tourEnd ? "HYBRID" : "SATELLITE",
+      neon: span(t, 0.2, 1.4),
+      fill: span(t, 0.8, 1.8),
+      lines,
+      markers,
+      pills,
+      card,
+      title: span(t, tourEnd + 1.4, tourEnd + 2.0),
+      counter: span(t, tourEnd + 1.5, tourEnd + 3.2),
+      location: span(t, tourEnd + 2.4, tourEnd + 3.0),
+    };
+  }
+  return { duration, frameState, tour };
 }
 
 const server = await createServer({ root: APP, configFile: join(APP, "vite.config.ts"), logLevel: "warn" });
@@ -122,7 +169,12 @@ try {
     `Alan ${Math.round(parcel.areaM2)} m², yarıçap ${parcel.radiusM.toFixed(0)} m, rakım ${parcel.elevation?.toFixed(0) ?? "?"} m — ` +
       `${parcel.pois.length} çevre noktası: ${parcel.pois.map((x) => `${x.label} ${Math.round(x.distanceM)} m`).join(", ")}`,
   );
-  console.log(`${totalFrames} kare @ ${fps} fps`);
+  const timeline = buildTimeline(parcel);
+  const totalFrames = Math.round(timeline.duration * fps);
+  console.log(
+    `Çevre turu: ${timeline.tour.map(({ poi }) => poi.name ?? poi.label).join(" → ") || "(yok)"} — ` +
+      `${timeline.duration.toFixed(1)} sn, ${totalFrames} kare @ ${fps} fps`,
+  );
 
   const out = join(outDir, args.preview ? "drone-preview.mp4" : "drone.mp4");
   const ffmpeg = spawn(
@@ -135,7 +187,8 @@ try {
   const t0 = Date.now();
   let timeouts = 0;
   for (let i = 0; i < totalFrames; i++) {
-    const ok = await page.evaluate((s) => (window as any).studio.render(s, 15000), frameState(i, parcel));
+    const state = timeline.frameState((i / Math.max(1, totalFrames - 1)) * timeline.duration);
+    const ok = await page.evaluate((s) => (window as any).studio.render(s, 15000), state);
     if (!ok) timeouts++;
     ffmpeg.stdin.write(await page.screenshot({ type: "jpeg", quality: 95 }));
     if (i % fps === 0) process.stdout.write(`\r  kare ${i + 1}/${totalFrames} (${((Date.now() - t0) / 1000).toFixed(0)} sn)`);

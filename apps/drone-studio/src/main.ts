@@ -38,13 +38,15 @@ export interface FrameState {
   title: number; // m² kartı
   counter: number; // m² sayacının ilerlemesi
   location: number; // konum satırı
-  poiLines: number; // parselden çevre noktalarına uzanan çizgiler
-  pills: number[]; // her çevre etiketinin ilerlemesi
+  lines: number[]; // her çevre noktası için parselden uzanan bağlantı çizgisinin çizilmiş oranı
+  markers: number[]; // her çevre noktasının işaretçisi (>0 görünür)
+  pills: number[]; // soldaki listede her çevre etiketinin ilerlemesi
+  card: { index: number; progress: number } | null; // ortadaki büyük yer kartı
+  /** HYBRID: Google'ın yer/yol etiketleri görünür (çevre turunda), SATELLITE: sade uydu. */
+  mode: "SATELLITE" | "HYBRID";
 }
 
 const NEON = "#00e5ff";
-/** Haritada çizgiyle bağlanacak en uzak nokta; daha uzaktakiler (ör. 16 km'deki ilçe merkezi) yalnızca listede. */
-const MAX_LINE_DISTANCE_M = 6000;
 const AMBER = "#ffc83d";
 const status = (t: string) => ((document.getElementById("status") as HTMLElement).textContent = t);
 
@@ -76,7 +78,7 @@ let fillEl: any;
 let outlineEl: any;
 let poiLineEls: any[] = [];
 let poiMarkerEls: any[] = [];
-let poisShown = false;
+const shown = new Set<any>();
 let steady = false;
 const steadyWaiters: (() => void)[] = [];
 
@@ -167,7 +169,7 @@ async function createScene() {
   // Çevre noktaları: parselden noktaya amber çizgi + direkli işaret.
   const { Marker3DElement } = lib;
   const origin = { lat: parcel.centroid.lat, lng: parcel.centroid.lng, altitude: 3 };
-  for (const poi of parcel.pois.filter((p) => p.distanceM <= MAX_LINE_DISTANCE_M)) {
+  for (const poi of parcel.pois) {
     poiLineEls.push(
       new Polyline3DElement({
         path: [origin, origin], // boş yol kabul edilmiyor; render() uzatır
@@ -184,7 +186,7 @@ async function createScene() {
         position: { lat: poi.position.lat, lng: poi.position.lng, altitude: 40 },
         altitudeMode: AltitudeMode.RELATIVE_TO_GROUND,
         extruded: true,
-        label: `${poi.emoji} ${formatDistance(poi.distanceM)}`,
+        label: `${poi.emoji} ${poi.name ?? poi.label} · ${formatDistance(poi.distanceM)}`,
         sizePreserved: true,
       }),
     );
@@ -264,24 +266,36 @@ const studio = {
     outlineEl.path = s.neon <= 0 ? [perimeter[0], perimeter[0]] : partialPerimeter(easeOut(s.neon));
     fillEl.fillColor = `rgba(0, 229, 255, ${(0.2 * clamp01(s.fill)).toFixed(3)})`;
 
-    // Çevre çizgileri: parsel merkezinden noktaya doğru uzayarak çizilir.
-    const show = s.poiLines > 0;
-    if (show !== poisShown) {
-      if (show) map.append(...poiLineEls, ...poiMarkerEls);
-      else [...poiLineEls, ...poiMarkerEls].forEach((el) => el.remove());
-      poisShown = show;
-    }
-    if (show) {
-      const k = easeOut(clamp01(s.poiLines));
-      parcel.pois.filter((p) => p.distanceM <= MAX_LINE_DISTANCE_M).forEach((poi, i) => {
+    if (map.mode !== lib.MapMode[s.mode]) map.mode = lib.MapMode[s.mode];
+
+    // Bağlantı çizgileri: parsel merkezinden noktaya doğru, kamerayla birlikte uzayarak çizilir.
+    const toggle = (el: any, visible: boolean) => {
+      if (visible && !shown.has(el)) (map.append(el), shown.add(el));
+      else if (!visible && shown.has(el)) (el.remove(), shown.delete(el));
+    };
+    parcel.pois.forEach((poi, i) => {
+      const k = clamp01(s.lines[i] ?? 0);
+      toggle(poiLineEls[i], k > 0);
+      toggle(poiMarkerEls[i], (s.markers[i] ?? 0) > 0);
+      if (k > 0) {
         const a = parcel.centroid;
         const b = poi.position;
         poiLineEls[i].path = [
           { lat: a.lat, lng: a.lng, altitude: 3 },
           { lat: a.lat + (b.lat - a.lat) * k, lng: a.lng + (b.lng - a.lng) * k, altitude: 3 },
         ];
-      });
-    }
+      }
+    });
+
+    const card = document.getElementById("poicard")!;
+    if (s.card) {
+      const poi = parcel.pois[s.card.index]!;
+      card.querySelector(".emoji")!.textContent = poi.emoji;
+      card.querySelector(".label")!.textContent = poi.label;
+      card.querySelector(".name")!.textContent = poi.name ?? poi.label;
+      card.querySelector(".dist")!.textContent = `Parsele ${formatDistance(poi.distanceM)}`;
+      setAnim(card, s.card.progress, 40);
+    } else setAnim(card, 0, 40);
 
     const title = document.getElementById("title")!;
     setAnim(title, s.title);
@@ -294,7 +308,9 @@ const studio = {
 
   /** Tüm yazı ve çizimleri gizler (inşaat sahnesi için temiz son kare). */
   async clean(keepNeon: boolean): Promise<boolean> {
-    for (const id of ["title", "location"]) (document.getElementById(id) as HTMLElement).style.opacity = "0";
+    for (const id of ["title", "location", "poicard"]) (document.getElementById(id) as HTMLElement).style.opacity = "0";
+    [...shown].forEach((el) => el !== fillEl && el !== outlineEl && (el.remove(), shown.delete(el)));
+    if (map.mode !== lib.MapMode.SATELLITE) map.mode = lib.MapMode.SATELLITE;
     document.querySelectorAll<HTMLElement>("#pois .pill").forEach((el) => (el.style.opacity = "0"));
     if (!keepNeon) [fillEl, outlineEl].forEach((el) => el.remove());
     return waitSteady();
@@ -326,8 +342,11 @@ if (file) {
         title: 1,
         counter: 1,
         location: 1,
-        poiLines: 0,
+        lines: p.pois.map(() => 1),
+        markers: p.pois.map(() => 0),
         pills: p.pois.map(() => 1),
+        card: null,
+        mode: "SATELLITE",
       }),
     )
     .catch((e) => status(`HATA: ${e.message}`));
