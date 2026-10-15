@@ -82,7 +82,8 @@ for (;;) {
     const save = async (name: string, item?: { url?: string; base64?: string }) => {
       if (!item) return;
       if (item.base64) await writeFile(join(outDir, name), Buffer.from(item.base64, "base64"));
-      console.log(`  ${name}: ${item.url ?? join(outDir, name)}`);
+      else if (item.url) await writeFile(join(outDir, name), Buffer.from(await (await fetch(item.url)).arrayBuffer()));
+      console.log(`  ${name}: ${join(outDir, name)}${item.url ? `\n    R2: ${item.url.split("?")[0]}` : ""}`);
     };
     await save("runpod-drone.mp4", out.video);
     await save("runpod-keyframe-neon.jpg", out.keyframe_neon);

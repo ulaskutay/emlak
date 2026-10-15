@@ -12,7 +12,8 @@ Girdi:
   limit_frames  test için yalnızca ilk N kare
   output_prefix R2 anahtar öneki, ör. "projects/123/drone"
   context       önceden hesaplanmış çevre bilgisi (context.json); verilmezse worker sorgular (~80 sn)
-Ortam: GOOGLE_MAPS_API_KEY (zorunlu), R2_* (opsiyonel)
+Ortam: GOOGLE_MAPS_API_KEY (zorunlu), R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET
+(opsiyonel; R2_PUBLIC_BASE_URL yoksa 7 günlük imzalı link döner)
 """
 
 import base64
@@ -55,7 +56,11 @@ print(f"[drone-worker] hazır · R2={'var' if S3 else 'yok (base64)'}", flush=Tr
 def publish(path: str, key: str, content_type: str, inline_ok: bool = True) -> dict:
     if S3 is not None:
         S3.upload_file(path, R2_BUCKET, key, ExtraArgs={"ContentType": content_type})
-        return {"url": f"{R2_PUBLIC_BASE_URL}/{key}"}
+        if R2_PUBLIC_BASE_URL:
+            return {"url": f"{R2_PUBLIC_BASE_URL}/{key}", "key": key}
+        # Bucket herkese açık değilse: 7 gün geçerli imzalı indirme linki.
+        url = S3.generate_presigned_url("get_object", Params={"Bucket": R2_BUCKET, "Key": key}, ExpiresIn=7 * 24 * 3600)
+        return {"url": url, "key": key}
     size_mb = os.path.getsize(path) / 1024**2
     if not inline_ok or size_mb > MAX_INLINE_MB:
         raise RuntimeError(f"{os.path.basename(path)} {size_mb:.1f} MB — base64 için çok büyük; R2 ayarlarını girin")
