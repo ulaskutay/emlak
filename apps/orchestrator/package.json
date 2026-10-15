@@ -8,7 +8,8 @@
     "scaler": "tsx --env-file-if-exists=../../.env src/scaler.ts",
     "bench": "tsx --env-file-if-exists=../../.env src/bench.ts",
     "listing-video": "tsx --env-file-if-exists=../../.env src/listing-video.ts",
-    "construction": "tsx --env-file-if-exists=../../.env src/construction.ts"
+    "construction": "tsx --env-file-if-exists=../../.env src/construction.ts",
+    "drone-job": "tsx --env-file-if-exists=../../.env src/drone-job.ts"
   },
   "dependencies": {
     "@arsa/providers": "workspace:*",

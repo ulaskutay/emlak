@@ -11,7 +11,8 @@
     "listing-video": "pnpm --filter @arsa/orchestrator listing-video",
     "drone": "pnpm --filter @arsa/drone-studio record",
     "drone:dev": "pnpm --filter @arsa/drone-studio dev",
-    "construction": "pnpm --filter @arsa/orchestrator construction"
+    "construction": "pnpm --filter @arsa/orchestrator construction",
+    "drone-job": "pnpm --filter @arsa/orchestrator drone-job"
   },
   "devDependencies": {
     "turbo": "^2.5.0",
