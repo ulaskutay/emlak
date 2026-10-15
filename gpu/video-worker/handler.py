@@ -37,7 +37,13 @@ MODEL_FAMILY = os.environ.get("MODEL_FAMILY", "hunyuan15")
 DEFAULT_MODELS = {
     "hunyuan15": "hunyuanvideo-community/HunyuanVideo-1.5-Diffusers-480p_i2v_step_distilled",
     "ltx2": "Lightricks/LTX-2.5-Diffusers",
+    # İnşaat sahnesi: ilk kare (boş arsa) → son kare (bitmiş bina). Lightning = 4 adım, CFG yok.
+    "wan22": "magespace/Wan2.2-I2V-A14B-Lightning-Diffusers",
+    # İnşaat sahnesinin son karesi: drone karesine bina ekleyen görsel düzenleme.
+    "qwen_edit": "Qwen/Qwen-Image-Edit-2511",
 }
+# Bu aileler video değil görsel üretir; handler PNG döndürür.
+IMAGE_FAMILIES = {"qwen_edit"}
 MODEL_ID = os.environ.get("MODEL_ID", DEFAULT_MODELS[MODEL_FAMILY])
 RUNPOD_HF_CACHE = os.environ.get("RUNPOD_HF_CACHE", "/runpod-volume/huggingface-cache/hub")
 # Önbellekte yoksa HF'den indirmeye izin ver (yalnızca geliştirme için; üretimde 0 olmalı).
@@ -140,6 +146,10 @@ def load_pipeline():
         from diffusers import HunyuanVideo15ImageToVideoPipeline as Pipeline
     elif MODEL_FAMILY == "ltx2":
         from diffusers import LTX2ImageToVideoPipeline as Pipeline
+    elif MODEL_FAMILY == "wan22":
+        from diffusers import WanImageToVideoPipeline as Pipeline
+    elif MODEL_FAMILY == "qwen_edit":
+        from diffusers import QwenImageEditPlusPipeline as Pipeline
     else:
         raise ValueError(f"bilinmeyen MODEL_FAMILY: {MODEL_FAMILY}")
     pipe = Pipeline.from_pretrained(path, torch_dtype=torch.bfloat16)
@@ -227,7 +237,8 @@ UNTILED_MAX_PIXELS = 81 * 848 * 480
 def configure_vae_tiling(inp: dict) -> bool:
     """Tiling yalnızca bellek tasarrufu içindir; kapalıyken tek parça çözümleme hem daha hızlı hem dikişsiz."""
     pixels = inp["num_frames"] * inp["width"] * inp["height"]
-    tiling = VRAM_GB < 70 or pixels > UNTILED_MAX_PIXELS
+    # Eşik Hunyuan için ölçüldü; Wan 2.2 (~70 GB ağırlık) 96 GB kartta tiling'siz çözümlemeye yer bırakmaz.
+    tiling = VRAM_GB < 70 or pixels > UNTILED_MAX_PIXELS or MODEL_FAMILY != "hunyuan15"
     if tiling:
         PIPE.vae.enable_tiling()
     else:
@@ -239,6 +250,24 @@ def generate(inp: dict) -> list:
     configure_vae_tiling(inp)
     image = load_image(inp["image_url"], inp["width"], inp["height"])
     generator = torch.Generator("cuda").manual_seed(int(inp.get("seed", 42)))
+
+    if MODEL_FAMILY == "wan22":
+        # last_image verilirse ilk/son kare arası geçiş (inşaat timelapse); yoksa normal i2v.
+        last = inp.get("last_image_url")
+        return PIPE(
+            image=image,
+            last_image=load_image(last, inp["width"], inp["height"]) if last else None,
+            prompt=inp["prompt"],
+            negative_prompt=inp.get("negative_prompt"),
+            width=inp["width"],
+            height=inp["height"],
+            num_frames=inp["num_frames"],
+            num_inference_steps=int(inp.get("num_steps", 4)),
+            guidance_scale=float(inp.get("guidance_scale", 1.0)),
+            guidance_scale_2=float(inp.get("guidance_scale", 1.0)),
+            generator=generator,
+            output_type="np",
+        ).frames[0]
 
     if MODEL_FAMILY == "hunyuan15":
         # Çözünürlük modelin kendi ızgarasından (480p) ve görselin en-boy oranından gelir.
@@ -313,10 +342,41 @@ def encode_video(frames: torch.Tensor, path: str, fps: int, out_w: int, out_h: i
         raise RuntimeError("ffmpeg kodlama hatası")
 
 
+def edit_image(inp: dict) -> dict:
+    """Qwen-Image-Edit: girdi görseli talimatla düzenler, aynı boyutta PNG (base64) döndürür."""
+    import base64
+
+    src = load_image(inp["image_url"], inp["width"], inp["height"])
+    t0 = time.time()
+    out = PIPE(
+        image=[src],
+        prompt=inp["prompt"],
+        negative_prompt=inp.get("negative_prompt") or " ",
+        true_cfg_scale=float(inp.get("true_cfg_scale", 4.0)),
+        num_inference_steps=int(inp.get("num_steps", 40)),
+        generator=torch.Generator("cuda").manual_seed(int(inp.get("seed", 42))),
+    ).images[0]
+    t_gen = time.time() - t0
+    # Model ~1 MP çıktı verir; drone karesiyle birebir hizalı olması için girdi boyutuna geri ölçekle.
+    out = out.convert("RGB").resize(src.size, Image.LANCZOS)
+    buf = BytesIO()
+    out.save(buf, format="PNG")
+    log(f"görsel düzenleme {t_gen:.1f}s ({src.size[0]}x{src.size[1]})")
+    return {
+        "image_base64": base64.b64encode(buf.getvalue()).decode(),
+        "gpu": GPU_NAME,
+        "peak_vram_gb": round(torch.cuda.max_memory_allocated() / 1024**3, 1),
+        "timings": {"boot_seconds": round(BOOT_SECONDS, 1), "generate_seconds": round(t_gen, 1)},
+    }
+
+
 def handler(job):
     inp = job["input"]
     if inp.get("warmup"):
         return {"warm": True, "boot_seconds": round(BOOT_SECONDS, 1), "gpu": GPU_NAME}
+    if MODEL_FAMILY in IMAGE_FAMILIES:
+        torch.cuda.reset_peak_memory_stats()
+        return edit_image(inp)
 
     torch.cuda.reset_peak_memory_stats()
     t0 = time.time()
