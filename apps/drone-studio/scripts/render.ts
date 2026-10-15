@@ -24,8 +24,9 @@ export interface RenderOptions {
   parallel?: number;
   /** Ön yükleme turu (saniyede kaç örnek); 0 kapalı. */
   prewarmPerSecond?: number;
-  /** GPU'suz ortam: yazılımsal WebGL (SwiftShader). */
+  /** GPU'suz ortam: yazılımsal WebGL (SwiftShader). glMode verilirse o kullanılır. */
   cpu?: boolean;
+  glMode?: GlMode;
   port?: number;
   crf?: number;
   headless?: boolean;
@@ -48,13 +49,27 @@ export interface RenderResult {
 
 const APP = resolve(import.meta.dirname, "..");
 
-function chromeArgs(cpu: boolean): string[] {
-  if (cpu) return ["--disable-gpu", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"];
-  // Linux sunucuda (RunPod) NVIDIA sürücüsü üzerinden Vulkan; macOS'ta varsayılan Metal.
-  if (process.platform === "linux") {
-    return ["--ignore-gpu-blocklist", "--enable-gpu-rasterization", "--use-angle=vulkan", "--enable-features=Vulkan", "--disable-vulkan-surface"];
+export type GlMode = "auto" | "vulkan" | "egl" | "swiftshader";
+
+/** Chrome WebGL arka ucu. auto: macOS'ta Metal, Linux'ta (RunPod) GL_MODE ortam değişkeni veya EGL. */
+export function chromeArgs(mode: GlMode): string[] {
+  const common = ["--no-sandbox", "--disable-dev-shm-usage"];
+  if (mode === "auto") mode = process.platform === "linux" ? ((process.env.GL_MODE as GlMode) ?? "egl") : "auto";
+  switch (mode) {
+    case "swiftshader":
+      return [...common, "--disable-gpu", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"];
+    case "vulkan":
+      return [...common, "--ignore-gpu-blocklist", "--use-angle=vulkan", "--enable-features=Vulkan", "--disable-vulkan-surface"];
+    case "egl":
+      return [...common, "--ignore-gpu-blocklist", "--use-gl=angle", "--use-angle=gl-egl"];
+    default:
+      return ["--ignore-gpu-blocklist", "--enable-gpu-rasterization"];
   }
-  return ["--ignore-gpu-blocklist", "--enable-gpu-rasterization"];
+}
+
+/** Takılan adımlar sonsuza dek beklemesin. */
+export function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  return Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`${what} ${ms / 1000} sn içinde bitmedi`)), ms))]);
 }
 
 async function webglRenderer(page: Page): Promise<string> {
@@ -88,22 +103,37 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
   });
   await server.listen();
   const url = server.resolvedUrls?.local[0] ?? `http://localhost:${o.port ?? 5178}/`;
-  const browser = await chromium.launch({
-    channel: "chrome",
-    headless: o.headless ?? true,
-    args: chromeArgs(!!o.cpu),
-  });
+  log(`vite hazır: ${url}`);
+  const browser = await withTimeout(
+    chromium.launch({
+      channel: "chrome",
+      headless: o.headless ?? true,
+      args: chromeArgs(o.glMode ?? (o.cpu ? "swiftshader" : "auto")),
+    }),
+    60000,
+    "Chrome açılışı",
+  );
+  log(`chrome açıldı (${browser.version()})`);
 
   try {
     // Tek bağlam: sayfalar HTTP önbelleğini (harita karoları) paylaşır.
     const context = await browser.newContext({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
     await context.addInitScript(() => ((window as any).__RECORDER__ = true));
+    let pageNo = 0;
     const openPage = async () => {
+      const n = ++pageNo;
       const page = await context.newPage();
-      page.on("console", (m) => m.type() === "error" && !m.text().includes("404") && log(`[sayfa] ${m.text()}`));
-      await page.goto(url);
-      await page.evaluate(([p, k]) => (window as any).studio.loadParcel(p, k), [o.parcel, o.googleKey] as const);
+      page.on("console", (m) => m.type() === "error" && !m.text().includes("404") && log(`[sayfa ${n}] ${m.text()}`));
+      page.on("pageerror", (e) => log(`[sayfa ${n}] hata: ${e.message}`));
+      const ts = Date.now();
+      await withTimeout(page.goto(url), 60000, `sayfa ${n} yüklemesi`);
+      await withTimeout(
+        page.evaluate(([p, k]) => (window as any).studio.loadParcel(p, k), [o.parcel, o.googleKey] as const),
+        150000,
+        `sayfa ${n} harita yüklemesi`,
+      );
       await page.evaluate(() => (window as any).studio.setChrome(false));
+      log(`sayfa ${n} hazır (${((Date.now() - ts) / 1000).toFixed(1)} sn)`);
       return page;
     };
 

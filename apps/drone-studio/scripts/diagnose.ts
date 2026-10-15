@@ -1,0 +1,97 @@
+/**
+ * Worker ortamı tanısı: Chrome'un hangi WebGL arka ucuyla çalıştığını ve stüdyonun her adımının
+ * süresini ölçer. RunPod'da handler `diagnose: true` ile çağırır; sonuç son satırda JSON.
+ *
+ *   tsx scripts/diagnose.ts --in parcel.geojson --out /tmp/diag
+ */
+import { mkdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { parseArgs } from "node:util";
+import { prepareParcel } from "@arsa/geo";
+import { chromium } from "playwright-core";
+import { createServer } from "vite";
+import { chromeArgs, withTimeout, type GlMode } from "./render.js";
+
+const { values: args } = parseArgs({
+  args: process.argv.slice(2).filter((a) => a !== "--"),
+  options: { in: { type: "string" }, out: { type: "string" }, port: { type: "string", default: "5178" } },
+});
+if (!args.in || !args.out) throw new Error("--in ve --out gerekli");
+await mkdir(args.out, { recursive: true });
+const key = process.env.GOOGLE_MAPS_API_KEY ?? "";
+const log = (m: string) => console.error(`[tanı] ${m}`);
+const report: Record<string, unknown> = { platform: process.platform, hasKey: !!key };
+
+// 1) Her WebGL arka ucu için: Chrome açılıyor mu, WebGL hangi çiziciyle çalışıyor?
+const modes: GlMode[] = ["egl", "vulkan", "swiftshader"];
+const gl: Record<string, unknown> = {};
+for (const mode of modes) {
+  const t = Date.now();
+  try {
+    const b = await withTimeout(chromium.launch({ channel: "chrome", headless: true, args: chromeArgs(mode) }), 45000, "launch");
+    const p = await b.newPage();
+    await p.setContent("<canvas></canvas>");
+    const info = await withTimeout(
+      p.evaluate(() => {
+        const g = document.createElement("canvas").getContext("webgl2") as WebGL2RenderingContext | null;
+        if (!g) return { webgl2: false };
+        const ext = g.getExtension("WEBGL_debug_renderer_info");
+        return { webgl2: true, renderer: ext ? String(g.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : "?" };
+      }),
+      20000,
+      "webgl",
+    );
+    gl[mode] = { ok: true, ms: Date.now() - t, ...info };
+    await b.close();
+  } catch (e) {
+    gl[mode] = { ok: false, ms: Date.now() - t, error: String(e).slice(0, 400) };
+  }
+  log(`${mode}: ${JSON.stringify(gl[mode])}`);
+}
+report.gl = gl;
+
+// 2) Stüdyo: en iyi arka uçla sayfa → Google Maps → harita hazır adımları
+const best = (["egl", "vulkan"] as GlMode[]).find((m) => {
+  const r = gl[m] as { ok?: boolean; renderer?: string } | undefined;
+  return r?.ok && r.renderer && !/swiftshader|llvmpipe/i.test(r.renderer);
+}) ?? "swiftshader";
+report.chosen = best;
+const steps: Record<string, number | string> = {};
+const consoleLines: string[] = [];
+const server = await createServer({ root: join(import.meta.dirname, ".."), configFile: join(import.meta.dirname, "../vite.config.ts"), logLevel: "warn", server: { port: Number(args.port), strictPort: true } });
+await server.listen();
+const browser = await chromium.launch({ channel: "chrome", headless: true, args: chromeArgs(best) });
+try {
+  let t = Date.now();
+  const parcel = await prepareParcel(await readFile(args.in, "utf8"));
+  steps.prepare = Date.now() - t;
+  const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
+  page.on("console", (m) => consoleLines.push(`${m.type()}: ${m.text()}`.slice(0, 300)));
+  page.on("pageerror", (e) => consoleLines.push(`pageerror: ${e.message}`.slice(0, 300)));
+  page.on("crash", () => consoleLines.push("SAYFA ÇÖKTÜ"));
+  t = Date.now();
+  await withTimeout(page.goto(server.resolvedUrls?.local[0] ?? "http://localhost:5178/"), 60000, "goto");
+  steps.goto = Date.now() - t;
+  t = Date.now();
+  try {
+    await withTimeout(page.evaluate(([p, k]) => (window as any).studio.loadParcel(p, k), [parcel, key] as const), 120000, "loadParcel");
+    steps.loadParcel = Date.now() - t;
+  } catch (e) {
+    steps.loadParcel = `HATA: ${String(e).slice(0, 300)}`;
+  }
+  await page.screenshot({ path: join(args.out, "diag.jpg"), type: "jpeg", quality: 70 }).catch(() => {});
+  steps.shm = await import("node:fs").then((fs) => {
+    try {
+      return String(fs.statfsSync("/dev/shm").blocks * fs.statfsSync("/dev/shm").bsize);
+    } catch {
+      return "?";
+    }
+  });
+} finally {
+  await browser.close();
+  await server.close();
+}
+report.steps = steps;
+report.console = consoleLines.slice(-40);
+report.screenshot = join(args.out, "diag.jpg");
+console.log(JSON.stringify(report));

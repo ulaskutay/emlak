@@ -45,7 +45,7 @@ def r2_client():
 
 
 S3 = r2_client()
-print(f"[drone-worker] hazır · R2={'var' if S3 else 'yok (base64)'} · cpu={os.cpu_count()}", flush=True)
+print(f"[drone-worker] hazır · R2={'var' if S3 else 'yok (base64)'}", flush=True)
 
 
 def publish(path: str, key: str, content_type: str, inline_ok: bool = True) -> dict:
@@ -66,6 +66,33 @@ def to_jpeg(png_path: str) -> str:
     return jpg
 
 
+def container_cpus() -> int:
+    """Konteynere ayrılan CPU (cgroup kotası). os.cpu_count() RunPod'da ana makinenin tümünü (ör. 256) gösterir."""
+    try:
+        quota, period = open("/sys/fs/cgroup/cpu.max").read().split()
+        if quota != "max":
+            return max(1, int(int(quota) / int(period)))
+    except (OSError, ValueError):
+        pass
+    try:
+        return len(os.sched_getaffinity(0))
+    except AttributeError:
+        return os.cpu_count() or 4
+
+
+def run_streaming(cmd: list[str], env: dict, timeout: int) -> str:
+    """Komutu çalıştırır; stderr satır satır RunPod loglarına akar, stdout'un son satırını döndürür."""
+    proc = subprocess.Popen(cmd, cwd=APP_DIR, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+    tail: list[str] = []
+    for line in proc.stderr:
+        print(line.rstrip(), flush=True)
+        tail = (tail + [line])[-40:]
+    stdout = proc.stdout.read()
+    if proc.wait(timeout=timeout) != 0:
+        raise RuntimeError(f"komut başarısız ({proc.returncode}): {''.join(tail)[-1500:]}")
+    return stdout.strip().splitlines()[-1]
+
+
 def handler(job):
     inp = job["input"]
     if inp.get("warmup"):
@@ -78,24 +105,28 @@ def handler(job):
     src = os.path.join(work, "parcel.kml" if parcel.lstrip().startswith("<") else "parcel.geojson")
     with open(src, "w", encoding="utf-8") as f:
         f.write(parcel)
+    env = {**os.environ}
+    if inp.get("gl_mode"):
+        env["GL_MODE"] = inp["gl_mode"]  # egl | vulkan | swiftshader
 
-    parallel = int(inp.get("parallel") or max(2, min(8, (os.cpu_count() or 4) // 2)))
+    if inp.get("diagnose"):
+        report = json.loads(run_streaming(["pnpm", "exec", "tsx", "scripts/diagnose.ts", "--in", src, "--out", work], env, 600))
+        shot = report.pop("screenshot", None)
+        if shot and os.path.exists(shot):
+            with open(shot, "rb") as f:
+                report["screenshot_base64"] = base64.b64encode(f.read()).decode()
+        report["cpu_count_host"] = os.cpu_count()
+        report["cpu_container"] = container_cpus()
+        return report
+
+    parallel = int(inp.get("parallel") or max(2, min(8, container_cpus() // 2)))
     cmd = ["pnpm", "exec", "tsx", "scripts/worker-render.ts", "--in", src, "--out", work,
            "--fps", str(inp.get("fps", 30)), "--parallel", str(parallel), "--crf", str(inp.get("crf", 22))]
     if inp.get("limit_frames"):
         cmd += ["--limit", str(inp["limit_frames"])]
 
     t0 = time.time()
-    # Render ilerlemesi (stderr) satır satır RunPod loglarına akar; sonuç JSON'u stdout'un son satırında.
-    proc = subprocess.Popen(cmd, cwd=APP_DIR, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
-    tail: list[str] = []
-    for line in proc.stderr:
-        print(line.rstrip(), flush=True)
-        tail = (tail + [line])[-40:]
-    stdout = proc.stdout.read()
-    if proc.wait(timeout=1500) != 0:
-        raise RuntimeError(f"render başarısız ({proc.returncode}): {''.join(tail)[-1500:]}")
-    result = json.loads(stdout.strip().splitlines()[-1])
+    result = json.loads(run_streaming(cmd, env, 1500))
 
     prefix = inp.get("output_prefix", f"drone/{job['id']}")
     out = {

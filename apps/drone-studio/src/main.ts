@@ -61,6 +61,8 @@ fitStage();
 async function loadGoogleMaps(key: string): Promise<void> {
   if ((window as any).google?.maps?.importLibrary) return;
   await new Promise<void>((resolve, reject) => {
+    // Betik yüklenip callback hiç çağrılmazsa sonsuza dek beklemeyelim.
+    setTimeout(() => reject(new Error("Google Maps JS 45 sn içinde yüklenmedi")), 45000);
     const cb = `__gmapsReady${Date.now()}`;
     (window as any)[cb] = () => resolve();
     const s = document.createElement("script");

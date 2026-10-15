@@ -18,6 +18,8 @@ const { values: args } = parseArgs({
     limit: { type: "string" },
     fps: { type: "string" },
     parallel: { type: "string" },
+    diagnose: { type: "boolean", default: false }, // worker ortam tanısı (WebGL, adım süreleri, ekran görüntüsü)
+    "gl-mode": { type: "string" }, // egl | vulkan | swiftshader
   },
 });
 if (!args.parcel) throw new Error("--parcel assets/parcels/<dosya>.geojson gerekli");
@@ -33,6 +35,8 @@ const job = await client.run({
   ...(args.limit ? { limit_frames: Number(args.limit) } : {}),
   ...(args.fps ? { fps: Number(args.fps) } : {}),
   ...(args.parallel ? { parallel: Number(args.parallel) } : {}),
+  ...(args.diagnose ? { diagnose: true } : {}),
+  ...(args["gl-mode"] ? { gl_mode: args["gl-mode"] } : {}),
 });
 console.log(`Gönderildi: ${job.id}`);
 
@@ -49,6 +53,15 @@ for (;;) {
   if (s.status !== lastStatus) {
     console.log(`${((Date.now() - t0) / 1000).toFixed(0)} sn: ${s.status}`);
     lastStatus = s.status;
+  }
+  if (s.status === "COMPLETED" && args.diagnose) {
+    const out = { ...(s.output as Record<string, any>) };
+    if (out.screenshot_base64) {
+      await writeFile(join(outDir, "runpod-diag.jpg"), Buffer.from(out.screenshot_base64, "base64"));
+      out.screenshot_base64 = `→ ${join(outDir, "runpod-diag.jpg")}`;
+    }
+    console.log(JSON.stringify(out, null, 2));
+    break;
   }
   if (s.status === "COMPLETED") {
     const out = s.output as Record<string, any>;
