@@ -51,6 +51,11 @@ const BUILDINGS: Record<string, { edit: string; label: string }> = {
     label: "Villa Projesi",
     edit: `a luxury modern two-storey villa with a flat roof, large glass windows, a swimming pool and a landscaped garden`,
   },
+  // Büyük arsalar (ör. 5.000 m² üzeri zeytinlik/tarla) için tek villa yerine site
+  villa_sitesi: {
+    label: "Villa Sitesi Projesi",
+    edit: `a luxury gated community of modern two-storey villas with flat roofs, private swimming pools, landscaped gardens, olive trees and internal roads`,
+  },
   ticari: {
     label: `${floors} Katlı Ticari Proje`,
     edit: `a modern ${floors}-storey commercial office building with a glass curtain wall facade, ground floor shops and a parking area`,
