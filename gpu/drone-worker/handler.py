@@ -63,6 +63,22 @@ def publish(path: str, key: str, content_type: str, inline_ok: bool = True) -> d
         return {"base64": base64.b64encode(f.read()).decode()}
 
 
+def inline_preview(video: str) -> str:
+    """R2 yokken tam video yanıta sığmaz: 720p, ~15 MB'a sığan bit hızıyla önizleme kopyası."""
+    if S3 is not None or os.path.getsize(video) / 1024**2 <= MAX_INLINE_MB:
+        return video
+    dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", video],
+                               capture_output=True, text=True, check=True).stdout.strip())
+    kbps = int(15 * 8 * 1024 / max(dur, 1))
+    out = video.rsplit(".", 1)[0] + "-720p.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", video, "-vf", "scale=720:-2", "-c:v", "libx264", "-preset", "medium",
+                    "-b:v", f"{kbps}k", "-maxrate", f"{kbps}k", "-bufsize", f"{kbps * 2}k", "-pix_fmt", "yuv420p",
+                    "-movflags", "+faststart", out], check=True)
+    print(f"[drone-worker] R2 yok: {os.path.getsize(video) / 1024**2:.0f} MB video yerine 720p önizleme "
+          f"({os.path.getsize(out) / 1024**2:.1f} MB) döndürülüyor", flush=True)
+    return out
+
+
 def to_jpeg(png_path: str) -> str:
     """Anahtar kareler PNG (~3 MB); yanıt için yüksek kaliteli JPEG yeterli."""
     jpg = png_path.rsplit(".", 1)[0] + ".jpg"
@@ -194,7 +210,7 @@ def handler(job):
 
     prefix = inp.get("output_prefix", f"drone/{job['id']}")
     out = {
-        "video": publish(result["video"], f"{prefix}/drone.mp4", "video/mp4"),
+        "video": publish(inline_preview(result["video"]), f"{prefix}/drone.mp4", "video/mp4"),
         "renderer": result["renderer"],
         "frames": result["frames"],
         "timeouts": result["timeouts"],
