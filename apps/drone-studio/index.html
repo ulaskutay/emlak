@@ -5,29 +5,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Drone Stüdyo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800;900&display=swap" rel="stylesheet" />
     <style>
       html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: Inter, system-ui, sans-serif; }
-      /* Kayıt 1080x1920 viewport'ta yapılır; tarayıcı önizlemesinde de aynı oranda ortalanır. */
-      #stage { position: relative; width: 1080px; height: 1920px; transform-origin: top left; }
+      /* Kayıt 1080x1920 viewport'ta yapılır; tarayıcı önizlemesinde de aynı oranda ölçeklenir. */
+      #stage { position: relative; width: 1080px; height: 1920px; transform-origin: top left; overflow: hidden; }
       #map { position: absolute; inset: 0; }
       gmp-map-3d { width: 100%; height: 100%; }
-      #overlay { position: absolute; left: 0; right: 0; top: 150px; text-align: center; pointer-events: none;
-                 opacity: 0; transform: translateY(24px); transition: none; }
-      #overlay .area { display: inline-block; font-size: 120px; font-weight: 900; color: #fff; letter-spacing: -2px;
-                       padding: 18px 48px; border-radius: 28px; background: rgba(0, 0, 0, 0.42);
-                       border: 4px solid #00e5ff; box-shadow: 0 0 40px rgba(0, 229, 255, 0.55); }
-      #overlay .sub { margin-top: 26px; font-size: 52px; font-weight: 800; color: #00e5ff;
-                      text-shadow: 0 3px 14px rgba(0, 0, 0, 0.85); }
-      #attribution { position: absolute; right: 24px; bottom: 18px; font-size: 22px; color: rgba(255,255,255,0.85);
-                     text-shadow: 0 1px 4px #000; }
+      /* Üst/alt kenarda yazıların okunması için hafif karartma */
+      #vignette { position: absolute; inset: 0; pointer-events: none;
+                  background: linear-gradient(to bottom, rgba(0,0,0,.45) 0%, rgba(0,0,0,0) 22%, rgba(0,0,0,0) 62%, rgba(0,0,0,.55) 100%); }
+
+      .anim { opacity: 0; will-change: opacity, transform; }
+      #title { position: absolute; left: 0; right: 0; top: 130px; text-align: center; pointer-events: none; }
+      #title .area { display: inline-block; font-size: 132px; font-weight: 900; color: #fff; letter-spacing: -3px;
+                     padding: 14px 52px; border-radius: 30px; background: rgba(0, 0, 0, 0.38);
+                     border: 5px solid #00e5ff; box-shadow: 0 0 46px rgba(0, 229, 255, 0.6), inset 0 0 22px rgba(0,229,255,.25); }
+      #title .sub { margin-top: 24px; font-size: 50px; font-weight: 800; color: #00e5ff; text-shadow: 0 3px 14px rgba(0,0,0,.9); }
+      #location { position: absolute; left: 60px; right: 60px; top: 470px; text-align: center; font-size: 42px; font-weight: 700;
+                  line-height: 1.25; color: #fff; text-shadow: 0 3px 14px rgba(0,0,0,.95); pointer-events: none; }
+      #location .mevkii { display: block; margin-top: 6px; font-size: 34px; font-weight: 600; color: rgba(255,255,255,.85); }
+
+      #pois { position: absolute; left: 48px; bottom: 210px; display: flex; flex-direction: column; gap: 22px; pointer-events: none; }
+      .pill { display: flex; align-items: center; gap: 18px; padding: 16px 30px 16px 20px; border-radius: 22px;
+              background: rgba(10, 14, 20, 0.72); border-left: 8px solid #ffc83d; box-shadow: 0 8px 30px rgba(0,0,0,.45); }
+      .pill .emoji { font-size: 50px; line-height: 1; }
+      .pill .txt { display: flex; flex-direction: column; }
+      .pill .main { font-size: 44px; font-weight: 800; color: #fff; }
+      .pill .main b { color: #ffc83d; }
+      .pill .name { font-size: 28px; font-weight: 600; color: rgba(255,255,255,.72); max-width: 640px;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+      #attribution { position: absolute; right: 24px; bottom: 18px; font-size: 22px; color: rgba(255,255,255,0.85); text-shadow: 0 1px 4px #000; }
       #status { position: absolute; right: 16px; top: 16px; font: 20px monospace; color: #0f0; background: #000a; padding: 6px 10px; }
     </style>
   </head>
   <body>
     <div id="stage">
       <div id="map"></div>
-      <div id="overlay"><div class="area"></div><div class="sub"></div></div>
+      <div id="vignette"></div>
+      <div id="title" class="anim"><div class="area"></div><div class="sub"></div></div>
+      <div id="location" class="anim"></div>
+      <div id="pois"></div>
       <!-- Google 3D harita görüntüleri atıf zorunlu; logo harita bileşeninin kendisinde de görünür. -->
       <div id="attribution">Görüntüler © Google</div>
       <div id="status">yükleniyor…</div>

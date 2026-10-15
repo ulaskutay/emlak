@@ -1,6 +1,7 @@
-import { readFile } from "node:fs/promises";
-import { resolve, relative } from "node:path";
-import { analyzeParcel, parseKml } from "@arsa/geo";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { basename, extname, join, resolve, relative } from "node:path";
+import { analyzeParcel, findNearbyPois, officialAreaM2, parseParcelFile, reverseGeocode, type Address, type Poi } from "@arsa/geo";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 
 const ROOT = resolve(import.meta.dirname, "../..");
@@ -32,7 +33,34 @@ async function groundElevation(lat: number, lng: number, key: string): Promise<{
   return null;
 }
 
-/** GET /api/parcel?file=<assets/parcels altındaki .kml> → parsel geometrisi + rakım */
+/**
+ * Yavaş dış sorgular (rakım, adres, çevre) parsel klasöründe context.json olarak önbelleğe alınır;
+ * kayıt sırasında tekrar sorgulanmaz. Yenilemek için dosyayı silin.
+ */
+async function parcelContext(
+  file: string,
+  centroid: { lat: number; lng: number },
+  key: string,
+  district?: string,
+): Promise<{ elevation: number | null; elevationSource: string | null; address: Address; pois: Poi[] }> {
+  const dir = join(PARCELS_DIR, basename(file, extname(file)));
+  const cache = join(dir, "context.json");
+  if (existsSync(cache)) return JSON.parse(await readFile(cache, "utf8"));
+  const [elev, address, pois] = await Promise.all([
+    groundElevation(centroid.lat, centroid.lng, key),
+    reverseGeocode(centroid).catch(() => ({})),
+    findNearbyPois(centroid, { district }).catch((e) => (console.warn(`[pois] ${e}`), [] as Poi[])),
+  ]);
+  const ctx = { elevation: elev?.meters ?? null, elevationSource: elev?.source ?? null, address, pois };
+  // Çevre sorgusu geçici olarak başarısız olduysa önbelleğe alma; bir sonraki çalıştırmada tekrar dene.
+  if (pois.length) {
+    await mkdir(dir, { recursive: true });
+    await writeFile(cache, JSON.stringify(ctx, null, 2));
+  }
+  return ctx;
+}
+
+/** GET /api/parcel?file=<assets/parcels altındaki .kml / .geojson / .json> → geometri, alan, rakım, adres, çevre */
 function parcelApi(key: string): Plugin {
   return {
     name: "parcel-api",
@@ -41,22 +69,25 @@ function parcelApi(key: string): Plugin {
         try {
           const file = new URL(req.url ?? "", "http://x").searchParams.get("file") ?? "";
           const path = resolve(ROOT, file);
-          if (!path.startsWith(PARCELS_DIR + "/") || !path.endsWith(".kml")) {
+          if (!path.startsWith(PARCELS_DIR + "/") || !/\.(kml|geojson|json)$/i.test(path)) {
             res.statusCode = 400;
-            return res.end(JSON.stringify({ error: "file assets/parcels altında bir .kml olmalı" }));
+            return res.end(JSON.stringify({ error: "file assets/parcels altında .kml veya .geojson olmalı" }));
           }
-          const kml = parseKml(await readFile(path, "utf8"));
-          const geo = analyzeParcel(kml.ring);
-          const elev = await groundElevation(geo.centroid.lat, geo.centroid.lng, key);
+          const parsed = parseParcelFile(await readFile(path, "utf8"));
+          const geo = analyzeParcel(parsed.ring);
+          const ctx = await parcelContext(file, geo.centroid, key, parsed.properties.Ilce);
+          // TKGM'nin resmî alanı varsa o (koordinatlar yuvarlatılmış olduğu için hesaplanan yaklaşık).
+          const official = officialAreaM2(parsed.properties);
           res.setHeader("Content-Type", "application/json");
           res.end(
             JSON.stringify({
               file: relative(ROOT, path),
-              name: kml.name,
-              properties: kml.properties,
+              name: parsed.name,
+              properties: parsed.properties,
               ...geo,
-              elevation: elev?.meters ?? null,
-              elevationSource: elev?.source ?? null,
+              areaM2: official ?? geo.areaM2,
+              areaComputedM2: geo.areaM2,
+              ...ctx,
             }),
           );
         } catch (e) {
