@@ -33,7 +33,18 @@ import runpod
 import torch
 from PIL import Image
 
-MODEL_FAMILY = os.environ.get("MODEL_FAMILY", "hunyuan15")
+def _infer_family() -> str:
+    """MODEL_FAMILY verilmemişse RunPod'un önbellekli model için koyduğu MODEL_NAME'den çıkar."""
+    if os.environ.get("MODEL_FAMILY"):
+        return os.environ["MODEL_FAMILY"]
+    name = os.environ.get("MODEL_NAME", "").lower()
+    for needle, family in (("wan2.2", "wan22"), ("qwen-image-edit", "qwen_edit"), ("ltx-2", "ltx2"), ("hunyuanvideo-1.5", "hunyuan15")):
+        if needle in name:
+            return family
+    return "hunyuan15"
+
+
+MODEL_FAMILY = _infer_family()
 DEFAULT_MODELS = {
     "hunyuan15": "hunyuanvideo-community/HunyuanVideo-1.5-Diffusers-480p_i2v_step_distilled",
     "ltx2": "Lightricks/LTX-2.5-Diffusers",
@@ -44,7 +55,8 @@ DEFAULT_MODELS = {
 }
 # Bu aileler video değil görsel üretir; handler PNG döndürür.
 IMAGE_FAMILIES = {"qwen_edit"}
-MODEL_ID = os.environ.get("MODEL_ID", DEFAULT_MODELS[MODEL_FAMILY])
+# Öncelik: MODEL_ID > RunPod'un önbellekli model adı (MODEL_NAME) > aile varsayılanı.
+MODEL_ID = os.environ.get("MODEL_ID") or os.environ.get("MODEL_NAME") or DEFAULT_MODELS[MODEL_FAMILY]
 RUNPOD_HF_CACHE = os.environ.get("RUNPOD_HF_CACHE", "/runpod-volume/huggingface-cache/hub")
 # Önbellekte yoksa HF'den indirmeye izin ver (yalnızca geliştirme için; üretimde 0 olmalı).
 ALLOW_DOWNLOAD = os.environ.get("ALLOW_DOWNLOAD", "0") == "1"
