@@ -10,7 +10,7 @@
 import { spawn } from "node:child_process";
 import { mkdir, readdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { chromium, type Page } from "playwright-core";
+import { chromium, type Browser, type Page } from "playwright-core";
 import { createServer } from "vite";
 import type { ParcelInfo } from "../src/main.js";
 import { buildTimeline } from "./timeline.js";
@@ -27,6 +27,8 @@ export interface RenderOptions {
   /** GPU'suz ortam: yazılımsal WebGL (SwiftShader). glMode verilirse o kullanılır. */
   cpu?: boolean;
   glMode?: GlMode;
+  /** Her paralel sayfa ayrı tarayıcıda (ayrı GPU süreci). Varsayılan: Linux + GPU'da açık. */
+  isolate?: boolean;
   port?: number;
   crf?: number;
   headless?: boolean;
@@ -129,25 +131,27 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
   log(`vite hazır: ${url}`);
   const glMode = o.glMode ?? (o.cpu ? "swiftshader" : await pickGlMode(log));
   log(`WebGL arka ucu: ${glMode}`);
-  const browser = await withTimeout(
-    chromium.launch({
-      channel: "chrome",
-      headless: o.headless ?? true,
-      args: chromeArgs(glMode),
-    }),
-    60000,
-    "Chrome açılışı",
-  );
-  log(`chrome açıldı (${browser.version()})`);
-
-  try {
-    // Tek bağlam: sayfalar HTTP önbelleğini (harita karoları) paylaşır.
+  // Linux GPU'da (Vulkan) her sayfa kendi Chrome'unda: tek GPU sürecini paylaşan 8 sayfada ekran görüntüsü
+  // takılıyordu. Mac'te tek tarayıcı/bağlam: sayfalar HTTP önbelleğini (harita karoları) paylaşır.
+  const isolate = o.isolate ?? (process.platform === "linux" && glMode !== "swiftshader");
+  const launch = () =>
+    withTimeout(chromium.launch({ channel: "chrome", headless: o.headless ?? true, args: chromeArgs(glMode) }), 60000, "Chrome açılışı");
+  const browsers: Browser[] = [];
+  const newContext = async () => {
+    const browser = await launch();
+    browsers.push(browser);
     const context = await browser.newContext({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
     await context.addInitScript(() => ((window as any).__RECORDER__ = true));
+    return context;
+  };
+  const shared = await newContext();
+  log(`chrome açıldı (${browsers[0]!.version()})${isolate ? " · her sayfa ayrı tarayıcıda" : ""}`);
+
+  try {
     let pageNo = 0;
     const openPage = async () => {
       const n = ++pageNo;
-      const page = await context.newPage();
+      const page = await (isolate && n > 1 ? await newContext() : shared).newPage();
       page.on("console", (m) => m.type() === "error" && !m.text().includes("404") && log(`[sayfa ${n}] ${m.text()}`));
       page.on("pageerror", (e) => log(`[sayfa ${n}] hata: ${e.message}`));
       const ts = Date.now();
@@ -190,9 +194,15 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
         const b = Math.min(last, a + chunk);
         for (let i = a; i < b; i++) {
           const tf = Date.now();
+          const path = join(framesDir, `${String(i - first).padStart(5, "0")}.jpg`);
           const ok = await page.evaluate((s) => (window as any).studio.render(s, 15000), stateAt(i));
           if (!ok) timeouts++;
-          await page.screenshot({ path: join(framesDir, `${String(i - first).padStart(5, "0")}.jpg`), type: "jpeg", quality: 95 });
+          // Ekran görüntüsü takılırsa kareyi yeniden çizip bir kez daha dene.
+          await page.screenshot({ path, type: "jpeg", quality: 95, timeout: 15000 }).catch(async (e) => {
+            log(`[sayfa ${k + 1}] kare ${i} ekran görüntüsü tekrar: ${String(e).split("\n")[0]}`);
+            await page.evaluate((s) => (window as any).studio.render(s, 15000), stateAt(i));
+            await page.screenshot({ path, type: "jpeg", quality: 95, timeout: 30000 });
+          });
           frameTimes.push(Date.now() - tf);
           if (++done % fps === 0) log(`  ${done}/${count} kare (${((Date.now() - tr) / 1000).toFixed(0)} sn)`);
         }
@@ -244,7 +254,7 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
   } finally {
     // Kapanış takılırsa (Chrome bazen sayfaları bırakmıyor) iş sonsuza dek beklemesin.
     const tc = Date.now();
-    await withTimeout(browser.close(), 15000, "Chrome kapanışı").catch((e) => log(`uyarı: ${e.message}`));
+    await withTimeout(Promise.all(browsers.map((b) => b.close())), 15000, "Chrome kapanışı").catch((e) => log(`uyarı: ${e.message}`));
     await withTimeout(server.close(), 5000, "Vite kapanışı").catch((e) => log(`uyarı: ${e.message}`));
     log(`kapatıldı (${((Date.now() - tc) / 1000).toFixed(1)} sn)`);
   }
