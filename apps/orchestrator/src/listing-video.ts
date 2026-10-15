@@ -10,7 +10,7 @@
  */
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs, promisify } from "node:util";
 import { MODEL_PROFILES, RunpodClient, RunpodVideoProvider, type ModelProfile } from "@arsa/providers";
@@ -35,6 +35,8 @@ const ListingStoryboard = z.object({
         photo: z.string(),
         camera: CameraMove,
         setting: z.enum(["exterior", "interior"]).default("exterior"),
+        /** Kırpım odağı (0 = sol, 1 = sağ). Dikey formatta yatay fotoğraftan bu noktaya göre kesilir. */
+        focusX: z.number().min(0).max(1).default(0.5),
         prompt: z.string(),
         title: z.string().optional(),
         subtitle: z.string().optional(),
@@ -78,7 +80,7 @@ async function generateClip(scene: ListingStoryboard["scenes"][number], index: n
     console.log(`[${scene.id}] mevcut klip kullanılıyor`);
     return out;
   }
-  const photo = await readFile(resolve(sbDir, scene.photo));
+  const photo = await cropToFormat(resolve(sbDir, scene.photo), scene.focusX);
   const aiScene: AiScene = {
     id: scene.id,
     type: "ai_photo_motion",
@@ -108,6 +110,23 @@ async function generateClip(scene: ListingStoryboard["scenes"][number], index: n
       throw new Error(`[${scene.id}] ${s.status}: ${s.error ?? s.output?.error ?? ""}`);
     }
   }
+}
+
+/** Fotoğrafı hedef en-boy oranına focusX'e göre kırpar (worker'ın merkezden kırpması devre dışı kalır). */
+async function cropToFormat(photoPath: string, focusX: number): Promise<Buffer> {
+  const { width: W, height: H } = FORMAT_SPECS[sb.format];
+  const out = join(clipsDir, `.crop-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`);
+  const ratio = `${W}/${H}`;
+  await run("ffmpeg", [
+    "-v", "error", "-y", "-i", photoPath,
+    "-vf",
+    `crop='if(gt(iw/ih,${ratio}),ih*${ratio},iw)':'if(gt(iw/ih,${ratio}),ih,iw/(${ratio}))':` +
+      `'(iw-ow)*${focusX}':'(ih-oh)/2'`,
+    "-q:v", "2", out,
+  ]);
+  const buf = await readFile(out);
+  await rm(out, { force: true });
+  return buf;
 }
 
 /** ffmpeg drawtext için kaçış: ' : \ % karakterleri. */
