@@ -86,12 +86,16 @@ def handler(job):
         cmd += ["--limit", str(inp["limit_frames"])]
 
     t0 = time.time()
-    proc = subprocess.run(cmd, cwd=APP_DIR, capture_output=True, text=True, timeout=1500)
-    # Render günlüğü RunPod loglarında görünsün
-    print(proc.stderr[-6000:], flush=True)
-    if proc.returncode != 0:
-        raise RuntimeError(f"render başarısız ({proc.returncode}): {proc.stderr[-1500:]}")
-    result = json.loads(proc.stdout.strip().splitlines()[-1])
+    # Render ilerlemesi (stderr) satır satır RunPod loglarına akar; sonuç JSON'u stdout'un son satırında.
+    proc = subprocess.Popen(cmd, cwd=APP_DIR, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+    tail: list[str] = []
+    for line in proc.stderr:
+        print(line.rstrip(), flush=True)
+        tail = (tail + [line])[-40:]
+    stdout = proc.stdout.read()
+    if proc.wait(timeout=1500) != 0:
+        raise RuntimeError(f"render başarısız ({proc.returncode}): {''.join(tail)[-1500:]}")
+    result = json.loads(stdout.strip().splitlines()[-1])
 
     prefix = inp.get("output_prefix", f"drone/{job['id']}")
     out = {
