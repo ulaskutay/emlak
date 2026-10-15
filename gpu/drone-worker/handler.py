@@ -128,6 +128,27 @@ def run_streaming(cmd: list[str], env: dict, timeout: int, job=None) -> str:
     return lines[-1]
 
 
+def gpu_env() -> dict:
+    """Chrome'un GPU'yu görebilmesi için gereken sürücü kütüphaneleri ve tanım dosyaları konteynerde var mı?"""
+    import glob
+
+    def sh(cmd):
+        try:
+            return subprocess.run(cmd, capture_output=True, text=True, timeout=20).stdout.strip()[-1500:]
+        except Exception as e:
+            return f"HATA: {e}"
+
+    libs = sorted({os.path.basename(p) for d in ("/usr/lib/x86_64-linux-gnu", "/usr/lib64", "/usr/lib")
+                   for p in glob.glob(f"{d}/lib*nvidia*.so*")})
+    return {
+        "nvidia_smi": sh(["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"]),
+        "nvidia_libs": [l for l in libs if any(k in l for k in ("EGL", "GLX", "glcore", "vulkan", "glvkspirv"))],
+        "vulkan_icds": glob.glob("/usr/share/vulkan/icd.d/*") + glob.glob("/etc/vulkan/icd.d/*"),
+        "egl_vendors": glob.glob("/usr/share/glvnd/egl_vendor.d/*"),
+        "vulkaninfo": sh(["vulkaninfo", "--summary"]),
+    }
+
+
 def handler(job):
     inp = job["input"]
     if inp.get("warmup"):
@@ -157,6 +178,7 @@ def handler(job):
         if shot and os.path.exists(shot):
             with open(shot, "rb") as f:
                 report["screenshot_base64"] = base64.b64encode(f.read()).decode()
+        report["gpu_env"] = gpu_env()
         report["cpu_count_host"] = os.cpu_count()
         report["cpu_container"] = container_cpus()
         return report

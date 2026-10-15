@@ -51,20 +51,43 @@ const APP = resolve(import.meta.dirname, "..");
 
 export type GlMode = "auto" | "vulkan" | "egl" | "swiftshader";
 
-/** Chrome WebGL arka ucu. auto: macOS'ta Metal, Linux'ta (RunPod) GL_MODE ortam değişkeni veya EGL. */
+/** Chrome WebGL arka ucu. auto: macOS'ta Metal; Linux'ta GL_MODE ya da swiftshader (seçimi pickGlMode yapar). */
 export function chromeArgs(mode: GlMode): string[] {
   const common = ["--no-sandbox", "--disable-dev-shm-usage"];
-  if (mode === "auto") mode = process.platform === "linux" ? ((process.env.GL_MODE as GlMode) ?? "egl") : "auto";
+  if (mode === "auto" && process.platform === "linux") mode = (process.env.GL_MODE as GlMode) ?? "swiftshader";
   switch (mode) {
     case "swiftshader":
       return [...common, "--disable-gpu", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"];
     case "vulkan":
-      return [...common, "--ignore-gpu-blocklist", "--use-angle=vulkan", "--enable-features=Vulkan", "--disable-vulkan-surface"];
+      return [...common, "--ignore-gpu-blocklist", "--use-angle=vulkan", "--enable-features=Vulkan,VulkanFromANGLE,DefaultANGLEVulkan", "--disable-vulkan-surface", "--enable-gpu"];
     case "egl":
-      return [...common, "--ignore-gpu-blocklist", "--use-gl=angle", "--use-angle=gl-egl"];
+      return [...common, "--ignore-gpu-blocklist", "--use-gl=angle", "--use-angle=gl-egl", "--enable-gpu"];
     default:
       return ["--ignore-gpu-blocklist", "--enable-gpu-rasterization"];
   }
+}
+
+/**
+ * Linux'ta (RunPod) gerçek GPU'lu WebGL arka ucunu bulur: vulkan → egl, çizici SwiftShader değilse onu seçer.
+ * Bulamazsa swiftshader: GPU'suz egl/vulkan yarım bir yazılım moduna düşüyor ve Google 3D harita
+ * orada "Attempted to load a 3D Map, but failed" ile açılmıyor.
+ */
+export async function pickGlMode(log: (m: string) => void = () => {}): Promise<GlMode> {
+  if (process.platform !== "linux") return "auto";
+  if (process.env.GL_MODE) return process.env.GL_MODE as GlMode;
+  for (const mode of ["vulkan", "egl"] as GlMode[]) {
+    const b = await withTimeout(chromium.launch({ channel: "chrome", headless: true, args: chromeArgs(mode) }), 20000, "launch").catch(() => null);
+    if (!b) continue;
+    try {
+      const page = await b.newPage();
+      const r = await withTimeout(webglRenderer(page), 10000, "webgl").catch(() => "yok");
+      log(`GL denemesi ${mode}: ${r}`);
+      if (!/swiftshader|llvmpipe|bilinmiyor|yok/i.test(r)) return mode;
+    } finally {
+      withTimeout(b.close(), 5000, "kapanış").catch(() => {});
+    }
+  }
+  return "swiftshader";
 }
 
 /** Takılan adımlar sonsuza dek beklemesin. */
@@ -104,11 +127,13 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
   await server.listen();
   const url = server.resolvedUrls?.local[0] ?? `http://localhost:${o.port ?? 5178}/`;
   log(`vite hazır: ${url}`);
+  const glMode = o.glMode ?? (o.cpu ? "swiftshader" : await pickGlMode(log));
+  log(`WebGL arka ucu: ${glMode}`);
   const browser = await withTimeout(
     chromium.launch({
       channel: "chrome",
       headless: o.headless ?? true,
-      args: chromeArgs(o.glMode ?? (o.cpu ? "swiftshader" : "auto")),
+      args: chromeArgs(glMode),
     }),
     60000,
     "Chrome açılışı",

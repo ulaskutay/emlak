@@ -16,10 +16,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
        > /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update && apt-get install -y --no-install-recommends \
-       google-chrome-stable ffmpeg libvulkan1 mesa-vulkan-drivers \
+       google-chrome-stable ffmpeg libvulkan1 libegl1 libgl1 libglvnd0 vulkan-tools \
        fonts-noto-color-emoji fonts-noto-core fonts-dejavu-core \
        python3 python3-pip \
     && rm -rf /var/lib/apt/lists/*
+
+# NVIDIA sürücü kütüphanelerini (libEGL_nvidia, libGLX_nvidia) konteyner araç seti bağlar, ama yükleyicilerin
+# onları bulması için tanım dosyaları gerekir; yoksa Chrome sessizce SwiftShader'a (işlemci) düşer.
+RUN mkdir -p /usr/share/vulkan/icd.d /usr/share/glvnd/egl_vendor.d \
+    && echo '{"file_format_version":"1.0.0","ICD":{"library_path":"libGLX_nvidia.so.0","api_version":"1.3"}}' \
+       > /usr/share/vulkan/icd.d/nvidia_icd.json \
+    && echo '{"file_format_version":"1.0.0","ICD":{"library_path":"libEGL_nvidia.so.0"}}' \
+       > /usr/share/glvnd/egl_vendor.d/10_nvidia.json
 
 RUN pip3 install --no-cache-dir runpod==1.7.13 boto3 && corepack enable
 
