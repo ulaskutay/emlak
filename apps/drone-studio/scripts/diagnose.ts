@@ -58,7 +58,7 @@ const best = (["egl", "vulkan"] as GlMode[]).find((m) => {
 report.chosen = best;
 const steps: Record<string, number | string> = {};
 const consoleLines: string[] = [];
-const server = await createServer({ root: join(import.meta.dirname, ".."), configFile: join(import.meta.dirname, "../vite.config.ts"), logLevel: "warn", server: { port: Number(args.port), strictPort: true } });
+const server = await createServer({ root: join(import.meta.dirname, ".."), configFile: join(import.meta.dirname, "../vite.config.ts"), logLevel: "warn", server: { port: Number(args.port), strictPort: true, watch: null } });
 await server.listen();
 const browser = await chromium.launch({ channel: "chrome", headless: true, args: chromeArgs(best) });
 try {

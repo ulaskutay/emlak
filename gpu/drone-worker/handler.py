@@ -19,12 +19,15 @@ import json
 import os
 import subprocess
 import tempfile
+import threading
 import time
 
 import boto3
 import runpod
 
 APP_DIR = "/app/apps/drone-studio"
+# pnpm/corepack katmanı olmadan doğrudan tsx (istem/indirme riski yok)
+TSX = [os.path.join(APP_DIR, "node_modules/.bin/tsx")]
 R2_BUCKET = os.environ.get("R2_BUCKET", "")
 R2_PUBLIC_BASE_URL = os.environ.get("R2_PUBLIC_BASE_URL", "").rstrip("/")
 # RunPod yanıt gövdesi büyük videoları taşıyamaz; R2 yoksa bu boyutun üstü hata.
@@ -81,16 +84,37 @@ def container_cpus() -> int:
 
 
 def run_streaming(cmd: list[str], env: dict, timeout: int) -> str:
-    """Komutu çalıştırır; stderr satır satır RunPod loglarına akar, stdout'un son satırını döndürür."""
-    proc = subprocess.Popen(cmd, cwd=APP_DIR, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+    """Komutu çalıştırır; stderr satır satır RunPod loglarına akar, stdout'un son satırını döndürür.
+
+    stdout bir dosyaya yazılır: Linux'ta Node'un pipe'a yazımı eşzamanlıdır, okunmayan bir stdout
+    pipe'ı dolunca tüm olay döngüsü (zaman aşımları dahil) donar. stdin kapalı: hiçbir istem beklemesin.
+    """
+    out_path = tempfile.mktemp(suffix=".stdout")
     tail: list[str] = []
-    for line in proc.stderr:
-        print(line.rstrip(), flush=True)
-        tail = (tail + [line])[-40:]
-    stdout = proc.stdout.read()
-    if proc.wait(timeout=timeout) != 0:
-        raise RuntimeError(f"komut başarısız ({proc.returncode}): {''.join(tail)[-1500:]}")
-    return stdout.strip().splitlines()[-1]
+
+    def pump(stream):
+        for line in stream:
+            print(line.rstrip(), flush=True)
+            tail.append(line)
+            del tail[:-40]
+
+    with open(out_path, "w") as out:
+        proc = subprocess.Popen(cmd, cwd=APP_DIR, env=env, stdin=subprocess.DEVNULL, stdout=out,
+                                stderr=subprocess.PIPE, text=True, bufsize=1)
+        reader = threading.Thread(target=pump, args=(proc.stderr,), daemon=True)
+        reader.start()
+        try:
+            code = proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            raise RuntimeError(f"komut {timeout} sn içinde bitmedi: {''.join(tail)[-1500:]}")
+        reader.join(timeout=5)
+    if code != 0:
+        raise RuntimeError(f"komut başarısız ({code}): {''.join(tail)[-1500:]}")
+    lines = open(out_path).read().strip().splitlines()
+    if not lines:
+        raise RuntimeError(f"komut çıktı vermedi: {''.join(tail)[-1500:]}")
+    return lines[-1]
 
 
 def handler(job):
@@ -105,12 +129,12 @@ def handler(job):
     src = os.path.join(work, "parcel.kml" if parcel.lstrip().startswith("<") else "parcel.geojson")
     with open(src, "w", encoding="utf-8") as f:
         f.write(parcel)
-    env = {**os.environ}
+    env = {**os.environ, "CI": "1", "COREPACK_ENABLE_DOWNLOAD_PROMPT": "0"}
     if inp.get("gl_mode"):
         env["GL_MODE"] = inp["gl_mode"]  # egl | vulkan | swiftshader
 
     if inp.get("diagnose"):
-        report = json.loads(run_streaming(["pnpm", "exec", "tsx", "scripts/diagnose.ts", "--in", src, "--out", work], env, 600))
+        report = json.loads(run_streaming([*TSX, "scripts/diagnose.ts", "--in", src, "--out", work], env, 600))
         shot = report.pop("screenshot", None)
         if shot and os.path.exists(shot):
             with open(shot, "rb") as f:
@@ -120,7 +144,7 @@ def handler(job):
         return report
 
     parallel = int(inp.get("parallel") or max(2, min(8, container_cpus() // 2)))
-    cmd = ["pnpm", "exec", "tsx", "scripts/worker-render.ts", "--in", src, "--out", work,
+    cmd = [*TSX, "scripts/worker-render.ts", "--in", src, "--out", work,
            "--fps", str(inp.get("fps", 30)), "--parallel", str(parallel), "--crf", str(inp.get("crf", 22))]
     if inp.get("limit_frames"):
         cmd += ["--limit", str(inp["limit_frames"])]

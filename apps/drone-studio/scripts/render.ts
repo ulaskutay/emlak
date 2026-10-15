@@ -99,7 +99,7 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
     root: APP,
     configFile: join(APP, "vite.config.ts"),
     logLevel: "warn",
-    server: { port: o.port ?? 5178, strictPort: true },
+    server: { port: o.port ?? 5178, strictPort: true, watch: null }, // dosya izleme gereksiz (konteynerde takılabilir)
   });
   await server.listen();
   const url = server.resolvedUrls?.local[0] ?? `http://localhost:${o.port ?? 5178}/`;
