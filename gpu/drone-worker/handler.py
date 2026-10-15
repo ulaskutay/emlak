@@ -12,6 +12,7 @@ Girdi:
   limit_frames  test için yalnızca ilk N kare
   output_prefix R2 anahtar öneki, ör. "projects/123/drone"
   context       önceden hesaplanmış çevre bilgisi (context.json); verilmezse worker sorgular (~80 sn)
+  story         seslendirmeli senaryo (apps/drone-studio/scripts/story.ts): kurgu anlatıma göre, altyazılı
 Ortam: GOOGLE_MAPS_API_KEY (zorunlu), R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET
 (opsiyonel; R2_PUBLIC_BASE_URL yoksa 7 günlük imzalı link döner)
 """
@@ -190,6 +191,12 @@ def handler(job):
         with open(ctx, "w", encoding="utf-8") as f:
             json.dump(inp["context"], f)
         ctx_args = ["--context", ctx]
+    # Seslendirmeli senaryo (sahne metinleri, süreler, kelime zamanları): kurgu ve altyazı buna göre.
+    if inp.get("story"):
+        story = os.path.join(work, "story.json")
+        with open(story, "w", encoding="utf-8") as f:
+            json.dump(inp["story"], f, ensure_ascii=False)
+        ctx_args += ["--story", story]
     if inp.get("gl_mode"):
         env["GL_MODE"] = inp["gl_mode"]  # egl | vulkan | swiftshader
 

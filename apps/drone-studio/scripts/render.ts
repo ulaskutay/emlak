@@ -13,10 +13,13 @@ import { join, resolve } from "node:path";
 import { chromium, type Browser, type Page } from "playwright-core";
 import { createServer } from "vite";
 import type { ParcelInfo } from "../src/main.js";
+import type { Story } from "./story.js";
 import { buildTimeline } from "./timeline.js";
 
 export interface RenderOptions {
   parcel: ParcelInfo;
+  /** Seslendirmeli senaryo: kurgu anlatıma göre uzar, altyazı çizilir. */
+  story?: Story;
   googleKey: string;
   outDir: string;
   fps?: number;
@@ -110,7 +113,7 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
   const fps = o.fps ?? 30;
   const parallel = Math.max(1, o.parallel ?? 6);
   const t0 = Date.now();
-  const timeline = buildTimeline(o.parcel);
+  const timeline = buildTimeline(o.parcel, o.story);
   const total = Math.round(timeline.duration * fps);
   const first = Math.round((o.fromSec ?? 0) * fps);
   const last = o.limitFrames ? Math.min(total, first + o.limitFrames) : total;

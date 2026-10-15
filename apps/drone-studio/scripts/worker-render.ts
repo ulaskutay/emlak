@@ -23,6 +23,7 @@ const { values: args } = parseArgs({
     crf: { type: "string", default: "22" },
     cpu: { type: "boolean", default: false },
     limit: { type: "string" },
+    story: { type: "string" }, // seslendirmeli senaryo (story.json)
     context: { type: "string" }, // önceden hesaplanmış çevre bilgisi (context.json)
   },
 });
@@ -47,6 +48,7 @@ const r = await renderDrone({
   crf: Number(args.crf),
   cpu: args.cpu,
   limitFrames: args.limit ? Number(args.limit) : undefined,
+  story: args.story ? JSON.parse(await readFile(args.story, "utf8")) : undefined,
   log: (m) => console.error(`[worker] ${m}`),
 });
 

@@ -42,6 +42,8 @@ export interface FrameState {
   markers: number[]; // her çevre noktasının işaretçisi (>0 görünür)
   pills: number[]; // soldaki listede her çevre etiketinin ilerlemesi
   card: { index: number; progress: number } | null; // ortadaki büyük yer kartı
+  /** Seslendirme altyazısı: o an okunan kelime parçası, active vurgulanan kelime, pop giriş animasyonu. */
+  caption?: { words: string[]; active: number; pop: number } | null;
   /** HYBRID: Google'ın yer/yol etiketleri görünür (çevre turunda), SATELLITE: sade uydu. */
   mode: "SATELLITE" | "HYBRID";
 }
@@ -237,6 +239,31 @@ function setAnim(el: HTMLElement, p: number, dy = 26, dx = 0) {
   el.style.transform = `translate(${(1 - e) * dx}px, ${(1 - e) * dy}px) scale(${0.94 + 0.06 * e})`;
 }
 
+/** Kelime kelime vurgulu altyazı; aynı parça içinde DOM yeniden kurulmaz (yalnız vurgu değişir). */
+let captionKey = "";
+function renderCaption(c: FrameState["caption"]) {
+  const el = document.getElementById("caption")!;
+  if (!c) {
+    el.style.opacity = "0";
+    captionKey = "";
+    return;
+  }
+  const key = c.words.join(" ");
+  if (key !== captionKey) {
+    el.innerHTML = "";
+    for (const w of c.words) {
+      const span = document.createElement("span");
+      span.textContent = w;
+      el.appendChild(span);
+    }
+    captionKey = key;
+  }
+  Array.from(el.children).forEach((n, i) => n.classList.toggle("on", i === c.active));
+  const e = easeOut(clamp01(c.pop));
+  el.style.opacity = String(e);
+  el.style.transform = `translateY(${(1 - e) * 18}px) scale(${0.9 + 0.1 * e})`;
+}
+
 const studio = {
   parcel: null as ParcelInfo | null,
 
@@ -313,13 +340,14 @@ const studio = {
     title.querySelector(".area")!.textContent = formatArea(parcel.areaM2 * easeOut(clamp01(s.counter)));
     setAnim(document.getElementById("location")!, s.location, 20);
     document.querySelectorAll<HTMLElement>("#pois .pill").forEach((el, i) => setAnim(el, s.pills[i] ?? 0, 0, -60));
+    renderCaption(s.caption ?? null);
 
     return waitSteady(timeoutMs);
   },
 
   /** Tüm yazı ve çizimleri gizler (inşaat sahnesi için temiz son kare). */
   async clean(keepNeon: boolean): Promise<boolean> {
-    for (const id of ["title", "location", "poicard"]) (document.getElementById(id) as HTMLElement).style.opacity = "0";
+    for (const id of ["title", "location", "poicard", "caption"]) (document.getElementById(id) as HTMLElement).style.opacity = "0";
     [...shown].forEach((el) => el !== fillEl && el !== outlineEl && (el.remove(), shown.delete(el)));
     if (map.mode !== lib.MapMode.SATELLITE) map.mode = lib.MapMode.SATELLITE;
     document.querySelectorAll<HTMLElement>("#pois .pill").forEach((el) => (el.style.opacity = "0"));

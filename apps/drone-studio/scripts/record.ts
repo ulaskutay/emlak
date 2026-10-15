@@ -26,6 +26,7 @@ const { values: args } = parseArgs({
     cpu: { type: "boolean", default: false }, // GPU'suz sunucuyu taklit (SwiftShader)
     from: { type: "string", default: "0" },
     limit: { type: "string" },
+    story: { type: "string" }, // seslendirmeli senaryo (story.json)
     port: { type: "string", default: "5178" },
     headed: { type: "boolean", default: false },
   },
@@ -66,6 +67,7 @@ const r = await renderDrone({
   headless: !args.headed,
   fromSec: Number(args.from),
   limitFrames: args.limit ? Number(args.limit) : undefined,
+  story: args.story ? JSON.parse(await readFile(args.story, "utf8")) : undefined,
 });
 console.log(
   `Video: ${r.video}\n` +

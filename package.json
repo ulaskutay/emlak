@@ -12,7 +12,9 @@
     "drone": "pnpm --filter @arsa/drone-studio record",
     "drone:dev": "pnpm --filter @arsa/drone-studio dev",
     "construction": "pnpm --filter @arsa/orchestrator construction",
-    "drone-job": "pnpm --filter @arsa/orchestrator drone-job"
+    "drone-job": "pnpm --filter @arsa/orchestrator drone-job",
+    "reel": "pnpm --filter @arsa/drone-studio reel",
+    "voices": "pnpm --filter @arsa/drone-studio voices"
   },
   "devDependencies": {
     "turbo": "^2.5.0",

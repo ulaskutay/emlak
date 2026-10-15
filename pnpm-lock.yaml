@@ -20,6 +20,9 @@ importers:
       '@arsa/geo':
         specifier: workspace:*
         version: link:../../packages/geo
+      '@arsa/providers':
+        specifier: workspace:*
+        version: link:../../packages/providers
     devDependencies:
       '@types/google.maps':
         specifier: ^3.58.0

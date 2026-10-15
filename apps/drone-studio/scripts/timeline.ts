@@ -10,6 +10,7 @@
  * Kamera hiçbir yerde tam durmaz: uçuşlar yumuşak başlayıp biter, duruşlar sabit hızlı süzülmedir.
  */
 import type { FrameState, ParcelInfo } from "../src/main.js";
+import type { Story, StoryWord } from "./story.js";
 
 const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
 /** t'nin [a, b] aralığındaki ilerlemesi (0..1). */
@@ -87,8 +88,34 @@ function cameraAt(keys: Key[], t: number) {
   };
 }
 
-/** Zaman çizelgesi parsel ve çevre bilgisine göre bir kez kurulur. */
-export function buildTimeline(p: ParcelInfo) {
+/** Seslendirme klibinin videodaki yeri (ses miksi buna göre yapılır). */
+export interface Cue {
+  id: string;
+  at: number;
+  duration: number;
+  words: StoryWord[];
+  file?: string;
+}
+
+/** Altyazı: en fazla 3 kelimelik parçalar, noktalamada bölünür (Reels tarzı). */
+function chunkWords(words: StoryWord[]) {
+  const chunks: StoryWord[][] = [];
+  let cur: StoryWord[] = [];
+  for (const w of words) {
+    cur.push(w);
+    if (cur.length >= 3 || /[.,!?;:]$/.test(w.word)) (chunks.push(cur), (cur = []));
+  }
+  if (cur.length) chunks.push(cur);
+  return chunks;
+}
+
+/**
+ * Zaman çizelgesi parsel ve çevre bilgisine göre bir kez kurulur.
+ * story verilirse sahneler seslendirme kadar uzar (anlatım hiç kesilmez) ve altyazı/ses noktaları üretilir.
+ */
+export function buildTimeline(p: ParcelInfo, story?: Story) {
+  const voice = (id: string) => story?.scenes.find((s) => s.id === id)?.voice;
+  const dur = (id: string) => voice(id)?.duration ?? 0;
   const r = Math.max(25, p.radiusM);
   const P = p.centroid;
   const h0 = (p.longestEdgeHeading + 25) % 360;
@@ -102,10 +129,12 @@ export function buildTimeline(p: ParcelInfo) {
     .map((s) => {
       // Uçuş süresi mesafeyle logaritmik artar: 1,2 km ≈ 2,5 sn, 4 km ≈ 3,3 sn, 16 km ≈ 4,2 sn.
       const out = Math.min(4.4, Math.max(2.4, 1.6 + 0.65 * Math.log(s.poi.distanceM / 300)));
-      return { ...s, out, hold: 1.3, back: Math.max(2, out * 0.8) };
+      // Anlatım uçuşla başlar, yer kartı ekrandayken biter: gerekirse duruş uzar.
+      const hold = Math.max(1.3, 0.25 + dur(`poi-${s.index}`) + 0.35 - out);
+      return { ...s, out, hold, back: Math.max(2, out * 0.8) };
     });
 
-  const INTRO = 3.5;
+  const INTRO = Math.max(3.5, 0.3 + dur("hook") + 0.5);
   let T = INTRO;
   const legs = tour.map((s) => {
     const leg = { ...s, start: T, arrive: T + s.out, leave: T + s.out + s.hold, end: T + s.out + s.hold + s.back };
@@ -113,10 +142,33 @@ export function buildTimeline(p: ParcelInfo) {
     return leg;
   });
   const tourEnd = T;
-  const SUMMARY = tour.length ? 2.8 : 0;
+  const SUMMARY = tour.length ? Math.max(2.8, 0.2 + dur("summary") + 0.4) : 0;
   const finalStart = tourEnd + SUMMARY;
-  const FINAL = 6;
+  const FINAL = Math.max(6, 0.5 + dur("final") + 1.0);
   const duration = finalStart + FINAL;
+
+  // Seslendirme klipleri: hangi an başlar (ses miksi ve altyazı).
+  const cueStart: Record<string, number> = { hook: 0.3, summary: tourEnd + 0.2, final: finalStart + 0.5 };
+  legs.forEach((leg) => (cueStart[`poi-${leg.index}`] = leg.start + 0.25));
+  const cues: Cue[] = (story?.scenes ?? [])
+    .filter((s) => s.voice && cueStart[s.id] !== undefined)
+    .map((s) => ({ id: s.id, at: cueStart[s.id]!, duration: s.voice!.duration, words: s.voice!.words, file: s.voice!.file }));
+  const captionChunks = cues.flatMap((c) =>
+    chunkWords(c.words).map((ws) => ({
+      words: ws.map((w) => ({ word: w.word, start: c.at + w.start, end: c.at + w.end })),
+      start: c.at + ws[0]!.start - 0.08,
+      end: c.at + ws[ws.length - 1]!.end + 0.15,
+    })),
+  );
+
+  function captionAt(t: number): FrameState["caption"] {
+    const i = captionChunks.findIndex((c, k) => t >= c.start && t < (captionChunks[k + 1]?.start ?? c.end + 0.6) && t < c.end + 0.6);
+    if (i < 0) return null;
+    const c = captionChunks[i]!;
+    let active = 0;
+    c.words.forEach((w, k) => t >= w.start - 0.03 && (active = k));
+    return { words: c.words.map((w) => w.word), active, pop: span(t, c.start, c.start + 0.18) };
+  }
 
   const keys: Key[] = [
     // Açılış: yüksekten, düz bakışla parsele dalış ve dönüş.
@@ -184,7 +236,10 @@ export function buildTimeline(p: ParcelInfo) {
       title,
       counter: span(t, 0.5, 2.6),
       location: t < finalStart ? Math.min(span(t, 1.2, 1.7), hookOut) : span(t, finalStart + 2.4, finalStart + 3.0),
+      caption: captionAt(t),
     };
   }
-  return { duration, frameState, tour };
+  /** Geçiş efektleri: her uçuşun kalkışı (gidiş ve dönüş) ve finale dalış. */
+  const whooshes = [...legs.flatMap((l) => [l.start, l.leave]), ...(legs.length ? [finalStart] : [])];
+  return { duration, frameState, tour, cues, whooshes };
 }

@@ -35,10 +35,14 @@ WORKDIR /app
 # Bağımlılıklar önce (katman önbelleği), sonra kaynak
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/geo/package.json packages/geo/
+COPY packages/providers/package.json packages/providers/
+COPY packages/shared/package.json packages/shared/
 COPY apps/drone-studio/package.json apps/drone-studio/
 RUN pnpm install --frozen-lockfile --filter @arsa/drone-studio...
 
 COPY packages/geo packages/geo
+COPY packages/providers packages/providers
+COPY packages/shared packages/shared
 COPY apps/drone-studio apps/drone-studio
 COPY gpu/drone-worker/handler.py /app/handler.py
 
