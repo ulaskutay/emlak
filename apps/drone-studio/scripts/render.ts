@@ -1,0 +1,193 @@
+/**
+ * Drone render motoru — hem yerel CLI (record.ts) hem RunPod worker'ı (gpu/drone-worker) kullanır.
+ *
+ * Her karede sahneyi kurar ve harita karoları tamamen yüklenene kadar bekler (bulanık kare olmaz).
+ * Hızlandırma: kareler K sayfaya ardışık parçalar halinde bölünür (aynı tarayıcı bağlamı = ortak önbellek).
+ * Ölçüm (Mac M2, Ezine, en ağır bölüm): tek sayfa 1,74 sn/kare; 4 paralel 0,44; 8 paralel 0,34.
+ * GPU'suz (SwiftShader) tek sayfa 2,58, 4 paralelde işlemci doyuyor (1,67). Ön yükleme turu kazanç
+ * getirmedi (bekleme karo indirmekten çok Google'ın detayı kademeli netleştirmesinden) — varsayılan kapalı.
+ */
+import { spawn } from "node:child_process";
+import { mkdir, readdir, rm } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { chromium, type Page } from "playwright-core";
+import { createServer } from "vite";
+import type { ParcelInfo } from "../src/main.js";
+import { buildTimeline } from "./timeline.js";
+
+export interface RenderOptions {
+  parcel: ParcelInfo;
+  googleKey: string;
+  outDir: string;
+  fps?: number;
+  /** Paralel sayfa sayısı. */
+  parallel?: number;
+  /** Ön yükleme turu (saniyede kaç örnek); 0 kapalı. */
+  prewarmPerSecond?: number;
+  /** GPU'suz ortam: yazılımsal WebGL (SwiftShader). */
+  cpu?: boolean;
+  port?: number;
+  crf?: number;
+  headless?: boolean;
+  /** Ölçüm için yalnızca bir aralık. */
+  fromSec?: number;
+  limitFrames?: number;
+  log?: (msg: string) => void;
+}
+
+export interface RenderResult {
+  video: string;
+  keyframeNeon: string;
+  keyframeClean: string;
+  frames: number;
+  renderer: string;
+  seconds: { prewarm: number; render: number; encode: number; total: number };
+  frameSeconds: { avg: number; p50: number; max: number };
+  timeouts: number;
+}
+
+const APP = resolve(import.meta.dirname, "..");
+
+function chromeArgs(cpu: boolean): string[] {
+  if (cpu) return ["--disable-gpu", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"];
+  // Linux sunucuda (RunPod) NVIDIA sürücüsü üzerinden Vulkan; macOS'ta varsayılan Metal.
+  if (process.platform === "linux") {
+    return ["--ignore-gpu-blocklist", "--enable-gpu-rasterization", "--use-angle=vulkan", "--enable-features=Vulkan", "--disable-vulkan-surface"];
+  }
+  return ["--ignore-gpu-blocklist", "--enable-gpu-rasterization"];
+}
+
+async function webglRenderer(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const gl = document.createElement("canvas").getContext("webgl2") as WebGL2RenderingContext | null;
+    const ext = gl?.getExtension("WEBGL_debug_renderer_info");
+    return ext ? String(gl!.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : "bilinmiyor";
+  });
+}
+
+export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
+  const log = o.log ?? ((m: string) => console.log(m));
+  const fps = o.fps ?? 30;
+  const parallel = Math.max(1, o.parallel ?? 6);
+  const t0 = Date.now();
+  const timeline = buildTimeline(o.parcel);
+  const total = Math.round(timeline.duration * fps);
+  const first = Math.round((o.fromSec ?? 0) * fps);
+  const last = o.limitFrames ? Math.min(total, first + o.limitFrames) : total;
+  const stateAt = (i: number) => timeline.frameState((i / Math.max(1, total - 1)) * timeline.duration);
+
+  const framesDir = join(o.outDir, ".frames");
+  await rm(framesDir, { recursive: true, force: true });
+  await mkdir(framesDir, { recursive: true });
+
+  const server = await createServer({
+    root: APP,
+    configFile: join(APP, "vite.config.ts"),
+    logLevel: "warn",
+    server: { port: o.port ?? 5178, strictPort: true },
+  });
+  await server.listen();
+  const url = server.resolvedUrls?.local[0] ?? `http://localhost:${o.port ?? 5178}/`;
+  const browser = await chromium.launch({
+    channel: "chrome",
+    headless: o.headless ?? true,
+    args: chromeArgs(!!o.cpu),
+  });
+
+  try {
+    // Tek bağlam: sayfalar HTTP önbelleğini (harita karoları) paylaşır.
+    const context = await browser.newContext({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
+    await context.addInitScript(() => ((window as any).__RECORDER__ = true));
+    const openPage = async () => {
+      const page = await context.newPage();
+      page.on("console", (m) => m.type() === "error" && !m.text().includes("404") && log(`[sayfa] ${m.text()}`));
+      await page.goto(url);
+      await page.evaluate(([p, k]) => (window as any).studio.loadParcel(p, k), [o.parcel, o.googleKey] as const);
+      await page.evaluate(() => (window as any).studio.setChrome(false));
+      return page;
+    };
+
+    const first0 = await openPage();
+    const renderer = await webglRenderer(first0);
+    log(`WebGL: ${renderer} · ${total} kare @ ${fps} fps · ${parallel} paralel sayfa`);
+
+    // 1) Ön yükleme: seyrek örneklerle yolu gez; karolar önbelleğe iner.
+    const tp = Date.now();
+    const perSec = o.prewarmPerSecond ?? 0;
+    if (perSec > 0) {
+      const step = Math.max(1, Math.round(fps / perSec));
+      for (let i = first; i < last; i += step) await first0.evaluate((s) => (window as any).studio.render(s, 6000), stateAt(i));
+      log(`Ön yükleme: ${((Date.now() - tp) / 1000).toFixed(0)} sn`);
+    }
+    const prewarmSec = (Date.now() - tp) / 1000;
+
+    // 2) Paralel render: her sayfa ardışık bir kare aralığı (kamera sürekliliği, kendi bölgesinin karoları).
+    const pages = [first0, ...(await Promise.all(Array.from({ length: parallel - 1 }, openPage)))];
+    const count = last - first;
+    const chunk = Math.ceil(count / pages.length);
+    const frameTimes: number[] = [];
+    let timeouts = 0;
+    let done = 0;
+    const tr = Date.now();
+    await Promise.all(
+      pages.map(async (page, k) => {
+        const a = first + k * chunk;
+        const b = Math.min(last, a + chunk);
+        for (let i = a; i < b; i++) {
+          const tf = Date.now();
+          const ok = await page.evaluate((s) => (window as any).studio.render(s, 15000), stateAt(i));
+          if (!ok) timeouts++;
+          await page.screenshot({ path: join(framesDir, `${String(i - first).padStart(5, "0")}.jpg`), type: "jpeg", quality: 95 });
+          frameTimes.push(Date.now() - tf);
+          if (++done % fps === 0) log(`  ${done}/${count} kare (${((Date.now() - tr) / 1000).toFixed(0)} sn)`);
+        }
+      }),
+    );
+    const renderSec = (Date.now() - tr) / 1000;
+
+    // Son kare (inşaat sahnesinin başlangıcı) son parçayı çizen sayfada: yazısız, neonlu ve neonsuz.
+    const lastPage = pages[pages.length - 1]!;
+    const keyframeNeon = join(o.outDir, "keyframe-neon.png");
+    const keyframeClean = join(o.outDir, "keyframe-clean.png");
+    if (last === total) {
+      await lastPage.evaluate(() => (window as any).studio.clean(true));
+      await lastPage.screenshot({ path: keyframeNeon });
+      await lastPage.evaluate(() => (window as any).studio.clean(false));
+      await lastPage.screenshot({ path: keyframeClean });
+    }
+
+    // 3) Kodlama
+    const te = Date.now();
+    const video = join(o.outDir, o.limitFrames ? "drone-sample.mp4" : "drone.mp4");
+    await new Promise<void>((res, rej) => {
+      const ff = spawn(
+        "ffmpeg",
+        ["-v", "error", "-y", "-framerate", String(fps), "-i", join(framesDir, "%05d.jpg"),
+         "-c:v", "libx264", "-crf", String(o.crf ?? 18), "-preset", "medium", "-pix_fmt", "yuv420p", "-movflags", "+faststart", video],
+        { stdio: "inherit" },
+      );
+      ff.on("close", (c) => (c === 0 ? res() : rej(new Error(`ffmpeg ${c}`))));
+    });
+    const encodeSec = (Date.now() - te) / 1000;
+    if ((await readdir(framesDir)).length) await rm(framesDir, { recursive: true, force: true });
+
+    const sorted = [...frameTimes].sort((x, y) => x - y);
+    return {
+      video,
+      keyframeNeon,
+      keyframeClean,
+      frames: count,
+      renderer,
+      seconds: { prewarm: prewarmSec, render: renderSec, encode: encodeSec, total: (Date.now() - t0) / 1000 },
+      frameSeconds: {
+        avg: frameTimes.reduce((x, y) => x + y, 0) / Math.max(1, frameTimes.length) / 1000,
+        p50: (sorted[Math.floor(sorted.length / 2)] ?? 0) / 1000,
+        max: (sorted[sorted.length - 1] ?? 0) / 1000,
+      },
+      timeouts,
+    };
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+}

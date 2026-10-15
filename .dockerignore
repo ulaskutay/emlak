@@ -1,0 +1,11 @@
+# Drone worker imajı depo kökünden build edilir; yalnızca gereken kaynaklar girsin.
+**/node_modules
+**/.turbo
+**/dist
+assets
+bench
+.env
+.env.*
+.git
+gpu/video-worker
+**/__pycache__

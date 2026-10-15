@@ -238,6 +238,7 @@ function setAnim(el: HTMLElement, p: number, dy = 26, dx = 0) {
 const studio = {
   parcel: null as ParcelInfo | null,
 
+  /** Tarayıcı önizlemesi: dosyayı geliştirme sunucusunun /api/parcel uç noktasından hazırlatır. */
   async load(file: string): Promise<ParcelInfo> {
     const key = import.meta.env.GOOGLE_MAPS_API_KEY as string | undefined;
     if (!key) throw new Error("GOOGLE_MAPS_API_KEY .env içinde tanımlı değil");
@@ -245,6 +246,14 @@ const studio = {
     const res = await fetch(`/api/parcel?file=${encodeURIComponent(file)}`);
     const data = (await res.json()) as ParcelInfo & { error?: string };
     if (data.error) throw new Error(data.error);
+    return this.loadParcel(data, key);
+  },
+
+  /**
+   * Hazırlanmış parsel verisiyle sahneyi kurar. Kaydedici ve RunPod worker'ı bunu kullanır;
+   * API anahtarı çalışma anında verilir (imaja/derlemeye gömülmez).
+   */
+  async loadParcel(data: ParcelInfo, key: string): Promise<ParcelInfo> {
     parcel = this.parcel = data;
     status("harita yükleniyor…");
     await loadGoogleMaps(key);
