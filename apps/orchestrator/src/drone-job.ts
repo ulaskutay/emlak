@@ -5,6 +5,7 @@
  *
  * Çıktılar parsel klasörüne "runpod-" önekiyle yazılır (yerel kayıtlarla karışmasın).
  */
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, extname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -28,10 +29,15 @@ const ROOT = resolve(import.meta.dirname, "../../..");
 const outDir = join(ROOT, "assets/parcels", basename(args.parcel, extname(args.parcel)));
 await mkdir(outDir, { recursive: true });
 
+// Yerel önbellekteki çevre bilgisi işle gider: worker yavaş Overpass sorgusunu tekrarlamaz.
+const contextFile = join(outDir, "context.json");
+const context = existsSync(contextFile) ? JSON.parse(await readFile(contextFile, "utf8")) : undefined;
+
 const client = new RunpodClient(requireEnv("RUNPOD_API_KEY"), requireEnv("RUNPOD_DRONE_ENDPOINT_ID"));
 const t0 = Date.now();
 const job = await client.run({
   parcel: await readFile(resolve(ROOT, args.parcel), "utf8"),
+  ...(context ? { context } : {}),
   ...(args.limit ? { limit_frames: Number(args.limit) } : {}),
   ...(args.fps ? { fps: Number(args.fps) } : {}),
   ...(args.parallel ? { parallel: Number(args.parallel) } : {}),
@@ -47,12 +53,20 @@ process.on("SIGINT", async () => {
 });
 
 let lastStatus = "";
+let lastProgress = "";
 for (;;) {
   await new Promise((r) => setTimeout(r, 4000));
   const s = await client.status(job.id);
   if (s.status !== lastStatus) {
     console.log(`${((Date.now() - t0) / 1000).toFixed(0)} sn: ${s.status}`);
     lastStatus = s.status;
+  }
+  // Worker'ın canlı ilerlemesi (progress_update): yalnızca yeni satırlar.
+  const progress = s.output as unknown;
+  if (s.status === "IN_PROGRESS" && typeof progress === "string" && progress !== lastProgress) {
+    const prev = new Set(lastProgress.split("\n"));
+    for (const line of progress.split("\n")) if (line.trim() && !prev.has(line)) console.log(`  │ ${line}`);
+    lastProgress = progress;
   }
   if (s.status === "COMPLETED" && args.diagnose) {
     const out = { ...(s.output as Record<string, any>) };

@@ -217,7 +217,10 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
       timeouts,
     };
   } finally {
-    await browser.close();
-    await server.close();
+    // Kapanış takılırsa (Chrome bazen sayfaları bırakmıyor) iş sonsuza dek beklemesin.
+    const tc = Date.now();
+    await withTimeout(browser.close(), 15000, "Chrome kapanışı").catch((e) => log(`uyarı: ${e.message}`));
+    await withTimeout(server.close(), 5000, "Vite kapanışı").catch((e) => log(`uyarı: ${e.message}`));
+    log(`kapatıldı (${((Date.now() - tc) / 1000).toFixed(1)} sn)`);
   }
 }

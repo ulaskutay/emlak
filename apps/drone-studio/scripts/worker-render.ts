@@ -23,6 +23,7 @@ const { values: args } = parseArgs({
     crf: { type: "string", default: "22" },
     cpu: { type: "boolean", default: false },
     limit: { type: "string" },
+    context: { type: "string" }, // önceden hesaplanmış çevre bilgisi (context.json)
   },
 });
 if (!args.in || !args.out) throw new Error("--in <parsel dosyası> --out <klasör> gerekli");
@@ -31,7 +32,8 @@ if (!key) throw new Error("GOOGLE_MAPS_API_KEY ortam değişkeni yok");
 
 await mkdir(args.out, { recursive: true });
 const t0 = Date.now();
-const parcel = await prepareParcel(await readFile(args.in, "utf8"), { googleKey: process.env.GOOGLE_ELEVATION_API_KEY });
+const cached = args.context ? JSON.parse(await readFile(args.context, "utf8")) : null;
+const parcel = await prepareParcel(await readFile(args.in, "utf8"), { googleKey: process.env.GOOGLE_ELEVATION_API_KEY, cached });
 const prepareSeconds = (Date.now() - t0) / 1000;
 await writeFile(join(args.out, "parcel.json"), JSON.stringify(parcel));
 console.error(`[worker] parsel hazır (${prepareSeconds.toFixed(1)} sn): ${Math.round(parcel.areaM2)} m², ${parcel.pois.length} çevre noktası`);
@@ -66,3 +68,4 @@ console.log(
     },
   }),
 );
+process.exit(0); // açık kalan tarayıcı süreçleri/zamanlayıcılar çıkışı bekletmesin

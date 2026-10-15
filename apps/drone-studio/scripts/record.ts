@@ -73,3 +73,4 @@ console.log(
     `kodlama ${r.seconds.encode.toFixed(0)}) · ${r.frames} kare → etkin ${(r.seconds.render / r.frames).toFixed(2)} sn/kare` +
     ` · sayfa başı kare ort. ${r.frameSeconds.avg.toFixed(2)} sn${r.timeouts ? ` · ${r.timeouts} zaman aşımı` : ""}`,
 );
+process.exit(0); // açık kalan tarayıcı süreçleri/zamanlayıcılar çıkışı bekletmesin

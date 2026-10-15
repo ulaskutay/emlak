@@ -11,6 +11,7 @@ Girdi:
   crf           video kalitesi (düşük = kaliteli/büyük); varsayılan 22
   limit_frames  test için yalnızca ilk N kare
   output_prefix R2 anahtar öneki, ör. "projects/123/drone"
+  context       önceden hesaplanmış çevre bilgisi (context.json); verilmezse worker sorgular (~80 sn)
 Ortam: GOOGLE_MAPS_API_KEY (zorunlu), R2_* (opsiyonel)
 """
 
@@ -83,7 +84,7 @@ def container_cpus() -> int:
         return os.cpu_count() or 4
 
 
-def run_streaming(cmd: list[str], env: dict, timeout: int) -> str:
+def run_streaming(cmd: list[str], env: dict, timeout: int, job=None) -> str:
     """Komutu çalıştırır; stderr satır satır RunPod loglarına akar, stdout'un son satırını döndürür.
 
     stdout bir dosyaya yazılır: Linux'ta Node'un pipe'a yazımı eşzamanlıdır, okunmayan bir stdout
@@ -92,11 +93,21 @@ def run_streaming(cmd: list[str], env: dict, timeout: int) -> str:
     out_path = tempfile.mktemp(suffix=".stdout")
     tail: list[str] = []
 
+    last_update = [0.0]
+
     def pump(stream):
         for line in stream:
-            print(line.rstrip(), flush=True)
+            # "| " öneki: RunPod log ekranı JSON içeren satırları boş gösteriyor.
+            print("| " + line.rstrip(), flush=True)
             tail.append(line)
             del tail[:-40]
+            # Canlı ilerleme: /status yanıtında görünür (log ekranına bağımlı değil).
+            if job is not None and time.time() - last_update[0] > 1.0:
+                last_update[0] = time.time()
+                try:
+                    runpod.serverless.progress_update(job, "".join(tail[-12:])[-3000:])
+                except Exception:
+                    pass
 
     with open(out_path, "w") as out:
         proc = subprocess.Popen(cmd, cwd=APP_DIR, env=env, stdin=subprocess.DEVNULL, stdout=out,
@@ -130,11 +141,18 @@ def handler(job):
     with open(src, "w", encoding="utf-8") as f:
         f.write(parcel)
     env = {**os.environ, "CI": "1", "COREPACK_ENABLE_DOWNLOAD_PROMPT": "0"}
+    # Önceden hesaplanmış çevre bilgisi (rakım, adres, yerler): yavaş Overpass sorgusu atlanır.
+    ctx_args: list[str] = []
+    if inp.get("context"):
+        ctx = os.path.join(work, "context.json")
+        with open(ctx, "w", encoding="utf-8") as f:
+            json.dump(inp["context"], f)
+        ctx_args = ["--context", ctx]
     if inp.get("gl_mode"):
         env["GL_MODE"] = inp["gl_mode"]  # egl | vulkan | swiftshader
 
     if inp.get("diagnose"):
-        report = json.loads(run_streaming([*TSX, "scripts/diagnose.ts", "--in", src, "--out", work], env, 600))
+        report = json.loads(run_streaming([*TSX, "scripts/diagnose.ts", "--in", src, "--out", work, *ctx_args], env, 420, job))
         shot = report.pop("screenshot", None)
         if shot and os.path.exists(shot):
             with open(shot, "rb") as f:
@@ -144,13 +162,13 @@ def handler(job):
         return report
 
     parallel = int(inp.get("parallel") or max(2, min(8, container_cpus() // 2)))
-    cmd = [*TSX, "scripts/worker-render.ts", "--in", src, "--out", work,
+    cmd = [*TSX, "scripts/worker-render.ts", "--in", src, "--out", work, *ctx_args,
            "--fps", str(inp.get("fps", 30)), "--parallel", str(parallel), "--crf", str(inp.get("crf", 22))]
     if inp.get("limit_frames"):
         cmd += ["--limit", str(inp["limit_frames"])]
 
     t0 = time.time()
-    result = json.loads(run_streaming(cmd, env, 1500))
+    result = json.loads(run_streaming(cmd, env, 1500, job))
 
     prefix = inp.get("output_prefix", f"drone/{job['id']}")
     out = {
