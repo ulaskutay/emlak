@@ -8,7 +8,9 @@
     "dev": "turbo run dev",
     "scaler": "pnpm --filter @arsa/orchestrator scaler",
     "bench": "pnpm --filter @arsa/orchestrator bench",
-    "listing-video": "pnpm --filter @arsa/orchestrator listing-video"
+    "listing-video": "pnpm --filter @arsa/orchestrator listing-video",
+    "drone": "pnpm --filter @arsa/drone-studio record",
+    "drone:dev": "pnpm --filter @arsa/drone-studio dev"
   },
   "devDependencies": {
     "turbo": "^2.5.0",
