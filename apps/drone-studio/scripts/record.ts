@@ -62,10 +62,11 @@ function cameraAt(i: number, p: Parcel) {
   const base = { lat: p.centroid.lat, lng: p.centroid.lng, altitude: p.elevation ?? 0 };
   if (t < 0.45) {
     const k = ease(t / 0.45);
-    return { ...base, range: lerp(Math.max(900, r * 30), r * 5.5, k), tilt: lerp(0, 55, k), heading: lerp(h0 - 40, h0, k) };
+    return { ...base, range: lerp(Math.max(900, r * 30), r * 8, k), tilt: lerp(0, 50, k), heading: lerp(h0 - 40, h0, k) };
   }
+  // Son kare inşaat sahnesinin başlangıcı: parsel dikey kadrajda bütünüyle ve çevresiyle görünmeli.
   const k = ease((t - 0.45) / 0.55);
-  return { ...base, range: lerp(r * 5.5, r * 4.2, k), tilt: lerp(55, 62, k), heading: lerp(h0, h0 + 110, k) };
+  return { ...base, range: lerp(r * 8, r * 7, k), tilt: lerp(50, 55, k), heading: lerp(h0, h0 + 110, k) };
 }
 
 const server = await createServer({ root: APP, configFile: join(APP, "vite.config.ts"), logLevel: "warn" });
@@ -87,7 +88,7 @@ const parcel = (await page.evaluate((kml) => (window as any).studio.load(kml), a
 await page.evaluate(() => (window as any).studio.setChrome(false));
 await writeFile(join(outDir, "parcel.json"), JSON.stringify(parcel, null, 2));
 console.log(
-  `Alan ${Math.round(parcel.areaM2)} m², yarıçap ${parcel.radiusM.toFixed(0)} m, rakım ${parcel.elevation ?? "?"} m — ${totalFrames} kare @ ${fps} fps`,
+  `Alan ${Math.round(parcel.areaM2)} m², yarıçap ${parcel.radiusM.toFixed(0)} m, rakım ${parcel.elevation?.toFixed(0) ?? "?"} m (${(parcel as any).elevationSource ?? "yok"}) — ${totalFrames} kare @ ${fps} fps`,
 );
 
 const out = join(outDir, args.preview ? "drone-preview.mp4" : "drone.mp4");

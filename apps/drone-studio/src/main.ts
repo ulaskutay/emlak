@@ -106,10 +106,11 @@ async function createMap(parcel: ParcelInfo) {
   const outline = new Polyline3DElement({
     path: [...path, path[0]],
     altitudeMode: AltitudeMode.RELATIVE_TO_MESH,
-    strokeColor: "#e9ffff",
-    strokeWidth: 5,
+    // outerWidth, strokeWidth'in dış hale rengine ayrılan oranıdır (0..1): beyaz çekirdek + camgöbeği hale.
+    strokeColor: "#f2ffff",
+    strokeWidth: 14,
     outerColor: NEON,
-    outerWidth: 1.2,
+    outerWidth: 0.6,
     drawsOccludedSegments: true,
   });
   neon = [fill, outline];
