@@ -21,5 +21,9 @@
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",
     "vite": "^6.3.0"
+  },
+  "exports": {
+    "./story": "./scripts/story.ts",
+    "./pipeline": "./scripts/pipeline.ts"
   }
 }

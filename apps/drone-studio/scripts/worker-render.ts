@@ -10,7 +10,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { prepareParcel } from "@arsa/geo";
-import type { ParcelInfo } from "../src/main.js";
+import type { ParcelInfo } from "../src/types.js";
 import { renderDrone } from "./render.js";
 
 const { values: args } = parseArgs({

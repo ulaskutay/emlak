@@ -4,7 +4,7 @@
  * Sahne kimlikleri zaman çizelgesiyle eşleşir: hook (açılış), poi-<index> (tur bacağı), summary, final.
  * Seslendirme (voice) eklenince kurgu ona göre uzar ve altyazı kelime kelime vurgulanır.
  */
-import type { ParcelInfo } from "../src/main.js";
+import type { ParcelInfo } from "../src/types.js";
 
 export interface StoryWord {
   word: string;
@@ -19,9 +19,30 @@ export interface StoryScene {
   voice?: { duration: number; words: StoryWord[]; file?: string };
 }
 
+/** İlan bilgileri (panel formu, packages/shared ReelListing ile aynı yapı). */
+export interface StoryListing {
+  priceTry?: number;
+  zoning?: string;
+  officeName?: string;
+  phone?: string;
+}
+
 export interface Story {
   scenes: StoryScene[];
+  /** Kapanış kartı: ofis, telefon, fiyat (son saniyelerde görünür). */
+  endcard?: { officeName?: string; phone?: string; price?: string };
+  /** Başlık kartının alt satırına eklenir (ör. "Konut imarlı"). */
+  zoning?: string;
 }
+
+/** Fiyatın okunuşu: 12.500.000 → "on iki buçuk milyon", 3.750.000 → "üç milyon yedi yüz elli bin". */
+export function spokenPrice(tl: number) {
+  if (tl >= 1_000_000 && tl % 500_000 === 0) return `${halves(tl / 1_000_000)} milyon`;
+  return numberWords(tl);
+}
+
+/** Kartlarda fiyat: 12.500.000 ₺ */
+export const formatPrice = (tl: number) => `${Math.round(tl).toLocaleString("tr-TR")} ₺`;
 
 /** Türkçe bulunma eki: Dalyan'da, Ezine'de, Kocaeli'nde değil — özel adlar için kesme işaretiyle. */
 export function locative(word: string) {
@@ -109,7 +130,7 @@ export function tourPois(p: ParcelInfo) {
   return p.pois.map((poi, index) => ({ poi, index })).filter(({ poi }) => poi.distanceM <= 20000).slice(0, 3);
 }
 
-export function buildStory(p: ParcelInfo): Story {
+export function buildStory(p: ParcelInfo, listing: StoryListing = {}): Story {
   const prop = p.properties;
   const district = prop.Ilce ?? p.address.district;
   const hood = (prop.Mahalle ?? p.address.neighbourhood)?.replace(/ (Mahallesi|Mah\.?|Köyü)$/i, "");
@@ -131,8 +152,13 @@ export function buildStory(p: ParcelInfo): Story {
   if (tour.length) scenes.push({ id: "summary", text: "Doğanın içinde, her yere yakın." });
   const num = (v: string) => (/^\d+$/.test(v) ? numberWords(Number(v)) : v);
   const parcelNo = prop.Ada && prop.ParselNo ? `${num(prop.Ada)} ada, ${num(prop.ParselNo)} parsel. ` : "";
-  scenes.push({ id: "final", text: `${parcelNo}Detaylar için hemen mesaj atın!` });
+  const price = listing.priceTry ? `Fiyatı ${spokenPrice(listing.priceTry)} lira. ` : "";
+  scenes.push({ id: "final", text: `${parcelNo}${price}Detaylar için hemen mesaj atın!` });
   // Cümle başı büyük harf (sayı okunuşuyla başlayan sahneler: "İki yüz otuz ada…").
   for (const sc of scenes) sc.text = sc.text.charAt(0).toLocaleUpperCase("tr") + sc.text.slice(1);
-  return { scenes };
+  const endcard =
+    listing.officeName || listing.phone || listing.priceTry
+      ? { officeName: listing.officeName, phone: listing.phone, price: listing.priceTry ? formatPrice(listing.priceTry) : undefined }
+      : undefined;
+  return { scenes, endcard, zoning: listing.zoning };
 }

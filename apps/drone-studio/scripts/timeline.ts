@@ -9,7 +9,7 @@
  *
  * Kamera hiçbir yerde tam durmaz: uçuşlar yumuşak başlayıp biter, duruşlar sabit hızlı süzülmedir.
  */
-import type { FrameState, ParcelInfo } from "../src/main.js";
+import type { FrameState, ParcelInfo } from "../src/types.js";
 import type { Story, StoryWord } from "./story.js";
 
 const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
@@ -237,6 +237,8 @@ export function buildTimeline(p: ParcelInfo, story?: Story) {
       counter: span(t, 0.5, 2.6),
       location: t < finalStart ? Math.min(span(t, 1.2, 1.7), hookOut) : span(t, finalStart + 2.4, finalStart + 3.0),
       caption: captionAt(t),
+      endcard: story?.endcard ? { ...story.endcard, progress: span(t, duration - 3.2, duration - 2.6) } : null,
+      zoning: story?.zoning,
     };
   }
   /** Geçiş efektleri: her uçuşun kalkışı (gidiş ve dönüş) ve finale dalış. */

@@ -12,7 +12,7 @@ import { mkdir, readdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { chromium, type Browser, type Page } from "playwright-core";
 import { createServer } from "vite";
-import type { ParcelInfo } from "../src/main.js";
+import type { ParcelInfo } from "../src/types.js";
 import type { Story } from "./story.js";
 import { buildTimeline } from "./timeline.js";
 

@@ -7,3 +7,6 @@ bench/results
 __pycache__
 assets/
 bench/compare
+.next
+*.tsbuildinfo
+next-env.d.ts

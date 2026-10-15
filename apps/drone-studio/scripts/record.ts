@@ -11,7 +11,7 @@ import { basename, extname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { prepareParcel, type ParcelContext } from "@arsa/geo";
 import { loadEnv } from "vite";
-import type { ParcelInfo } from "../src/main.js";
+import type { ParcelInfo } from "../src/types.js";
 import { renderDrone } from "./render.js";
 
 const { values: args } = parseArgs({

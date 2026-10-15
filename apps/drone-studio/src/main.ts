@@ -7,46 +7,9 @@
  */
 import { formatArea, formatDistance } from "@arsa/geo";
 
-export interface ParcelInfo {
-  name?: string;
-  properties: Record<string, string>;
-  ring: { lat: number; lng: number }[];
-  centroid: { lat: number; lng: number };
-  areaM2: number;
-  radiusM: number;
-  longestEdgeHeading: number;
-  elevation: number | null;
-  address: { province?: string; district?: string; neighbourhood?: string };
-  pois: { label: string; emoji: string; name?: string; position: { lat: number; lng: number }; distanceM: number }[];
-}
+import type { FrameState, ParcelInfo } from "./types.js";
 
-export interface Camera {
-  lat: number;
-  lng: number;
-  /** Bakılan noktanın deniz seviyesine göre yüksekliği (m). */
-  altitude: number;
-  range: number;
-  tilt: number;
-  heading: number;
-}
-
-/** Bir karenin tüm görsel durumu; değerler 0..1 arası animasyon ilerlemesidir. */
-export interface FrameState {
-  camera: Camera;
-  neon: number; // parsel konturunun çizilmiş oranı
-  fill: number; // parsel dolgusunun görünürlüğü
-  title: number; // m² kartı
-  counter: number; // m² sayacının ilerlemesi
-  location: number; // konum satırı
-  lines: number[]; // her çevre noktası için parselden uzanan bağlantı çizgisinin çizilmiş oranı
-  markers: number[]; // her çevre noktasının işaretçisi (>0 görünür)
-  pills: number[]; // soldaki listede her çevre etiketinin ilerlemesi
-  card: { index: number; progress: number } | null; // ortadaki büyük yer kartı
-  /** Seslendirme altyazısı: o an okunan kelime parçası, active vurgulanan kelime, pop giriş animasyonu. */
-  caption?: { words: string[]; active: number; pop: number } | null;
-  /** HYBRID: Google'ın yer/yol etiketleri görünür (çevre turunda), SATELLITE: sade uydu. */
-  mode: "SATELLITE" | "HYBRID";
-}
+export type { Camera, FrameState, ParcelInfo } from "./types.js";
 
 const NEON = "#00e5ff";
 const AMBER = "#ffc83d";
@@ -264,6 +227,15 @@ function renderCaption(c: FrameState["caption"]) {
   el.style.transform = `translateY(${(1 - e) * 18}px) scale(${0.9 + 0.1 * e})`;
 }
 
+function renderEndcard(e: FrameState["endcard"]) {
+  const el = document.getElementById("endcard")!;
+  if (!e) return setAnim(el, 0, 40);
+  el.querySelector(".office")!.textContent = e.officeName ?? "";
+  el.querySelector(".phone")!.textContent = e.phone ? `📞 ${e.phone}` : "";
+  el.querySelector(".price")!.textContent = e.price ?? "";
+  setAnim(el, e.progress, 40);
+}
+
 const studio = {
   parcel: null as ParcelInfo | null,
 
@@ -341,13 +313,16 @@ const studio = {
     setAnim(document.getElementById("location")!, s.location, 20);
     document.querySelectorAll<HTMLElement>("#pois .pill").forEach((el, i) => setAnim(el, s.pills[i] ?? 0, 0, -60));
     renderCaption(s.caption ?? null);
+    renderEndcard(s.endcard ?? null);
+    const sub = title.querySelector(".sub") as HTMLElement;
+    if (s.zoning && !sub.dataset.zoning) (sub.textContent += `  ·  ${s.zoning}`), (sub.dataset.zoning = "1");
 
     return waitSteady(timeoutMs);
   },
 
   /** Tüm yazı ve çizimleri gizler (inşaat sahnesi için temiz son kare). */
   async clean(keepNeon: boolean): Promise<boolean> {
-    for (const id of ["title", "location", "poicard", "caption"]) (document.getElementById(id) as HTMLElement).style.opacity = "0";
+    for (const id of ["title", "location", "poicard", "caption", "endcard"]) (document.getElementById(id) as HTMLElement).style.opacity = "0";
     [...shown].forEach((el) => el !== fillEl && el !== outlineEl && (el.remove(), shown.delete(el)));
     if (map.mode !== lib.MapMode.SATELLITE) map.mode = lib.MapMode.SATELLITE;
     document.querySelectorAll<HTMLElement>("#pois .pill").forEach((el) => (el.style.opacity = "0"));
