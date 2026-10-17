@@ -23,6 +23,7 @@ const { values: args } = parseArgs({
     crf: { type: "string", default: "22" },
     cpu: { type: "boolean", default: false },
     limit: { type: "string" },
+    "from-frame": { type: "string" }, // bölünmüş render: başlangıç karesi
     story: { type: "string" }, // seslendirmeli senaryo (story.json)
     engine: { type: "string" }, // cesium (varsayılan) | google
     msaa: { type: "string" }, // Cesium MSAA örnek sayısı (1 = kapalı)
@@ -51,6 +52,7 @@ const r = await renderDrone({
   crf: Number(args.crf),
   cpu: args.cpu,
   limitFrames: args.limit ? Number(args.limit) : undefined,
+  fromFrame: args["from-frame"] ? Number(args["from-frame"]) : undefined,
   story: args.story ? JSON.parse(await readFile(args.story, "utf8")) : undefined,
   engineParams: { ...(args.engine ? { engine: args.engine } : {}), ...(args.msaa ? { msaa: args.msaa } : {}), ...(args.sse ? { sse: args.sse } : {}) },
   log: (m) => console.error(`[worker] ${m}`),

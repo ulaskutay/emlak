@@ -39,6 +39,8 @@ export interface RenderOptions {
   headless?: boolean;
   /** Ölçüm için yalnızca bir aralık. */
   fromSec?: number;
+  /** Bölünmüş render: bu kareden başla (fromSec yerine; parçalar uç uca birleşsin diye kesin kare). */
+  fromFrame?: number;
   limitFrames?: number;
   log?: (msg: string) => void;
 }
@@ -84,7 +86,8 @@ export function chromeArgs(mode: GlMode): string[] {
 export async function pickGlMode(log: (m: string) => void = () => {}): Promise<GlMode> {
   if (process.platform !== "linux") return "auto";
   if (process.env.GL_MODE) return process.env.GL_MODE as GlMode;
-  for (const mode of ["vulkan", "egl"] as GlMode[]) {
+  // Önce EGL: RunPod NVIDIA ölçümünde Cesium Vulkan arka ucunda WebGL bağlamını kaybediyordu, EGL hem kararlı hem 4 kat hızlı.
+  for (const mode of ["egl", "vulkan"] as GlMode[]) {
     const b = await withTimeout(chromium.launch({ channel: "chrome", headless: true, args: chromeArgs(mode) }), 20000, "launch").catch(() => null);
     if (!b) continue;
     try {
@@ -119,7 +122,7 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
   const t0 = Date.now();
   const timeline = buildTimeline(o.parcel, o.story);
   const total = Math.round(timeline.duration * fps);
-  const first = Math.round((o.fromSec ?? 0) * fps);
+  const first = o.fromFrame ?? Math.round((o.fromSec ?? 0) * fps);
   const last = o.limitFrames ? Math.min(total, first + o.limitFrames) : total;
   const stateAt = (i: number) => timeline.frameState((i / Math.max(1, total - 1)) * timeline.duration);
 

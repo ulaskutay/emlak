@@ -216,6 +216,8 @@ def handler(job):
            "--fps", str(inp.get("fps", 30)), "--parallel", str(parallel), "--crf", str(inp.get("crf", 22))]
     if inp.get("limit_frames"):
         cmd += ["--limit", str(inp["limit_frames"])]
+    if inp.get("from_frame"):
+        cmd += ["--from-frame", str(int(inp["from_frame"]))]  # bölünmüş render (birden çok worker)
     if inp.get("engine"):
         cmd += ["--engine", str(inp["engine"])]  # cesium | google
     if inp.get("msaa"):

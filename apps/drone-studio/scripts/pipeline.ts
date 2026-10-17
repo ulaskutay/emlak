@@ -39,6 +39,8 @@ export interface ReelInput {
   outputPrefix?: string;
   /** Yerel render paralel sayfa. */
   parallel?: number;
+  /** RunPod'da kaç parçaya bölünüp aynı anda render edilsin (varsayılan DRONE_RENDER_CHUNKS ya da 3). */
+  renderChunks?: number;
   /** Var olan drone.mp4 ile yalnızca ses/miks (geliştirme). */
   skipRender?: boolean;
   log?: (m: string) => void;
@@ -165,54 +167,80 @@ export async function produceReel(i: ReelInput): Promise<ReelResult> {
   if (i.skipRender) {
     if (!existsSync(droneVideo)) throw new Error(`skipRender: ${droneVideo} yok`);
   } else if (i.render === "runpod") {
+    // Bölünmüş render: kareler parçalara ayrılır, her parça ayrı bir RunPod worker'ında aynı anda çizilir,
+    // sonra uç uca eklenir (toplam GPU süresi aynı, bekleme parça sayısına bölünür).
     const client = new RunpodClient(env.RUNPOD_API_KEY!, env.RUNPOD_DRONE_ENDPOINT_ID!);
-    const job = await client.run({ parcel: i.parcelText, context, story: renderStory, ...(i.outputPrefix ? { output_prefix: i.outputPrefix } : {}) });
-    log(`RunPod işi ${job.id}`);
-    let last = "";
-    let retried = false;
-    let jobId = job.id;
-    for (;;) {
-      await new Promise((r) => setTimeout(r, 4000));
-      const s = await client.status(jobId);
-      const progress = s.output as unknown;
-      if (s.status === "IN_PROGRESS" && typeof progress === "string") {
-        const line = progress.trim().split("\n").pop() ?? "";
-        if (line !== last) log(`  │ ${(last = line)}`);
-        const m = [...progress.matchAll(/(\d+)\/(\d+) kare/g)].pop();
-        if (m) await stage("render", Number(m[1]) / Number(m[2]));
-      }
-      if (s.status === "COMPLETED") {
-        const out = s.output as any;
-        // Rollout sırasında eski sürümlü bir worker senaryoyu yok sayabilir: kare sayısı kurguyla tutmalı.
-        const expected = Math.round(timeline.duration * 30);
-        if (out.frames !== expected) {
-          if (!retried) {
+    const fps = 30;
+    const totalFrames = Math.round(timeline.duration * fps);
+    const chunks = Math.max(1, Math.min(i.renderChunks ?? Number(env.DRONE_RENDER_CHUNKS ?? 3), Math.ceil(totalFrames / 90)));
+    const size = Math.ceil(totalFrames / chunks);
+    const ranges = Array.from({ length: chunks }, (_, k) => [k * size, Math.min(totalFrames, (k + 1) * size)] as const).filter(([a0, b0]) => b0 > a0);
+    const done = ranges.map(() => 0);
+    log(`RunPod: ${totalFrames} kare, ${ranges.length} parça`);
+    const job = (a0: number, b0: number) =>
+      client.run({
+        parcel: i.parcelText,
+        context,
+        story: renderStory,
+        from_frame: a0,
+        limit_frames: b0 - a0,
+        // Cesium ayarları (RunPod RTX 4090 ölçümleri, EGL): 4 sayfa, MSAA kapalı, karo keskinliği 16 (4 ile gözle fark yok, 2 kat hızlı).
+        parallel: Number(env.DRONE_PARALLEL ?? 4),
+        msaa: Number(env.DRONE_MSAA ?? 1),
+        sse: Number(env.DRONE_SSE ?? 16),
+        ...(i.outputPrefix ? { output_prefix: `${i.outputPrefix}/part${a0}` } : {}),
+      });
+    const renderPart = async (k: number) => {
+      const [a0, b0] = ranges[k]!;
+      let jobId = (await job(a0, b0)).id;
+      let retried = false;
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 4000));
+        const s = await client.status(jobId);
+        const progress = s.output as unknown;
+        if (s.status === "IN_PROGRESS" && typeof progress === "string") {
+          const m = [...progress.matchAll(/(\d+)\/(\d+) kare/g)].pop();
+          if (m) {
+            done[k] = Number(m[1]);
+            await stage("render", done.reduce((x, y) => x + y, 0) / totalFrames);
+          }
+        }
+        if (s.status === "COMPLETED") {
+          const out = s.output as any;
+          // Rollout sırasında eski sürümlü bir worker kurguyu/aralığı yok sayabilir: kare sayısı tutmalı.
+          if (out.frames !== b0 - a0) {
+            if (retried) throw new Error(`Drone worker kurguyu uygulamadı (${out.frames}/${b0 - a0} kare): worker sürümü güncel değil`);
             retried = true;
-            jobId = (await client.run({ parcel: i.parcelText, context, story: renderStory, ...(i.outputPrefix ? { output_prefix: i.outputPrefix } : {}) })).id;
-            log(`Worker kurguyu uygulamadı (${out.frames} kare, beklenen ${expected}) — eski sürüm olabilir, yeniden: ${jobId}`);
+            jobId = (await job(a0, b0)).id;
+            log(`Parça ${k + 1}: ${out.frames} kare (beklenen ${b0 - a0}) — eski sürüm olabilir, yeniden: ${jobId}`);
             continue;
           }
-          throw new Error(`Drone worker kurguyu uygulamadı (${out.frames}/${expected} kare): worker sürümü güncel değil`);
+          const v = out.video as { url?: string; base64?: string };
+          const file = join(i.workDir, `drone-part${k}.mp4`);
+          await writeFile(file, v.base64 ? Buffer.from(v.base64, "base64") : Buffer.from(await (await fetch(v.url!)).arrayBuffer()));
+          if (out.errors?.length) log(`Parça ${k + 1} uyarıları: ${out.errors.slice(0, 3).join(" | ").slice(0, 300)}`);
+          log(`Parça ${k + 1}/${ranges.length} hazır (${a0}–${b0}) · ${((s.executionTime ?? 0) / 1000).toFixed(0)} sn`);
+          return { file, out };
         }
-        const v = out.video as { url?: string; base64?: string };
-        const buf = v.base64 ? Buffer.from(v.base64, "base64") : Buffer.from(await (await fetch(v.url!)).arrayBuffer());
-        await writeFile(droneVideo, buf);
-        keyframes = { neon: out.keyframe_neon, clean: out.keyframe_clean };
-        renderer = out.renderer;
-        log(`Render: ${renderer} · ${((s.executionTime ?? 0) / 1000).toFixed(0)} sn`);
-        break;
-      }
-      if (["FAILED", "CANCELLED", "TIMED_OUT"].includes(s.status)) {
-        // Rollout sırasında iptal edilen işler olur: bir kez yeniden dene.
-        if (!retried && s.status !== "FAILED") {
-          retried = true;
-          jobId = (await client.run({ parcel: i.parcelText, context, story: renderStory, ...(i.outputPrefix ? { output_prefix: i.outputPrefix } : {}) })).id;
-          log(`RunPod işi ${s.status}, yeniden: ${jobId}`);
-          continue;
+        if (["FAILED", "CANCELLED", "TIMED_OUT"].includes(s.status)) {
+          // Rollout sırasında iptal edilen işler olur: bir kez yeniden dene.
+          if (!retried && s.status !== "FAILED") {
+            retried = true;
+            jobId = (await job(a0, b0)).id;
+            log(`Parça ${k + 1}: ${s.status}, yeniden: ${jobId}`);
+            continue;
+          }
+          throw new Error(`Drone render başarısız (parça ${k + 1}, ${s.status}): ${typeof s.error === "string" ? s.error : JSON.stringify(s.error ?? "")}`.slice(0, 1500));
         }
-        throw new Error(`Drone render başarısız (${s.status}): ${typeof s.error === "string" ? s.error : JSON.stringify(s.error ?? "")}`.slice(0, 1500));
       }
-    }
+    };
+    const parts = await Promise.all(ranges.map((_, k) => renderPart(k)));
+    const list = join(i.workDir, "parts.txt");
+    await writeFile(list, parts.map((x) => `file '${x.file.replace(/'/g, "'\\''")}'`).join("\n"));
+    await run("ffmpeg", ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", list, "-c", "copy", droneVideo]);
+    const lastOut = parts[parts.length - 1]!.out;
+    keyframes = { neon: lastOut.keyframe_neon, clean: lastOut.keyframe_clean };
+    renderer = lastOut.renderer;
   } else {
     // Yerel render (geliştirme): Chrome + Playwright yalnızca burada yüklenir.
     const { renderDrone } = await import("./render.js");
