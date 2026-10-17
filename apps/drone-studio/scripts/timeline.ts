@@ -1,91 +1,54 @@
 /**
- * Drone kurgusu: parsel ve çevre bilgisine göre kamera yolu ve her karenin görsel durumu.
+ * Drone kurgusu (arsa odaklı): her karenin kamera ve görsel durumu.
  *
- *   Açılış (3,5 sn)   yüksekten parsele dalış, neon kontur çizilir; kanca: m² sayacı + konum ilk saniyelerde
- *   Çevre turu        en önemli 3 yer: parselden yere drone uçuşu (yüksel → ilerle → alçal, süre mesafeye göre),
- *                     yerin üstünde süzülerek duruş + büyük kart, parsele dönüş (bir sonraki hedefe dönerek)
- *   Özet (2,8 sn)     kamera yükselir: parsel tüm yerlere bağlı ağ olarak görünür
- *   Final (6 sn)      parsele dalış, etrafında tur, m² ve konum; sabitlenen son kare inşaatın başlangıcı
+ *   1 Kanca     alçaktan, hızlı ve gerçekçi drone yaklaşması + yörünge; büyük başlık, neon kontur çizilir
+ *   2 Bölge     kesme → yüksek plan: mahalle sınırı çizilir, parsele pin düşer, dalga halkaları, konum etiketi
+ *   3 Tarama    aynı plan içinde parsele dalış, kuşbakışı tarama çizgisi + ızgara, m² sayacı taramayla sayar
+ *   4 Özellik   kesme → alçak yörünge (kenar ölçüleri) / kesme → vinç yükselişi; özellik kutucukları sırayla gelir
+ *   5 Kapanış   kesme → kahraman plan, m² + konum, fiyat ve iletişim kartı
  *
- * Kamera hiçbir yerde tam durmaz: uçuşlar yumuşak başlayıp biter, duruşlar sabit hızlı süzülmedir.
+ * Süreler seslendirmeye göre uzar (anlatım kesilmez). Çekimler arasında kesme + parlama + whoosh;
+ * çekim içinde kamera hiç durmaz (uç hızlar sıfır değil, Hermite eğrisi).
  */
-import type { FrameState, ParcelInfo } from "../src/types.js";
+import type { FeatureChip, FrameState, ParcelInfo } from "../src/types.js";
 import type { Story, StoryWord } from "./story.js";
 
 const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
 /** t'nin [a, b] aralığındaki ilerlemesi (0..1). */
 const span = (t: number, a: number, b: number) => clamp01((t - a) / (b - a));
-/** Uçlarda hız ve ivme sıfır: kamerada sarsıntısız kalkış/varış. */
 const smoother = (u: number) => u * u * u * (u * (u * 6 - 15) + 10);
+const easeOutBack = (u: number) => 1 + 2.2 * (u - 1) ** 3 + 1.2 * (u - 1) ** 2;
 const lerp = (a: number, b: number, u: number) => a + (b - a) * u;
-/** En kısa yönden açı geçişi (359° → 1° arası 2°). */
-const lerpAngle = (a: number, b: number, u: number) => a + ((((b - a) % 360) + 540) % 360 - 180) * u;
-function bearing(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
-  const k = Math.cos((a.lat * Math.PI) / 180);
-  return ((Math.atan2((b.lng - a.lng) * k, b.lat - a.lat) * 180) / Math.PI + 360) % 360;
-}
+
+/** Kamera anahtarı: heading sürekli sayı (360'a sarılmaz), range metre. */
+type Key = { t: number; lat: number; lng: number; range: number; tilt: number; heading: number };
+type Shot = { start: number; end: number; keys: Key[] };
 
 /**
- * Kamera anahtar karesi; geçiş bu kareye gelen yolu tanımlar.
- *   ease   yumuşak başla/bitir (varsayılan)
- *   drift  sabit hızlı süzülme (duruşlar: kamera durmaz)
- *   fly    drone uçuşu: yol boyunca peak menziline yükselip alçalır, uçuşun ortasında harita biraz daha yukarıdan görünür
+ * Çekim içi kamera: Hermite eğrisi, menzil log uzayında. Eğimler monoton (Fritsch–Carlson benzeri): yön değiştiren
+ * anahtarda hız sıfır, aşma yok (kamera hedefin altına inip geri çıkmaz). Uçlarda hız sürer (kesmeye canlı girilir).
  */
-type Key = { t: number; lat: number; lng: number; range: number; tilt: number; heading: number; move?: "ease" | "drift" | "fly"; peak?: number };
-
-/** Uçuşta menzil (log) eğrisi: uçlar arasında logaritmik geçiş + ortada peak'e yükselme. */
-function flyLogRange(a: Key, b: Key, u: number) {
-  const la = Math.log(a.range);
-  const lb = Math.log(b.range);
-  const lift = b.peak ? Math.max(0, Math.log(b.peak) - Math.max(la, lb)) : 0;
-  return lerp(la, lb, u) + lift * Math.sin(Math.PI * u);
-}
-
-/**
- * Uçuşta yatay ilerleme: ekrandaki kayma hızı ≈ yer hızı / menzil. İlerlemeyi menzille ağırlıklandırınca
- * kamera alçaktayken yavaş, yüksekteyken hızlı ilerler, ekranda akış düzgün olur (van Wijk fly-to).
- */
-const flyTables = new WeakMap<Key, number[]>();
-function flyProgress(a: Key, b: Key, u: number) {
-  let table = flyTables.get(b);
-  if (!table) {
-    const N = 200;
-    table = [0];
-    for (let i = 1; i <= N; i++) {
-      const v = (i - 0.5) / N;
-      // smoother'ın türevi (30v²(1-v)²) zamanlamayı, menzil ise o andaki ekran ölçeğini verir.
-      table.push(table[i - 1]! + Math.exp(flyLogRange(a, b, v)) * 30 * v * v * (1 - v) * (1 - v));
-    }
-    const total = table[N]!;
-    table = table.map((x) => x / total);
-    flyTables.set(b, table);
-  }
-  const x = u * (table.length - 1);
-  const i = Math.min(table.length - 2, Math.floor(x));
-  return lerp(table[i]!, table[i + 1]!, x - i);
-}
-
-function cameraAt(keys: Key[], t: number) {
-  let i = keys.findIndex((k, j) => j < keys.length - 1 && t <= keys[j + 1]!.t);
+function shotCamera(keys: Key[], t: number) {
+  const ch = ["lat", "lng", "range", "tilt", "heading"] as const;
+  const val = (k: Key, c: (typeof ch)[number]) => (c === "range" ? Math.log(k.range) : k[c]);
+  let i = keys.findIndex((_, j) => j < keys.length - 1 && t <= keys[j + 1]!.t);
   if (i < 0) i = keys.length - 2;
   const a = keys[i]!;
   const b = keys[i + 1]!;
-  const raw = span(t, a.t, b.t);
-  const u = b.move === "drift" ? raw : smoother(raw);
-  const fly = b.move === "fly";
-  // Menzil logaritmik uzayda: geniş açıdan yakına geçiş doğal.
-  const logRange = fly ? flyLogRange(a, b, u) : lerp(Math.log(a.range), Math.log(b.range), u);
-  const tilt = lerp(a.tilt, b.tilt, u) - (fly ? 14 * Math.sin(Math.PI * u) : 0);
-  const s = fly ? flyProgress(a, b, raw) : u;
-  return {
-    lat: lerp(a.lat, b.lat, s),
-    lng: lerp(a.lng, b.lng, s),
-    range: Math.exp(logRange),
-    tilt,
-    heading: lerpAngle(a.heading, b.heading, u),
-    /** Konumun a→b ilerlemesi: bağlantı çizgisinin ucu ekran merkeziyle birlikte gider. */
-    progress: s,
+  const secant = (j: number, c: (typeof ch)[number]) => (val(keys[j + 1]!, c) - val(keys[j]!, c)) / (keys[j + 1]!.t - keys[j]!.t || 1);
+  const slope = (j: number, c: (typeof ch)[number]) => {
+    if (j === 0) return secant(0, c);
+    if (j === keys.length - 1) return secant(j - 1, c);
+    const [d0, d1] = [secant(j - 1, c), secant(j, c)];
+    return d0 * d1 <= 0 ? 0 : 2 / (1 / d0 + 1 / d1);
   };
+  const dt = b.t - a.t;
+  const s = clamp01((t - a.t) / dt);
+  const [s2, s3] = [s * s, s * s * s];
+  const h = [2 * s3 - 3 * s2 + 1, s3 - 2 * s2 + s, -2 * s3 + 3 * s2, s3 - s2];
+  const v = {} as Record<(typeof ch)[number], number>;
+  for (const c of ch) v[c] = h[0]! * val(a, c) + h[1]! * dt * slope(i, c) + h[2]! * val(b, c) + h[3]! * dt * slope(i + 1, c);
+  return { ...v, range: Math.exp(v.range), heading: ((v.heading % 360) + 360) % 360 };
 }
 
 /** Seslendirme klibinin videodaki yeri (ses miksi buna göre yapılır). */
@@ -109,47 +72,70 @@ function chunkWords(words: StoryWord[]) {
   return chunks;
 }
 
+/** Halkanın metre cinsinden sınır kutusu ve merkezi. */
+function bounds(ring: { lat: number; lng: number }[]) {
+  const lats = ring.map((q) => q.lat);
+  const lngs = ring.map((q) => q.lng);
+  const [s, n, w, e] = [Math.min(...lats), Math.max(...lats), Math.min(...lngs), Math.max(...lngs)];
+  const k = Math.cos((((s + n) / 2) * Math.PI) / 180);
+  return { center: { lat: (s + n) / 2, lng: (w + e) / 2 }, widthM: (e - w) * 111_320 * k, heightM: (n - s) * 111_320 };
+}
+
 /**
- * Zaman çizelgesi parsel ve çevre bilgisine göre bir kez kurulur.
- * story verilirse sahneler seslendirme kadar uzar (anlatım hiç kesilmez) ve altyazı/ses noktaları üretilir.
+ * Zaman çizelgesi parsel ve senaryoya göre bir kez kurulur.
+ * story verilirse sahneler seslendirme kadar uzar ve altyazı/ses noktaları üretilir.
  */
 export function buildTimeline(p: ParcelInfo, story?: Story) {
-  const voice = (id: string) => story?.scenes.find((s) => s.id === id)?.voice;
-  const dur = (id: string) => voice(id)?.duration ?? 0;
+  const dur = (id: string) => story?.scenes.find((s) => s.id === id)?.voice?.duration ?? 0;
+  const has = (id: string) => !!story?.scenes.some((s) => s.id === id);
   const r = Math.max(25, p.radiusM);
   const P = p.centroid;
-  const h0 = (p.longestEdgeHeading + 25) % 360;
-  const Rp = Math.max(r * 12, 900); // turda parselin görüldüğü mesafe
+  const h0 = p.longestEdgeHeading;
+  const hood = p.hood && p.hood.ring.length > 2 ? p.hood : null;
 
-  // En önemli 3 yer (öncelik sırası API'den gelir); çok uzaktakiler uçuşu uzatır.
-  const tour = p.pois
-    .map((poi, index) => ({ poi, index }))
-    .filter(({ poi }) => poi.distanceM <= 20000)
-    .slice(0, 3)
-    .map((s) => {
-      // Uçuş süresi mesafeyle logaritmik artar: 1,2 km ≈ 2,5 sn, 4 km ≈ 3,3 sn, 16 km ≈ 4,2 sn.
-      const out = Math.min(4.4, Math.max(2.4, 1.6 + 0.65 * Math.log(s.poi.distanceM / 300)));
-      // Anlatım uçuşla başlar, yer kartı ekrandayken biter: gerekirse duruş uzar.
-      const hold = Math.max(1.3, 0.25 + dur(`poi-${s.index}`) + 0.35 - out);
-      return { ...s, out, hold, back: Math.max(2, out * 0.8) };
-    });
+  // ---- Sahne süreleri (anlatım + nefes payı, en az görsel süre) ----
+  const T_HOOK = Math.max(3.4, 0.3 + dur("hook") + 0.5);
+  const T_REGION = Math.max(hood ? 4.6 : 3.2, 0.2 + dur("region") + 0.6);
+  const DIVE = 2.0; // bölge planından parselin üstüne iniş
+  const T_SCAN = Math.max(3.0, dur("scan") + 1.0);
+  const T_FEAT = Math.max(story?.features?.length ? 6.5 : 4, 0.3 + dur("features") + 0.8);
+  const T_FINAL = Math.max(4.8, 0.4 + dur("final") + 1.6);
 
-  const INTRO = Math.max(3.5, 0.3 + dur("hook") + 0.5);
-  let T = INTRO;
-  const legs = tour.map((s) => {
-    const leg = { ...s, start: T, arrive: T + s.out, leave: T + s.out + s.hold, end: T + s.out + s.hold + s.back };
-    T = leg.end;
-    return leg;
-  });
-  const tourEnd = T;
-  const SUMMARY = tour.length ? Math.max(2.8, 0.2 + dur("summary") + 0.4) : 0;
-  const finalStart = tourEnd + SUMMARY;
-  const FINAL = Math.max(6, 0.5 + dur("final") + 1.0);
-  const duration = finalStart + FINAL;
+  const t1 = T_HOOK; // kesme: bölge
+  const tDive = t1 + T_REGION;
+  const tScan = tDive + DIVE;
+  const t3 = tScan + T_SCAN; // kesme: özellikler
+  const tMid = t3 + T_FEAT * 0.5; // kesme: vinç
+  const t4 = t3 + T_FEAT; // kesme: kapanış
+  const duration = t4 + T_FINAL;
 
-  // Seslendirme klipleri: hangi an başlar (ses miksi ve altyazı).
-  const cueStart: Record<string, number> = { hook: 0.3, summary: tourEnd + 0.2, final: finalStart + 0.5 };
-  legs.forEach((leg) => (cueStart[`poi-${leg.index}`] = leg.start + 0.25));
+  // ---- Kamera çekimleri ----
+  const regionView = (() => {
+    if (!hood) return { center: P, range: Math.max(1600, r * 28) };
+    const b = bounds(hood.ring);
+    // Dikey (9:16) kadraj dar: sınırın tamamı sığsın diye genişliğin ~2,3 katı menzil; parsel merkeze yakın kalsın.
+    const range = Math.min(16000, Math.max(1400, Math.max(b.widthM * 2.3, b.heightM * 1.35)));
+    return { center: { lat: lerp(b.center.lat, P.lat, 0.25), lng: lerp(b.center.lng, P.lng, 0.25) }, range };
+  })();
+  const K = (t: number, at: { lat: number; lng: number }, range: number, tilt: number, heading: number): Key => ({ t, ...at, range, tilt, heading });
+  const shots: Shot[] = [
+    // 1 Kanca: alçak, hızlı yaklaşma + yörünge (gerçek drone hissi: ufka yakın bakış).
+    { start: 0, end: t1, keys: [K(0, P, r * 11, 74, h0 + 150), K(t1 * 0.55, P, r * 6, 69, h0 + 178), K(t1, P, r * 4.2, 64, h0 + 205)] },
+    // 2 Bölge: yukarıdan mahalle sınırı, yavaş dönüş.
+    { start: t1, end: tDive, keys: [K(t1, regionView.center, regionView.range * 1.1, 20, h0 - 25), K(tDive, regionView.center, regionView.range, 14, h0 - 8)] },
+    // 3 Dalış → tarama (bölgeyle kesintisiz): parselin tam üstüne, kuşbakışı.
+    { start: tDive, end: t3, keys: [K(tDive, regionView.center, regionView.range, 14, h0 - 8), K(tScan, P, r * 5.4, 6, h0), K(t3, P, r * 4.8, 4, h0 + 9)] },
+    // 4a Alçak yörünge: kenar ölçüleri, ilk kutucuklar.
+    { start: t3, end: tMid, keys: [K(t3, P, r * 5.6, 66, h0 + 35), K(tMid, P, r * 4.6, 63, h0 + 105)] },
+    // 4b Vinç: karşı açıdan alçaktan yükselen plan.
+    { start: tMid, end: t4, keys: [K(tMid, P, r * 3.4, 54, h0 + 245), K(t4, P, r * 7.5, 40, h0 + 285)] },
+    // 5 Kapanış: kahraman plan, yavaş yörünge ve geri çekilme.
+    { start: t4, end: duration, keys: [K(t4, P, r * 6.5, 50, h0 + 120), K(duration, P, r * 9.5, 44, h0 + 165)] },
+  ];
+  const cuts = [t1, t3, tMid, t4];
+
+  // ---- Seslendirme noktaları ve altyazı ----
+  const cueStart: Record<string, number> = { hook: 0.3, region: t1 + 0.4, scan: tScan + 0.2, features: t3 + 0.3, final: t4 + 0.4 };
   const cues: Cue[] = (story?.scenes ?? [])
     .filter((s) => s.voice && cueStart[s.id] !== undefined)
     .map((s) => ({ id: s.id, at: cueStart[s.id]!, duration: s.voice!.duration, words: s.voice!.words, file: s.voice!.file }));
@@ -160,7 +146,6 @@ export function buildTimeline(p: ParcelInfo, story?: Story) {
       end: c.at + ws[ws.length - 1]!.end + 0.15,
     })),
   );
-
   function captionAt(t: number): FrameState["caption"] {
     const i = captionChunks.findIndex((c, k) => t >= c.start && t < (captionChunks[k + 1]?.start ?? c.end + 0.6) && t < c.end + 0.6);
     if (i < 0) return null;
@@ -170,78 +155,55 @@ export function buildTimeline(p: ParcelInfo, story?: Story) {
     return { words: c.words.map((w) => w.word), active, pop: span(t, c.start, c.start + 0.18) };
   }
 
-  const keys: Key[] = [
-    // Açılış: yüksekten, düz bakışla parsele dalış ve dönüş.
-    { t: 0, ...P, range: Math.max(3200, r * 55), tilt: 12, heading: h0 - 70 },
-    { t: INTRO, ...P, range: Rp * 0.85, tilt: 45, heading: legs[0] ? bearing(P, legs[0].poi.position) - 15 : h0 },
-  ];
-  legs.forEach((leg, k) => {
-    const dir = bearing(P, leg.poi.position);
-    // Yerin üstünde: uçuş yönüne bakış, hedef ekran ortasında; yolculuk sırasında iki uç birlikte görünsün diye yükselme.
-    const Rpoi = Math.min(1500, Math.max(450, leg.poi.distanceM * 0.22));
-    const peak = leg.poi.distanceM * 0.5;
-    keys.push({ t: leg.arrive, ...leg.poi.position, range: Rpoi, tilt: 50, heading: dir, move: "fly", peak });
-    keys.push({ t: leg.leave, ...leg.poi.position, range: Rpoi * 0.86, tilt: 53, heading: dir + 10, move: "drift" });
-    // Dönüşte bir sonraki hedefe doğru dönerek parsele in: sonraki uçuş dönmeden başlar.
-    const next = legs[k + 1];
-    const nextHeading = next ? bearing(P, next.poi.position) - 15 : dir + 40;
-    keys.push({ t: leg.end, ...P, range: Rp, tilt: 45, heading: nextHeading, move: "fly", peak });
-  });
-  const hEnd = keys[keys.length - 1]!.heading;
-  if (legs.length) {
-    // Özet: bağlantı ağı tek karede — en uzak yer bile ekranın kenarına yakın görünsün.
-    const far = Math.max(...legs.map((l) => l.poi.distanceM));
-    const Rs = Math.min(9000, Math.max(2200, far * 0.55));
-    keys.push(
-      { t: tourEnd + 1.7, ...P, range: Rs, tilt: 30, heading: hEnd + 15 },
-      { t: finalStart, ...P, range: Rs * 0.92, tilt: 32, heading: hEnd + 25, move: "drift" },
-    );
-  }
-  const hf = keys[keys.length - 1]!.heading;
-  keys.push(
-    { t: finalStart + 2.2, ...P, range: r * 7.5, tilt: 52, heading: hf + 30 },
-    { t: duration - 0.4, ...P, range: r * 6.1, tilt: 57, heading: hf + 120, move: "drift" },
-    { t: duration, ...P, range: r * 6.0, tilt: 57, heading: hf + 126, move: "drift" },
-  );
+  // Özellik kutucukları: 4a ve 4b'ye bölünür, her biri 0,55 sn arayla gelir; kapanışta çekilir.
+  const feats = story?.features ?? [];
+  const firstHalf = Math.ceil(feats.length / 2);
+  const featIn = feats.map((_, i) => (i < firstHalf ? t3 + 0.5 + i * 0.6 : tMid + 0.4 + (i - firstHalf) * 0.6));
+
+  const hookLines = story?.hookLines ?? [];
 
   function frameState(t: number): FrameState {
-    const cam = cameraAt(keys, t);
-    const lines = p.pois.map(() => 0);
-    const markers = p.pois.map(() => 0);
-    const pills = p.pois.map(() => 0);
-    let card: FrameState["card"] = null;
-    const dive = finalStart + 0.6; // finale dalışta tur grafikleri çekilir
-    legs.forEach((leg) => {
-      // Çizgi ucu kamera merkeziyle aynı ilerler: ekranda hedefe "çekiliyormuş" gibi görünür.
-      if (t >= leg.start && t < dive) lines[leg.index] = t < leg.arrive ? cam.progress : 1;
-      markers[leg.index] = t >= leg.start + leg.out * 0.7 && t < dive ? 1 : 0;
-      if (t >= leg.arrive - 0.3 && t <= leg.leave + 0.3) {
-        card = { index: leg.index, progress: Math.min(span(t, leg.arrive - 0.3, leg.arrive + 0.2), 1 - span(t, leg.leave, leg.leave + 0.3)) };
-      }
-      // Ziyaret edilen yer dönüşte soldaki listeye eklenir; finalde liste çekilir.
-      pills[leg.index] = Math.min(span(t, leg.leave + 0.1, leg.leave + 0.5), 1 - span(t, dive - 0.4, dive + 0.2));
-    });
-    // m² kartı: açılışta kanca olarak, turda gizli (yer kartıyla çakışmasın), finalde yeniden.
-    const hookOut = legs.length ? 1 - span(t, INTRO - 0.4, INTRO + 0.1) : 1;
-    const title = t < finalStart ? Math.min(span(t, 0.4, 1.0), hookOut) : span(t, finalStart + 1.6, finalStart + 2.2);
+    const shot = shots.find((s) => t < s.end) ?? shots[shots.length - 1]!;
+    const cam = shotCamera(shot.keys, Math.min(t, shot.end));
+    // Drone yatışı: yön değişim hızıyla orantılı, dönüşe doğru (en fazla 9°).
+    const ahead = shotCamera(shot.keys, Math.min(t + 0.05, shot.end));
+    const dh = ((((ahead.heading - cam.heading) % 360) + 540) % 360) - 180;
+    const roll = Math.max(-9, Math.min(9, (dh / 0.05) * 0.2));
+    const features: FeatureChip[] = feats.map((f, i) => ({ ...f, progress: Math.min(easeOutBack(span(t, featIn[i]!, featIn[i]! + 0.45)), 1 - span(t, t4 - 0.3, t4)) }));
+    const scanP = smoother(span(t, tScan + 0.1, tScan + Math.min(2.4, T_SCAN - 0.4)));
     return {
-      camera: { ...cam, altitude: p.elevation ?? 0 },
-      mode: t > INTRO - 0.5 && t < dive ? "HYBRID" : "SATELLITE",
-      neon: span(t, 1.2, 3.0),
-      fill: span(t, 1.8, 3.2),
-      lines,
-      markers,
-      pills,
-      card,
-      title,
-      counter: span(t, 0.5, 2.6),
-      location: t < finalStart ? Math.min(span(t, 1.2, 1.7), hookOut) : span(t, finalStart + 2.4, finalStart + 3.0),
+      camera: { ...cam, altitude: p.elevation ?? 0, roll },
+      mode: t >= t1 && t < tDive + 0.6 ? "HYBRID" : "SATELLITE",
+      // Kontur kancada çizilir; bölge planında da görünür (pinin altında küçük), taramada dolgu ızgaraya geçer.
+      neon: span(t, 0.4, 1.9),
+      fill: t < tScan ? span(t, 1.2, 2.4) * 0.7 : Math.max(0.25, 1 - span(t, tScan, tScan + 0.5)),
+      hood: hood ? { draw: smoother(span(t, t1 + 0.3, t1 + 2.1)), fill: span(t, t1 + 1.6, t1 + 2.4), opacity: 1 - span(t, tScan - 0.6, tScan) } : null,
+      pin: { drop: smoother(span(t, t1 + 0.9, t1 + 1.7)), pulse: Math.max(0, t - (t1 + 1.6)) / 1.4, opacity: t >= t1 && t < tScan - 0.3 ? 1 : 0 },
+      scan: t >= tScan && t < t3 ? { progress: scanP, line: Math.min(span(t, tScan, tScan + 0.2), 1 - span(t, tScan + 2.3, tScan + 2.6)), grid: span(t, tScan, tScan + 0.3) } : null,
+      // Çit duvarı: özellik bölümünde yerden yükselir, sonuna kadar kalır.
+      fence: span(t, t3 + 0.15, t3 + 1.1),
+      edges: t >= t3 && t < tMid ? Math.min(span(t, t3 + 0.2, t3 + 0.6), 1 - span(t, tMid - 0.3, tMid)) : 0,
+      hook: hookLines.length ? { lines: hookLines, progress: Math.min(span(t, 0.15, 0.6), 1 - span(t, t1 - 0.35, t1)) } : null,
+      place: story?.place ? { ...story.place, progress: Math.min(span(t, t1 + 1.3, t1 + 1.8), 1 - span(t, tDive + 0.2, tDive + 0.6)) } : null,
+      area: {
+        progress: t < t4 ? Math.min(span(t, tScan + 0.1, tScan + 0.5), 1 - span(t, t3 - 0.3, t3)) : span(t, t4 + 0.6, t4 + 1.1),
+        counter: t < t4 ? scanP : 1,
+        sub: t >= t4 ? story?.place?.title : undefined,
+      },
+      features,
       caption: captionAt(t),
-      endcard: story?.endcard ? { ...story.endcard, progress: span(t, duration - 3.2, duration - 2.6) } : null,
-      zoning: story?.zoning,
+      endcard: story?.endcard ? { ...story.endcard, progress: span(t, duration - 3.0, duration - 2.4) } : null,
+      flash: Math.max(0, ...cuts.map((c) => Math.min(span(t, c - 0.08, c), 1 - span(t, c, c + 0.35)) * 0.6)),
+      contact:
+        story?.endcard?.officeName || story?.endcard?.phone
+          ? { officeName: story.endcard.officeName, phone: story.endcard.phone, progress: Math.min(span(t, t1, t1 + 0.5), 1 - span(t, duration - 3.2, duration - 2.8)) }
+          : null,
     };
   }
-  /** Geçiş efektleri: her uçuşun kalkışı (gidiş ve dönüş) ve finale dalış. */
-  const whooshes = [...legs.flatMap((l) => [l.start, l.leave]), ...(legs.length ? [finalStart] : [])];
-  return { duration, frameState, tour, cues, whooshes };
+
+  /** Geçiş sesleri: her kesme + dalış başlangıcı. */
+  const whooshes = [...cuts, tDive + 0.1];
+  /** İnşaat sahnesinin başlangıç karesi: alçak yörüngenin başı (parsel ortada, eğik bakış). */
+  const keyframe = frameState(t3 + 0.05);
+  return { duration, frameState, cues, whooshes, keyframe, has };
 }

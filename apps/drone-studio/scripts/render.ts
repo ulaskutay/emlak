@@ -213,11 +213,12 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
     );
     const renderSec = (Date.now() - tr) / 1000;
 
-    // Son kare (inşaat sahnesinin başlangıcı) son parçayı çizen sayfada: yazısız, neonlu ve neonsuz.
+    // İnşaat sahnesinin başlangıç karesi (kurgudaki yakın çekim anı): yazısız, neonlu ve neonsuz.
     const lastPage = pages[pages.length - 1]!;
     const keyframeNeon = join(o.outDir, "keyframe-neon.png");
     const keyframeClean = join(o.outDir, "keyframe-clean.png");
     if (last === total) {
+      await lastPage.evaluate((s) => (window as any).studio.render(s, 30000), timeline.keyframe);
       await lastPage.evaluate(() => (window as any).studio.clean(true));
       await lastPage.screenshot({ path: keyframeNeon });
       await lastPage.evaluate(() => (window as any).studio.clean(false));

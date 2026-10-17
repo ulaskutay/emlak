@@ -120,10 +120,12 @@ export class ElevenLabsClient {
     const res = await this.post(`/v1/text-to-speech/${voice}/with-timestamps?output_format=mp3_44100_128`, {
       text,
       model_id: this.model,
-      previous_text: ctx.previous,
-      next_text: ctx.next,
-      // Reklam anlatımı: canlı ama tutarlı
-      voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.35, use_speaker_boost: true },
+      // Dil sabit Türkçe: v3 özel adları ("Ezine") zaman zaman İngilizce okuyor.
+      language_code: "tr",
+      // eleven_v3 komşu metin bağlamını desteklemiyor (istek reddediliyor).
+      ...(this.model === "eleven_v3" ? {} : { previous_text: ctx.previous, next_text: ctx.next }),
+      // Reklam anlatımı: canlı ama tutarlı; hız 0,9: sayılar ("on bir") yutulmadan, net söylenir.
+      voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.3, use_speaker_boost: true, speed: 0.9 },
     });
     const data = (await res.json()) as {
       audio_base64: string;
@@ -132,6 +134,17 @@ export class ElevenLabsClient {
     const words = wordsFromAlignment(data.alignment);
     const ends = data.alignment.character_end_times_seconds;
     return { audio: Buffer.from(data.audio_base64, "base64"), duration: ends[ends.length - 1] ?? 0, words };
+  }
+
+  /** Konuşmayı yazıya çevirir (Scribe): seslendirmenin metni doğru okuyup okumadığını denetlemek için. */
+  async transcribe(audio: Buffer, languageCode = "tr"): Promise<string> {
+    const fd = new FormData();
+    fd.append("model_id", "scribe_v1");
+    fd.append("language_code", languageCode);
+    fd.append("file", new Blob([new Uint8Array(audio)]), "speech.mp3");
+    const res = await fetch(`${API}/v1/speech-to-text`, { method: "POST", headers: { "xi-api-key": this.o.apiKey }, body: fd });
+    if (!res.ok) throw new Error(`ElevenLabs speech-to-text ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    return ((await res.json()) as { text: string }).text;
   }
 
   /** Enstrümantal fon müziği (Eleven Music). */

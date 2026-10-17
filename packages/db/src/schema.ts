@@ -97,7 +97,7 @@ export const videos = pgTable(
   (t) => [index("videos_user_created_idx").on(t.userId, t.createdAt)],
 );
 
-/** Çevre bilgisi önbelleği (Overpass/Nominatim ~80 sn): parsel merkezine göre. */
+/** Çevre bilgisi önbelleği (Google Places + yükseklik verisi): parsel merkezine göre. */
 export const parcelContexts = pgTable("parcel_contexts", {
   key: text("key").primaryKey(),
   context: jsonb("context").notNull(),

@@ -29,7 +29,7 @@ const ROOT = resolve(import.meta.dirname, "../../..");
 const outDir = join(ROOT, "assets/parcels", basename(args.parcel, extname(args.parcel)));
 await mkdir(outDir, { recursive: true });
 
-// Yerel önbellekteki çevre bilgisi işle gider: worker yavaş Overpass sorgusunu tekrarlamaz.
+// Yerel önbellekteki çevre bilgisi işle gider: worker çevre sorgularını tekrarlamaz.
 const contextFile = join(outDir, "context.json");
 const context = existsSync(contextFile) ? JSON.parse(await readFile(contextFile, "utf8")) : undefined;
 

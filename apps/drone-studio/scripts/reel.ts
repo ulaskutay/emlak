@@ -2,6 +2,7 @@
  * Arsa Reels CLI: üretim hattını (scripts/pipeline.ts) bir parsel dosyası için çalıştırır.
  *
  *   pnpm reel -- --parcel assets/parcels/<dosya>.geojson [--voice <id>] [--runpod] [--no-voice] [--no-music]
+ *                [--pois <seçim.json>]   (paneldeki gibi seçilmiş çevre noktaları; yoksa otomatik seçilir)
  *                [--price 12500000 --office "Etic Emlak" --phone "0532 000 00 00" --zoning "Konut imarlı"]
  *
  * Çıktı: assets/parcels/<ad>/reel/reel.mp4 (ara dosyalar ve ses önbelleği aynı klasörde)
@@ -27,6 +28,7 @@ const { values: args } = parseArgs({
     office: { type: "string" },
     phone: { type: "string" },
     zoning: { type: "string" },
+    pois: { type: "string" },
   },
 });
 if (!args.parcel) throw new Error("--parcel assets/parcels/<dosya>.geojson gerekli");
@@ -44,6 +46,7 @@ const r = await produceReel({
     officeName: args.office,
     phone: args.phone,
     zoning: args.zoning,
+    ...(args.pois ? { pois: JSON.parse(await readFile(resolve(ROOT, args.pois), "utf8")) } : {}),
   },
   voiceId: args.voice,
   voice: !args["no-voice"],

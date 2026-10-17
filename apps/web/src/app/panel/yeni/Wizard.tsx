@@ -4,11 +4,21 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ParcelShape } from "@/components/ParcelShape";
 import { formatArea, parcelPlace, parcelTitle } from "@/lib/format";
+import { PoiStep, type PoiItem } from "./PoiStep";
 
-type Summary = { areaM2: number; ada?: string; parsel?: string; nitelik?: string; il?: string; ilce?: string; mahalle?: string };
+type Summary = {
+  areaM2: number;
+  ada?: string;
+  parsel?: string;
+  nitelik?: string;
+  il?: string;
+  ilce?: string;
+  mahalle?: string;
+  centroid: { lat: number; lng: number };
+};
 type Parsed = { fileName: string; text: string; summary: Summary; ring: { lat: number; lng: number }[]; hook: string };
 
-const STEPS = ["Parsel dosyası", "İlan bilgileri", "Ses ve müzik"];
+const STEPS = ["Parsel dosyası", "Yakın noktalar", "İlan bilgileri", "Ses ve müzik"];
 const OFFICE_KEY = "arsa-video:office";
 
 export function Wizard() {
@@ -17,6 +27,8 @@ export function Wizard() {
   const [parcel, setParcel] = useState<Parsed | null>(null);
   const [listing, setListing] = useState({ price: "", zoning: "", officeName: "", phone: "" });
   const [voiceId, setVoiceId] = useState<string | null>(null);
+  // Videoya yalnızca kullanıcının seçtiği noktalar girer (boşsa yalnızca parsel anlatılır).
+  const [pois, setPois] = useState<PoiItem[]>([]);
   const [music, setMusic] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -48,6 +60,7 @@ export function Wizard() {
           ...(listing.zoning.trim() ? { zoning: listing.zoning.trim() } : {}),
           ...(listing.officeName.trim() ? { officeName: listing.officeName.trim() } : {}),
           ...(listing.phone.trim() ? { phone: listing.phone.trim() } : {}),
+          pois,
         },
         ...(voiceId ? { voiceId } : {}),
         music,
@@ -71,9 +84,30 @@ export function Wizard() {
         ))}
       </ol>
 
-      {step === 0 && <ParcelStep parcel={parcel} onParsed={setParcel} onNext={() => setStep(1)} />}
+      {step === 0 && (
+        <ParcelStep
+          parcel={parcel}
+          onParsed={(p) => (setParcel(p), setPois([]))} // yeni parselde seçim baştan
+          onNext={() => setStep(1)}
+        />
+      )}
 
-      {step === 1 && (
+      {step === 1 && parcel && (
+        <PoiStep
+          key={parcel.fileName + parcel.summary.centroid.lat}
+          center={parcel.summary.centroid}
+          ring={parcel.ring}
+          district={parcel.summary.ilce}
+          province={parcel.summary.il}
+          neighbourhood={parcel.summary.mahalle}
+          selected={pois}
+          onChange={setPois}
+          onBack={() => setStep(0)}
+          onNext={() => setStep(2)}
+        />
+      )}
+
+      {step === 2 && (
         <div className="card space-y-5 p-6">
           <p className="text-sm text-mute">
             Hepsi isteğe bağlı. Fiyat videonun sonunda okunur ve kapanış kartında yazar; telefon yalnızca kartta görünür.
@@ -104,13 +138,13 @@ export function Wizard() {
             </div>
           </div>
           <div className="flex justify-between">
-            <button className="btn-ghost" onClick={() => setStep(0)}>← Geri</button>
-            <button className="btn-primary" onClick={() => setStep(2)}>Devam →</button>
+            <button className="btn-ghost" onClick={() => setStep(1)}>← Geri</button>
+            <button className="btn-primary" onClick={() => setStep(3)}>Devam →</button>
           </div>
         </div>
       )}
 
-      {step === 2 && parcel && (
+      {step === 3 && parcel && (
         <div className="space-y-4">
           <VoiceStep hook={parcel.hook} voiceId={voiceId} onSelect={setVoiceId} />
           <label className="card flex cursor-pointer items-center justify-between p-5">
@@ -122,7 +156,7 @@ export function Wizard() {
           </label>
           {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
           <div className="flex justify-between">
-            <button className="btn-ghost" onClick={() => setStep(1)}>← Geri</button>
+            <button className="btn-ghost" onClick={() => setStep(2)}>← Geri</button>
             <button className="btn-primary" disabled={busy} onClick={submit}>{busy ? "Gönderiliyor…" : "Videoyu oluştur"}</button>
           </div>
         </div>

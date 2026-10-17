@@ -7,6 +7,8 @@ try {
 } catch {}
 
 const config: NextConfig = {
+  // Tarayıcıdaki harita (yakın nokta seçimi): Maps JavaScript anahtarı zaten istemci anahtarıdır (alan adı kısıtlı).
+  env: { NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY ?? "" },
   // Coolify/Docker: bağımsız çalışan sunucu çıktısı
   output: "standalone",
   outputFileTracingRoot: resolve(import.meta.dirname, "../.."),

@@ -14,51 +14,62 @@
       gmp-map-3d { width: 100%; height: 100%; }
       /* Üst/alt kenarda yazıların okunması için hafif karartma */
       #vignette { position: absolute; inset: 0; pointer-events: none;
-                  background: linear-gradient(to bottom, rgba(0,0,0,.45) 0%, rgba(0,0,0,0) 22%, rgba(0,0,0,0) 62%, rgba(0,0,0,.55) 100%); }
+                  background: linear-gradient(to bottom, rgba(0,0,0,.28) 0%, rgba(0,0,0,0) 18%, rgba(0,0,0,0) 70%, rgba(0,0,0,.32) 100%); }
 
       .anim { opacity: 0; will-change: opacity, transform; }
-      #title { position: absolute; left: 0; right: 0; top: 130px; text-align: center; pointer-events: none; }
-      #title .area { display: inline-block; font-size: 132px; font-weight: 900; color: #fff; letter-spacing: -3px;
-                     padding: 14px 52px; border-radius: 30px; background: rgba(0, 0, 0, 0.38);
-                     border: 5px solid #00e5ff; box-shadow: 0 0 46px rgba(0, 229, 255, 0.6), inset 0 0 22px rgba(0,229,255,.25); }
-      #title .sub { margin-top: 24px; font-size: 50px; font-weight: 800; color: #00e5ff; text-shadow: 0 3px 14px rgba(0,0,0,.9); }
-      #location { position: absolute; left: 60px; right: 60px; top: 470px; text-align: center; font-size: 42px; font-weight: 700;
-                  line-height: 1.25; color: #fff; text-shadow: 0 3px 14px rgba(0,0,0,.95); pointer-events: none; }
-      #location .mevkii { display: block; margin-top: 6px; font-size: 34px; font-weight: 600; color: rgba(255,255,255,.85); }
-
-      #pois { position: absolute; left: 48px; bottom: 210px; display: flex; flex-direction: column; gap: 22px; pointer-events: none; }
-      .pill { display: flex; align-items: center; gap: 18px; padding: 16px 30px 16px 20px; border-radius: 22px;
-              background: rgba(10, 14, 20, 0.72); border-left: 8px solid #ffc83d; box-shadow: 0 8px 30px rgba(0,0,0,.45); }
-      .pill .emoji { font-size: 50px; line-height: 1; }
-      .pill .txt { display: flex; flex-direction: column; }
-      .pill .main { font-size: 44px; font-weight: 800; color: #fff; }
-      .pill .main b { color: #ffc83d; }
-      .pill .name { font-size: 28px; font-weight: 600; color: rgba(255,255,255,.72); max-width: 640px;
-                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-      /* Ziyaret edilen yerin kartı: ekranın alt-ortasında büyük */
-      #poicard { position: absolute; left: 70px; right: 70px; top: 170px; display: flex; align-items: center; gap: 28px;
-                 padding: 30px 40px; border-radius: 34px; background: rgba(8, 12, 18, 0.78);
-                 border: 4px solid #ffc83d; box-shadow: 0 0 40px rgba(255, 200, 61, .45), 0 18px 50px rgba(0,0,0,.5); pointer-events: none; }
-      #poicard .emoji { font-size: 110px; line-height: 1; }
-      #poicard .label { font-size: 40px; font-weight: 700; color: rgba(255,255,255,.8); }
-      #poicard .name { font-size: 58px; font-weight: 900; color: #fff; line-height: 1.05; }
-      #poicard .dist { margin-top: 8px; font-size: 54px; font-weight: 900; color: #ffc83d; }
+      /* Açılış başlığı (kanca): iki satır, kinetik */
+      #hook { position: absolute; left: 0; right: 0; top: 230px; text-align: center; pointer-events: none; opacity: 0; }
+      #hook .line { font-weight: 900; line-height: .98; letter-spacing: -4px; text-transform: uppercase; will-change: transform, opacity;
+                    -webkit-text-stroke: 4px rgba(20,10,4,.55); paint-order: stroke fill; text-shadow: 0 10px 40px rgba(0,0,0,.6); }
+      #hook .l0 { font-size: 168px; color: #ffc24d; }
+      #hook .l1 { font-size: 112px; color: #fff; margin-top: 6px; }
+      /* Konum etiketi (mahalle) */
+      #place { position: absolute; left: 70px; right: 70px; top: 190px; text-align: center; pointer-events: none; }
+      #place .t { display: inline-block; font-size: 72px; font-weight: 900; color: #fff; padding: 16px 40px; border-radius: 26px;
+                  background: rgba(8, 24, 32, .72); border: 4px solid #3fe0ff; box-shadow: 0 0 40px rgba(63,224,255,.45); }
+      #place .t::before { content: "📍 "; }
+      #place .s { margin-top: 18px; font-size: 44px; font-weight: 800; color: #c9f6ff; text-shadow: 0 3px 14px rgba(0,0,0,.9); }
+      /* m² rozeti (tarama sırasında sayar, kapanışta yeniden) */
+      #area { position: absolute; left: 0; right: 0; top: 150px; text-align: center; pointer-events: none; }
+      #area .num { display: inline-block; font-size: 138px; font-weight: 900; color: #fff; letter-spacing: -3px; font-variant-numeric: tabular-nums;
+                   padding: 12px 52px; border-radius: 30px; background: rgba(30, 16, 6, 0.5);
+                   border: 5px solid #ffc24d; box-shadow: 0 0 50px rgba(255, 194, 77, 0.6), inset 0 0 22px rgba(255,194,77,.22); }
+      #area .sub { margin-top: 18px; font-size: 50px; font-weight: 800; color: #ffd99a; text-shadow: 0 3px 14px rgba(0,0,0,.9); }
+      #area .sub:empty { display: none; }
+      /* Özellik kutucukları */
+      #features { position: absolute; left: 48px; top: 170px; display: flex; flex-direction: column; gap: 22px; pointer-events: none; }
+      .chip { display: flex; align-items: center; gap: 22px; padding: 18px 34px 18px 22px; border-radius: 26px; will-change: transform, opacity;
+              background: linear-gradient(100deg, rgba(30, 17, 8, .86), rgba(30, 17, 8, .66)); border: 3px solid rgba(255, 194, 77, .9);
+              box-shadow: 0 10px 34px rgba(0,0,0,.45), 0 0 26px rgba(255,194,77,.25); }
+      .chip .icon { font-size: 62px; line-height: 1; width: 72px; text-align: center; }
+      .chip .lbl { font-size: 30px; font-weight: 700; color: rgba(255,255,255,.75); text-transform: uppercase; letter-spacing: 1px; }
+      .chip .val { font-size: 54px; font-weight: 900; color: #ffc24d; line-height: 1.05; max-width: 700px;
+                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       /* Seslendirme altyazısı: büyük, kalın, okunan kelime sarı (Reels tarzı) */
       #caption { position: absolute; left: 60px; right: 60px; top: 1180px; display: flex; flex-wrap: wrap; justify-content: center;
                  gap: 0 22px; opacity: 0; pointer-events: none; will-change: opacity, transform; }
       #caption span { font-size: 76px; font-weight: 900; line-height: 1.12; color: #fff; letter-spacing: -1px;
                       -webkit-text-stroke: 3px rgba(0,0,0,.85); paint-order: stroke fill;
                       text-shadow: 0 6px 24px rgba(0,0,0,.75); }
-      #caption span.on { color: #ffc83d; transform: scale(1.06); display: inline-block; }
+      #caption span.on { color: #ffd166; transform: scale(1.06); display: inline-block; }
       /* Kapanış kartı: ofis adı, telefon, fiyat */
       #endcard { position: absolute; left: 70px; right: 70px; bottom: 170px; padding: 34px 44px; border-radius: 34px; text-align: center;
-                 background: rgba(8, 12, 18, 0.82); border: 4px solid #00e5ff; box-shadow: 0 0 44px rgba(0,229,255,.45), 0 18px 50px rgba(0,0,0,.5);
+                 background: rgba(30, 17, 8, 0.84); border: 4px solid #ffc24d; box-shadow: 0 0 44px rgba(255,194,77,.42), 0 18px 50px rgba(0,0,0,.5);
                  pointer-events: none; }
-      #endcard .price { font-size: 88px; font-weight: 900; color: #ffc83d; letter-spacing: -2px; }
+      #endcard .price { font-size: 88px; font-weight: 900; color: #ffc24d; letter-spacing: -2px; }
       #endcard .price:empty, #endcard .office:empty, #endcard .phone:empty { display: none; }
       #endcard .office { font-size: 50px; font-weight: 800; color: #fff; margin-top: 6px; }
-      #endcard .phone { font-size: 58px; font-weight: 900; color: #00e5ff; margin-top: 10px; }
+      #endcard .phone { font-size: 58px; font-weight: 900; color: #ffd99a; margin-top: 10px; }
+      /* Bölüm geçişi: kısa sıcak ışık parlaması */
+      #flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; mix-blend-mode: screen;
+               background: radial-gradient(ellipse at 50% 45%, rgba(255, 244, 220, .95) 0%, rgba(255, 196, 100, .72) 45%, rgba(255, 120, 60, .5) 100%); }
+      /* Danışman şeridi: ofis + telefon, video boyunca altta */
+      #contact { position: absolute; left: 48px; right: 48px; bottom: 64px; display: flex; justify-content: space-between; align-items: center;
+                 gap: 24px; padding: 18px 34px; border-radius: 26px; background: rgba(30, 17, 8, 0.76); border: 3px solid rgba(255, 194, 77, .85);
+                 box-shadow: 0 10px 34px rgba(0,0,0,.45); pointer-events: none; }
+      #contact .office { font-size: 40px; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #contact .phone { font-size: 44px; font-weight: 900; color: #ffd99a; white-space: nowrap; }
+      #contact .office:empty, #contact .phone:empty { display: none; }
       #attribution { position: absolute; right: 24px; bottom: 18px; font-size: 22px; color: rgba(255,255,255,0.85); text-shadow: 0 1px 4px #000; }
       #status { position: absolute; right: 16px; top: 16px; font: 20px monospace; color: #0f0; background: #000a; padding: 6px 10px; }
     </style>
@@ -67,12 +78,14 @@
     <div id="stage">
       <div id="map"></div>
       <div id="vignette"></div>
-      <div id="title" class="anim"><div class="area"></div><div class="sub"></div></div>
-      <div id="location" class="anim"></div>
-      <div id="pois"></div>
+      <div id="hook"></div>
+      <div id="place" class="anim"><div class="t"></div><div class="s"></div></div>
+      <div id="area" class="anim"><div class="num"></div><div class="sub"></div></div>
+      <div id="features"></div>
       <div id="caption"></div>
       <div id="endcard" class="anim"><div class="price"></div><div class="office"></div><div class="phone"></div></div>
-      <div id="poicard" class="anim"><div class="emoji"></div><div><div class="label"></div><div class="name"></div><div class="dist"></div></div></div>
+      <div id="contact" class="anim"><div class="office"></div><div class="phone"></div></div>
+      <div id="flash"></div>
       <!-- Google 3D harita görüntüleri atıf zorunlu; logo harita bileşeninin kendisinde de görünür. -->
       <div id="attribution">Görüntüler © Google</div>
       <div id="status">yükleniyor…</div>

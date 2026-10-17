@@ -2,7 +2,7 @@
  * Arsa Reels üretim hattı (kütüphane): parsel → senaryo → seslendirme → sese göre kurgu → drone render → ses miksi.
  * CLI (scripts/reel.ts) ve panel kuyruğu (scripts/queue-worker.ts) aynı fonksiyonu kullanır.
  *
- *   1. Parsel + çevre (verilen önbellekli bağlam ya da Overpass/Nominatim)
+ *   1. Parsel + çevre (kullanıcının seçtiği noktalar, önbellekli bağlam ya da Google Places + yükseklik verisi)
  *   2. Senaryo: sahne sahne Türkçe anlatım + ilan bilgisi (scripts/story.ts)
  *   3. ElevenLabs seslendirme, kelime zamanlarıyla (cacheDir'de önbellekli: metin değişmedikçe tekrar ödenmez)
  *   4. Kurgu sese göre: uçuşlar anlatım kadar sürer, altyazı kelime kelime (scripts/timeline.ts)
@@ -14,10 +14,10 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { prepareParcel, type ParcelContext } from "@arsa/geo";
+import { prepareParcel, type ParcelContext, type Poi } from "@arsa/geo";
 import { ElevenLabsClient, RunpodClient } from "@arsa/providers";
 import type { ParcelInfo } from "../src/types.js";
-import { buildStory, type Story, type StoryListing } from "./story.js";
+import { buildStory, numberWords, type Story, type StoryListing } from "./story.js";
 import { buildTimeline } from "./timeline.js";
 
 export type ReelStage = "parcel" | "script" | "voice" | "render" | "mix" | "done";
@@ -70,9 +70,14 @@ function run(cmd: string, argv: string[]): Promise<void> {
   });
 }
 
+/** Emlak tanıtım müziği: zarif, sıcak, güven veren; yakın çekimde sakin, uzaklaşırken yükselir, temiz biter. */
 const MUSIC_PROMPT =
-  "Cinematic, uplifting modern real estate drone video background. Warm ambient pads, soft piano, light percussion, " +
-  "gentle build, hopeful and premium mood, no vocals, steady 100 bpm, clean ending.";
+  "Elegant luxury real estate showcase background music. Warm felt piano melody over soft lush strings and gentle " +
+  "fingerpicked acoustic guitar, airy pads. Calm and aspirational at the start, light modern percussion and a subtle " +
+  "pulse join after about 10 seconds, gradual uplifting build to a confident, inspiring peak near the end, then a " +
+  "clean resolved final chord. Polished cinematic production, 90 bpm, major key, no vocals, no drops, no risers, no whooshes.";
+/** Seslendirme ayarlarının sürümü: ElevenLabs ayarları değişince önbellek yenilenir. */
+const VOICE_SETTINGS = "s05-st03-h09-tr-stt";
 
 export async function produceReel(i: ReelInput): Promise<ReelResult> {
   const env = i.env ?? process.env;
@@ -87,7 +92,12 @@ export async function produceReel(i: ReelInput): Promise<ReelResult> {
 
   // 1) Parsel + çevre
   await stage("parcel");
-  const parcel = (await prepareParcel(i.parcelText, { cached: i.context })) as unknown as ParcelInfo & ParcelContext;
+  // Kullanıcının seçtiği noktalar varsa onlar; yoksa otomatik (Google Places + yükseklik verisinden deniz).
+  const parcel = (await prepareParcel(i.parcelText, {
+    cached: i.context,
+    pois: i.listing?.pois as Poi[] | undefined, // şema panelde doğrulandı (ReelPoi)
+    placesKey: env.GOOGLE_PLACES_API_KEY || env.GOOGLE_MAPS_API_KEY,
+  })) as unknown as ParcelInfo & ParcelContext;
   const context: ParcelContext = {
     elevation: parcel.elevation,
     elevationSource: parcel.elevationSource,
@@ -104,18 +114,27 @@ export async function produceReel(i: ReelInput): Promise<ReelResult> {
 
   // 3) Seslendirme (ElevenLabs)
   const elKey = env.ELEVENLABS_API_KEY;
-  const model = env.ELEVENLABS_MODEL || "eleven_multilingual_v2";
+  const model = env.ELEVENLABS_MODEL || "eleven_v3"; // v3: Türkçe sayıları ("on bir dönüm") net söylüyor
   const el = elKey ? new ElevenLabsClient({ apiKey: elKey, voiceId: i.voiceId || env.ELEVENLABS_VOICE_ID, model }) : null;
   if (el && i.voice !== false) {
     await stage("voice");
     const voiceId = await el.resolveVoice();
     for (const [k, s] of story.scenes.entries()) {
-      const mp3 = join(cacheDir, `voice-${hash(`${voiceId}|${model}|${s.text}`)}.mp3`);
+      const mp3 = join(cacheDir, `voice-${hash(`${voiceId}|${model}|${VOICE_SETTINGS}|${s.text}`)}.mp3`);
       const meta = mp3.replace(/\.mp3$/, ".json");
       if (!existsSync(meta)) {
-        const sp = await el.speak(s.text, { previous: story.scenes[k - 1]?.text, next: story.scenes[k + 1]?.text });
-        await writeFile(mp3, sp.audio);
-        await writeFile(meta, JSON.stringify({ duration: sp.duration, words: sp.words }));
+        // Seslendirme bazen bir kelimeyi yanlış okur ("Ezine" → "Izına"): kayıt yazıya çevrilip metinle
+        // karşılaştırılır, farklıysa yeniden üretilir (en fazla 3 deneme, en iyisi kullanılır).
+        let best: { sp: Awaited<ReturnType<typeof el.speak>>; score: number; heard: string } | null = null;
+        for (let attempt = 1; attempt <= 3 && (best?.score ?? 0) < 1; attempt++) {
+          const sp = await el.speak(s.text, { previous: story.scenes[k - 1]?.text, next: story.scenes[k + 1]?.text });
+          const heard = await el.transcribe(sp.audio).catch(() => null);
+          const score = heard === null ? 1 : similarity(spokenWords(s.text), spokenWords(heard));
+          if (!best || score > best.score) best = { sp, score, heard: heard ?? "" };
+          if (score < 1) log(`  ! ${s.id} okunuşu farklı (${attempt}. deneme): "${heard}"`);
+        }
+        await writeFile(mp3, best!.sp.audio);
+        await writeFile(meta, JSON.stringify({ duration: best!.sp.duration, words: best!.sp.words }));
       }
       s.voice = { ...(JSON.parse(await readFile(meta, "utf8")) as { duration: number; words: [] }), file: mp3 };
       await stage("voice", (k + 1) / story.scenes.length);
@@ -127,21 +146,14 @@ export async function produceReel(i: ReelInput): Promise<ReelResult> {
   // Render'a dosya yolları gitmez; yalnızca metin, süre, kelime zamanları ve kartlar.
   const renderStory: Story = { ...story, scenes: story.scenes.map((s) => ({ ...s, voice: s.voice && { duration: s.voice.duration, words: s.voice.words } })) };
 
-  // Müzik ve geçiş efekti (önbellekli, işler arasında ortak)
+  // Müzik (önbellekli, işler arasında ortak; istem değişince yenilenir). Geçiş efekti yok: kurgu kesmesiz.
   let music: string | null = null;
-  let whoosh: string | null = null;
+  const whoosh: string | null = null;
   if (el && i.music !== false) {
-    const len = Math.ceil(timeline.duration) + 2;
-    const m = join(cacheDir, `music-${len}.mp3`);
+    const len = Math.ceil(timeline.duration) + 1;
+    const m = join(cacheDir, `music-${hash(MUSIC_PROMPT)}-${len}.mp3`);
     if (!existsSync(m)) await el.music(MUSIC_PROMPT, len).then((b) => writeFile(m, b)).catch((e) => log(`! müzik üretilemedi: ${String(e).slice(0, 160)}`));
     if (existsSync(m)) music = m;
-    const w = join(cacheDir, "whoosh.mp3");
-    if (!existsSync(w))
-      await el
-        .soundEffect("Smooth cinematic air whoosh transition, drone flying fast past the camera, clean, no music", 1.2)
-        .then((b) => writeFile(w, b))
-        .catch((e) => log(`! efekt üretilemedi: ${String(e).slice(0, 160)}`));
-    if (existsSync(w)) whoosh = w;
   }
   lap("voice");
 
@@ -220,6 +232,24 @@ export async function produceReel(i: ReelInput): Promise<ReelResult> {
   return { reelPath, droneVideoPath: droneVideo, durationSec: timeline.duration, context, story, keyframes, renderer, seconds };
 }
 
+/** Karşılaştırma için kelimeler: küçük harf, noktalamasız, rakamlar Türkçe okunuşuyla ("16,2" → "on altı virgül iki"). */
+function spokenWords(text: string) {
+  return text
+    .toLocaleLowerCase("tr")
+    .replace(/(\d+)(?:,(\d+))?/g, (_, a: string, b?: string) => `${numberWords(Number(a))}${b ? ` virgül ${numberWords(Number(b))}` : ""}`)
+    .replace(/[^\p{L}\s]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/** Kelime dizilerinin benzerliği (en uzun ortak alt dizi / uzun olanın boyu): 1 = birebir. */
+function similarity(a: string[], b: string[]) {
+  const dp = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++) dp[i]![j] = a[i - 1] === b[j - 1] ? dp[i - 1]![j - 1]! + 1 : Math.max(dp[i - 1]![j]!, dp[i]![j - 1]!);
+  return dp[a.length]![b.length]! / Math.max(1, a.length, b.length);
+}
+
 /** Anlatım + müzik (anlatımda kısılır) + geçiş efektleri; videoya hafif renk düzeltme. */
 async function mix(o: {
   video: string;
@@ -249,7 +279,7 @@ async function mix(o: {
   if (o.music) {
     inputs.push("-i", o.music);
     const m = n++;
-    filters.push(`[${m}:a]atrim=0:${D.toFixed(2)},afade=t=in:d=0.6,afade=t=out:st=${(D - 2.5).toFixed(2)}:d=2.5,volume=0.5[mus]`);
+    filters.push(`[${m}:a]atrim=0:${D.toFixed(2)},afade=t=in:d=0.6,afade=t=out:st=${(D - 1.8).toFixed(2)}:d=1.8,volume=0.5[mus]`);
     if (voiceCues.length) {
       // Anlatım varken müzik kısılır (ducking).
       filters.push(`[mus][vsc]sidechaincompress=threshold=0.02:ratio=10:attack=15:release=450:makeup=1[mduck]`);
@@ -273,8 +303,10 @@ async function mix(o: {
     filters.push(`${buses.join("")}amix=inputs=${buses.length}:normalize=0,alimiter=limit=0.95,apad[aout]`);
     ff.push("-filter_complex", filters.join(";"), "-map", "0:v", "-map", "[aout]", "-c:a", "aac", "-b:a", "192k");
   } else ff.push("-map", "0:v");
-  // Uydu görüntüsü biraz soluk: kontrast ve doygunluk hafifçe artırılır.
-  ff.push("-vf", "eq=contrast=1.05:saturation=1.12,unsharp=5:5:0.35:5:5:0", "-c:v", "libx264", "-crf", "19", "-preset", "medium",
+  // Siyahtan açılış ve sona yumuşak kararma (kesmesiz kurgunun tek "geçişi").
+  const fades = `fade=t=in:st=0:d=0.5,fade=t=out:st=${(D - 0.7).toFixed(2)}:d=0.7`;
+  // Renk doğal bırakılır (renk düzeltmesi/vinyet yok); yalnızca açılış/kapanış kararması.
+  ff.push("-vf", fades, "-c:v", "libx264", "-crf", "19", "-preset", "medium",
     "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-t", D.toFixed(2), o.out);
   await run("ffmpeg", ff);
 }

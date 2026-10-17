@@ -9,7 +9,10 @@ export interface ParcelInfo {
   longestEdgeHeading: number;
   elevation: number | null;
   address: { province?: string; district?: string; neighbourhood?: string };
-  pois: { label: string; emoji: string; name?: string; position: { lat: number; lng: number }; distanceM: number }[];
+  /** category: @arsa/geo PoiCategory (sea, town, village, hospital, custom...). */
+  pois: { category?: string; label: string; emoji: string; name?: string; position: { lat: number; lng: number }; distanceM: number }[];
+  /** Mahalle / köy sınırı (TKGM ya da OSM); yoksa bölge sahnesi yalnızca pinle. */
+  hood?: { name: string; ring: { lat: number; lng: number }[]; source?: string } | null;
 }
 
 export interface Camera {
@@ -20,26 +23,54 @@ export interface Camera {
   range: number;
   tilt: number;
   heading: number;
+  /** Drone yatışı (derece, dönüşe doğru); yalnızca Cesium motoru uygular. */
+  roll?: number;
 }
 
-/** Bir karenin tüm görsel durumu; değerler 0..1 arası animasyon ilerlemesidir. */
+/** Özellik kutucuğu (ekranda soldan kayarak gelir). */
+export interface FeatureChip {
+  icon: string;
+  label: string;
+  value: string;
+  /** 0..1 giriş/çıkış animasyonu */
+  progress: number;
+}
+
+/**
+ * Bir karenin tüm görsel durumu; değerler 0..1 arası animasyon ilerlemesidir.
+ * Kurgu arsanın etrafında döner: kanca → mahalle sınırı + pin → tarama + m² → özellik kutucukları → kapanış.
+ */
 export interface FrameState {
   camera: Camera;
-  neon: number; // parsel konturunun çizilmiş oranı
-  fill: number; // parsel dolgusunun görünürlüğü
-  title: number; // m² kartı
-  counter: number; // m² sayacının ilerlemesi
-  location: number; // konum satırı
-  lines: number[]; // her çevre noktası için parselden uzanan bağlantı çizgisinin çizilmiş oranı
-  markers: number[]; // her çevre noktasının işaretçisi (>0 görünür)
-  pills: number[]; // soldaki listede her çevre etiketinin ilerlemesi
-  card: { index: number; progress: number } | null; // ortadaki büyük yer kartı
+  /** HYBRID: Google'ın yer/yol etiketleri görünür, SATELLITE: sade uydu. */
+  mode: "SATELLITE" | "HYBRID";
+  /** Parsel konturunun çizilmiş oranı ve dolgusu. */
+  neon: number;
+  fill: number;
+  /** Mahalle sınırı: çizim oranı, dolgu ve çizginin görünürlüğü. */
+  hood?: { draw: number; fill: number; opacity: number } | null;
+  /** Parsel pini: drop gökten inişi (0..1), pulse dalga halkalarının fazı (sürekli artar), opacity. */
+  pin?: { drop: number; pulse: number; opacity: number } | null;
+  /** Arazi taraması: tarama çizgisinin konumu (0..1), çizginin görünürlüğü, ızgaranın görünürlüğü. */
+  scan?: { progress: number; line: number; grid: number } | null;
+  /** Parselin etrafında yükselen ışıklı çit duvarı (0..1 yükselme). */
+  fence?: number;
+  /** Kenar ölçüleri (metre etiketleri) görünürlüğü. */
+  edges?: number;
+  /** Büyük açılış başlığı (kanca). */
+  hook?: { lines: string[]; progress: number } | null;
+  /** Mahalle / konum etiketi. */
+  place?: { title: string; sub: string; progress: number } | null;
+  /** m² rozeti: progress görünürlük, counter sayaç (0..1), sub alt satır. */
+  area?: { progress: number; counter: number; sub?: string } | null;
+  /** Özellik kutucukları. */
+  features?: FeatureChip[];
   /** Seslendirme altyazısı: o an okunan kelime parçası, active vurgulanan kelime, pop giriş animasyonu. */
   caption?: { words: string[]; active: number; pop: number } | null;
   /** Kapanış kartı (ofis, telefon, fiyat); progress 0..1. */
   endcard?: { officeName?: string; phone?: string; price?: string; progress: number } | null;
-  /** İmar durumu: başlık kartının alt satırına eklenir. */
-  zoning?: string;
-  /** HYBRID: Google'ın yer/yol etiketleri görünür (çevre turunda), SATELLITE: sade uydu. */
-  mode: "SATELLITE" | "HYBRID";
+  /** Kesme parlaması (0..1). */
+  flash?: number;
+  /** Danışman şeridi (ofis, telefon) altta; progress 0..1. */
+  contact?: { officeName?: string; phone?: string; progress: number } | null;
 }

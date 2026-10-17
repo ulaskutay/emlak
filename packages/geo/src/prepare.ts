@@ -5,13 +5,17 @@
  */
 import { parseParcelFile, officialAreaM2 } from "./kml.js";
 import { analyzeParcel, type ParcelGeometry } from "./parcel.js";
-import { findNearbyPois, reverseGeocode, type Address, type Poi } from "./pois.js";
+import { pickDefaultPois, poiCandidates } from "./candidates.js";
+import { reverseGeocode, type Address, type Poi } from "./pois.js";
+import { neighbourhoodBoundary, type Neighbourhood } from "./hood.js";
 
 export interface ParcelContext {
   elevation: number | null;
   elevationSource: string | null;
   address: Address;
   pois: Poi[];
+  /** Mahalle / köy sınırı (undefined: henüz sorgulanmadı — eski önbellek; null: bulunamadı). */
+  hood?: Neighbourhood | null;
 }
 
 export interface PreparedParcel extends ParcelGeometry, ParcelContext {
@@ -50,31 +54,46 @@ export async function groundElevation(
   return null;
 }
 
+/**
+ * @param opts.pois Kullanıcının panelde seçtiği noktalar: verilirse çevre sorgusu yapılmaz.
+ * @param opts.placesKey Google Places anahtarı (yoksa yalnızca denize uzaklık hesaplanır).
+ */
 export async function buildContext(
   centroid: { lat: number; lng: number },
-  opts: { googleKey?: string; district?: string } = {},
+  opts: { googleKey?: string; placesKey?: string; district?: string; province?: string; neighbourhood?: string; pois?: Poi[] } = {},
 ): Promise<ParcelContext> {
-  const [elev, address, pois] = await Promise.all([
+  const [elev, address, pois, hood] = await Promise.all([
     groundElevation(centroid.lat, centroid.lng, opts.googleKey),
-    reverseGeocode(centroid).catch(() => ({}) as Address),
-    findNearbyPois(centroid, { district: opts.district }).catch(() => [] as Poi[]),
+    reverseGeocode(centroid, opts.placesKey ?? opts.googleKey).catch(() => ({}) as Address),
+    opts.pois ??
+      poiCandidates(centroid, { googleKey: opts.placesKey, district: opts.district, province: opts.province, neighbourhood: opts.neighbourhood })
+        .then((c) => pickDefaultPois(c.pois))
+        .catch(() => [] as Poi[]),
+    neighbourhoodBoundary(centroid).catch(() => null),
   ]);
-  return { elevation: elev?.meters ?? null, elevationSource: elev?.source ?? null, address, pois };
+  return { elevation: elev?.meters ?? null, elevationSource: elev?.source ?? null, address, pois, hood };
 }
 
 /**
  * @param cached Daha önce hesaplanmış bağlam (yavaş dış sorgular tekrarlanmasın). Çevre listesi boşsa yeniden sorgulanır.
+ * @param pois Kullanıcının seçtiği çevre noktaları (boş dizi: hiç nokta yok); verilmezse otomatik seçilir (CLI).
  */
 export async function prepareParcel(
   fileText: string,
-  opts: { googleKey?: string; cached?: ParcelContext | null } = {},
+  opts: { googleKey?: string; placesKey?: string; cached?: ParcelContext | null; pois?: Poi[] } = {},
 ): Promise<PreparedParcel> {
   const parsed = parseParcelFile(fileText);
   const geo = analyzeParcel(parsed.ring);
+  // Seçili noktalar verildiyse önbellekteki rakım/adres kullanılır, çevre listesi seçimle değişir.
+  // Eski (OpenStreetMap dönemi, kaynaksız) önbellek kullanılmaz: deniz/plaj mesafeleri yanlıştı.
+  const cached = opts.cached?.pois.every((p) => p.source && (p.source as string) !== "osm") ? opts.cached : null;
+  // opts.pois verildiyse (boş dizi dahil) kullanıcının seçimidir: otomatik seçim yapılmaz.
   const context =
-    opts.cached && opts.cached.pois.length
-      ? opts.cached
-      : await buildContext(geo.centroid, { googleKey: opts.googleKey, district: parsed.properties.Ilce });
+    cached && (opts.pois || cached.pois.length)
+      ? { ...cached, pois: opts.pois ?? cached.pois }
+      : await buildContext(geo.centroid, { googleKey: opts.googleKey, placesKey: opts.placesKey, district: parsed.properties.Ilce, province: parsed.properties.Il, neighbourhood: parsed.properties.Mahalle, pois: opts.pois });
+  // Mahalle sınırı eklenmeden önceki önbellek: yalnızca sınır sorgulanır.
+  if (context.hood === undefined) context.hood = await neighbourhoodBoundary(geo.centroid).catch(() => null);
   return {
     name: parsed.name,
     properties: parsed.properties,
