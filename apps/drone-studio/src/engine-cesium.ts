@@ -145,7 +145,10 @@ export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number }
       });
       viewer.useDefaultRenderLoop = false;
       const scene = viewer.scene;
-      scene.canvas.addEventListener("webglcontextlost", () => console.error("[cesium] WebGL bağlamı kaybedildi"));
+      scene.canvas.addEventListener("webglcontextlost", () => {
+        (window as any).__contextLost = true;
+        console.error("[cesium] WebGL bağlamı kaybedildi");
+      });
       // Çizim hatası kareyi kaybettirmesin: panel gösterme, hatayı fırlat (settle yakalar ve tekrar dener).
       viewer.cesiumWidget.showRenderLoopErrors = false;
       scene.rethrowRenderErrors = true;

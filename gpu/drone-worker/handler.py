@@ -216,6 +216,10 @@ def handler(job):
            "--fps", str(inp.get("fps", 30)), "--parallel", str(parallel), "--crf", str(inp.get("crf", 22))]
     if inp.get("limit_frames"):
         cmd += ["--limit", str(inp["limit_frames"])]
+    if inp.get("engine"):
+        cmd += ["--engine", str(inp["engine"])]  # cesium | google
+    if inp.get("msaa"):
+        cmd += ["--msaa", str(inp["msaa"])]
 
     t0 = time.time()
     result = json.loads(run_streaming(cmd, env, 1500, job))

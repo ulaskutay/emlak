@@ -21,6 +21,8 @@ const { values: args } = parseArgs({
     parallel: { type: "string" },
     diagnose: { type: "boolean", default: false }, // worker ortam tanısı (WebGL, adım süreleri, ekran görüntüsü)
     "gl-mode": { type: "string" }, // egl | vulkan | swiftshader
+    engine: { type: "string" }, // cesium | google
+    msaa: { type: "string" },
   },
 });
 if (!args.parcel) throw new Error("--parcel assets/parcels/<dosya>.geojson gerekli");
@@ -43,6 +45,8 @@ const job = await client.run({
   ...(args.parallel ? { parallel: Number(args.parallel) } : {}),
   ...(args.diagnose ? { diagnose: true } : {}),
   ...(args["gl-mode"] ? { gl_mode: args["gl-mode"] } : {}),
+  ...(args.engine ? { engine: args.engine } : {}),
+  ...(args.msaa ? { msaa: Number(args.msaa) } : {}),
 });
 console.log(`Gönderildi: ${job.id}`);
 

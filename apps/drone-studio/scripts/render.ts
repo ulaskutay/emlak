@@ -30,6 +30,8 @@ export interface RenderOptions {
   /** GPU'suz ortam: yazılımsal WebGL (SwiftShader). glMode verilirse o kullanılır. */
   cpu?: boolean;
   glMode?: GlMode;
+  /** Çizim motoru ve ayarları (sayfa adresine sorgu olarak gider): engine=cesium|google, msaa, sse, fov. */
+  engineParams?: Record<string, string | number>;
   /** Her paralel sayfa ayrı tarayıcıda (ayrı GPU süreci). Varsayılan: Linux + GPU'da açık. */
   isolate?: boolean;
   port?: number;
@@ -66,9 +68,9 @@ export function chromeArgs(mode: GlMode): string[] {
     case "swiftshader":
       return [...common, "--disable-gpu", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"];
     case "vulkan":
-      return [...common, "--ignore-gpu-blocklist", "--use-angle=vulkan", "--enable-features=Vulkan,VulkanFromANGLE,DefaultANGLEVulkan", "--disable-vulkan-surface", "--enable-gpu"];
+      return [...common, "--ignore-gpu-blocklist", "--use-angle=vulkan", "--disable-gpu-watchdog", "--enable-features=Vulkan,VulkanFromANGLE,DefaultANGLEVulkan", "--disable-vulkan-surface", "--enable-gpu"];
     case "egl":
-      return [...common, "--ignore-gpu-blocklist", "--use-gl=angle", "--use-angle=gl-egl", "--enable-gpu"];
+      return [...common, "--ignore-gpu-blocklist", "--use-gl=angle", "--use-angle=gl-egl", "--disable-gpu-watchdog", "--enable-gpu"];
     default:
       return ["--ignore-gpu-blocklist", "--enable-gpu-rasterization"];
   }
@@ -132,7 +134,9 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
     server: { port: o.port ?? 5178, strictPort: true, watch: null }, // dosya izleme gereksiz (konteynerde takılabilir)
   });
   await server.listen();
-  const url = server.resolvedUrls?.local[0] ?? `http://localhost:${o.port ?? 5178}/`;
+  const base = server.resolvedUrls?.local[0] ?? `http://localhost:${o.port ?? 5178}/`;
+  const query = new URLSearchParams(Object.entries(o.engineParams ?? {}).map(([k, v]) => [k, String(v)])).toString();
+  const url = query ? `${base}?${query}` : base;
   log(`vite hazır: ${url}`);
   const glMode = o.glMode ?? (o.cpu ? "swiftshader" : await pickGlMode(log));
   log(`WebGL arka ucu: ${glMode}`);
@@ -155,6 +159,18 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
   try {
     let pageNo = 0;
     const errors = new Set<string>();
+    /** Sayfayı yükleyip sahneyi kurar (WebGL bağlamı kaybolunca da aynı sayfa yeniden kurulur). */
+    const preparePage = async (page: Page, n: number) => {
+      const ts = Date.now();
+      await withTimeout(page.goto(url), 60000, `sayfa ${n} yüklemesi`);
+      await withTimeout(
+        page.evaluate(([p, k]) => (window as any).studio.loadParcel(p, k), [o.parcel, o.googleKey] as const),
+        150000,
+        `sayfa ${n} harita yüklemesi`,
+      );
+      await page.evaluate(() => (window as any).studio.setChrome(false));
+      log(`sayfa ${n} hazır (${((Date.now() - ts) / 1000).toFixed(1)} sn)`);
+    };
     const openPage = async () => {
       const n = ++pageNo;
       const page = await (isolate && n > 1 ? await newContext() : shared).newPage();
@@ -165,15 +181,7 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
       };
       page.on("console", (m) => (m.type() === "error" || m.type() === "warning") && !m.text().includes("404") && note(m.text()));
       page.on("pageerror", (e) => note(`hata: ${e.message}`));
-      const ts = Date.now();
-      await withTimeout(page.goto(url), 60000, `sayfa ${n} yüklemesi`);
-      await withTimeout(
-        page.evaluate(([p, k]) => (window as any).studio.loadParcel(p, k), [o.parcel, o.googleKey] as const),
-        150000,
-        `sayfa ${n} harita yüklemesi`,
-      );
-      await page.evaluate(() => (window as any).studio.setChrome(false));
-      log(`sayfa ${n} hazır (${((Date.now() - ts) / 1000).toFixed(1)} sn)`);
+      await preparePage(page, n);
       return page;
     };
 
@@ -197,6 +205,7 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
     const chunk = Math.ceil(count / pages.length);
     const frameTimes: number[] = [];
     let timeouts = 0;
+    let recoveries = 0;
     let done = 0;
     const tr = Date.now();
     await Promise.all(
@@ -206,7 +215,14 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
         for (let i = a; i < b; i++) {
           const tf = Date.now();
           const path = join(framesDir, `${String(i - first).padStart(5, "0")}.jpg`);
-          const ok = await page.evaluate((s) => (window as any).studio.render(s, 15000), stateAt(i));
+          let ok = await page.evaluate((s) => (window as any).studio.render(s, 15000), stateAt(i));
+          // WebGL bağlamı kaybolduysa (GPU sürücüsü/bellek) sayfayı yeniden kurup kareyi tekrar çiz.
+          for (let attempt = 0; attempt < 3 && (await page.evaluate(() => !!(window as any).__contextLost)); attempt++) {
+            recoveries++;
+            log(`[sayfa ${k + 1}] WebGL bağlamı kayboldu, sayfa yeniden kuruluyor (kare ${i})`);
+            await preparePage(page, k + 1);
+            ok = await page.evaluate((s) => (window as any).studio.render(s, 15000), stateAt(i));
+          }
           if (!ok) timeouts++;
           // Ekran görüntüsü takılırsa kareyi yeniden çizip bir kez daha dene.
           await page.screenshot({ path, type: "jpeg", quality: 95, timeout: 15000 }).catch(async (e) => {
@@ -262,7 +278,7 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
         max: (sorted[sorted.length - 1] ?? 0) / 1000,
       },
       timeouts,
-      errors: [...errors],
+      errors: recoveries ? [`${recoveries} kez WebGL bağlamı kurtarıldı`, ...errors] : [...errors],
     };
   } finally {
     // Kapanış takılırsa (Chrome bazen sayfaları bırakmıyor) iş sonsuza dek beklemesin.
