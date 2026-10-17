@@ -114,6 +114,16 @@ const worker = new Worker<{ videoId: string }>(
   { connection: redisConnection(), concurrency: CONCURRENCY, lockDuration: 60_000 },
 );
 worker.on("ready", () => console.log(`Video worker hazır · kuyruk "${QUEUE}" · eşzamanlı ${CONCURRENCY}`));
+// Bağlantı/kurulum hatası döngüye girerse log diski doldurmasın: art arda 20 hatada çık (Coolify yeniden başlatır).
+let errorStreak = 0;
+worker.on("error", (e) => {
+  if (++errorStreak <= 3) console.error(`Worker hatası: ${e.message}`);
+  if (errorStreak >= 20) {
+    console.error("Art arda 20 hata: çıkılıyor");
+    process.exit(1);
+  }
+});
+worker.on("completed", () => (errorStreak = 0));
 
 for (const sig of ["SIGINT", "SIGTERM"] as const)
   process.on(sig, async () => {
