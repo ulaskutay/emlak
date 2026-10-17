@@ -220,6 +220,8 @@ def handler(job):
         cmd += ["--engine", str(inp["engine"])]  # cesium | google
     if inp.get("msaa"):
         cmd += ["--msaa", str(inp["msaa"])]
+    if inp.get("sse"):
+        cmd += ["--sse", str(inp["sse"])]
 
     t0 = time.time()
     result = json.loads(run_streaming(cmd, env, 1500, job))

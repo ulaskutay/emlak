@@ -23,6 +23,7 @@ const { values: args } = parseArgs({
     "gl-mode": { type: "string" }, // egl | vulkan | swiftshader
     engine: { type: "string" }, // cesium | google
     msaa: { type: "string" },
+    sse: { type: "string" },
   },
 });
 if (!args.parcel) throw new Error("--parcel assets/parcels/<dosya>.geojson gerekli");
@@ -47,6 +48,7 @@ const job = await client.run({
   ...(args["gl-mode"] ? { gl_mode: args["gl-mode"] } : {}),
   ...(args.engine ? { engine: args.engine } : {}),
   ...(args.msaa ? { msaa: Number(args.msaa) } : {}),
+  ...(args.sse ? { sse: Number(args.sse) } : {}),
 });
 console.log(`Gönderildi: ${job.id}`);
 
