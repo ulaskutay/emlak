@@ -50,6 +50,8 @@ export interface RenderResult {
   seconds: { prewarm: number; render: number; encode: number; total: number };
   frameSeconds: { avg: number; p50: number; max: number };
   timeouts: number;
+  /** Tekilleştirilmiş sayfa hata/uyarıları (en fazla 30). */
+  errors: string[];
 }
 
 const APP = resolve(import.meta.dirname, "..");
@@ -152,11 +154,17 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
 
   try {
     let pageNo = 0;
+    const errors = new Set<string>();
     const openPage = async () => {
       const n = ++pageNo;
       const page = await (isolate && n > 1 ? await newContext() : shared).newPage();
-      page.on("console", (m) => m.type() === "error" && !m.text().includes("404") && log(`[sayfa ${n}] ${m.text()}`));
-      page.on("pageerror", (e) => log(`[sayfa ${n}] hata: ${e.message}`));
+      // Sayfa hataları hem loglanır hem (tekilleştirilip) sonuçta döner: uzak worker'da teşhis için.
+      const note = (m: string) => {
+        log(`[sayfa ${n}] ${m}`);
+        if (errors.size < 30) errors.add(m.slice(0, 400));
+      };
+      page.on("console", (m) => (m.type() === "error" || m.type() === "warning") && !m.text().includes("404") && note(m.text()));
+      page.on("pageerror", (e) => note(`hata: ${e.message}`));
       const ts = Date.now();
       await withTimeout(page.goto(url), 60000, `sayfa ${n} yüklemesi`);
       await withTimeout(
@@ -254,6 +262,7 @@ export async function renderDrone(o: RenderOptions): Promise<RenderResult> {
         max: (sorted[sorted.length - 1] ?? 0) / 1000,
       },
       timeouts,
+      errors: [...errors],
     };
   } finally {
     // Kapanış takılırsa (Chrome bazen sayfaları bırakmıyor) iş sonsuza dek beklemesin.

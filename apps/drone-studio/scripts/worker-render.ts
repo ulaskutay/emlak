@@ -61,6 +61,7 @@ console.log(
     renderer: r.renderer,
     frames: r.frames,
     timeouts: r.timeouts,
+    errors: r.errors,
     seconds: { prepare: prepareSeconds, ...r.seconds },
     parcel: {
       areaM2: parcel.areaM2,

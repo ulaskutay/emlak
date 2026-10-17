@@ -226,6 +226,7 @@ def handler(job):
         "renderer": result["renderer"],
         "frames": result["frames"],
         "timeouts": result["timeouts"],
+        "errors": result.get("errors", []),
         "parcel": result["parcel"],
         "timings": {**result["seconds"], "handler_total": round(time.time() - t0, 1)},
         "parallel": parallel,

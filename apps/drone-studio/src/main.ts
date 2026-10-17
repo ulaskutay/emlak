@@ -28,7 +28,7 @@ fitStage();
 const q = new URLSearchParams(location.search);
 const engineName = q.get("engine") === "google" ? "google" : "cesium";
 const engine =
-  engineName === "google" ? googleEngine() : cesiumEngine({ sse: Number(q.get("sse") ?? 4), fov: Number(q.get("fov") ?? 42) });
+  engineName === "google" ? googleEngine() : cesiumEngine({ sse: Number(q.get("sse") ?? 4), fov: Number(q.get("fov") ?? 42), msaa: Number(q.get("msaa") ?? 4) });
 let parcel: ParcelInfo;
 
 const studio = {

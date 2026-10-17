@@ -88,6 +88,7 @@ for (;;) {
     await save("runpod-drone.mp4", out.video);
     await save("runpod-keyframe-neon.jpg", out.keyframe_neon);
     await save("runpod-keyframe-clean.jpg", out.keyframe_clean);
+    if (out.errors?.length) console.log(`Sayfa hataları:\n  ${out.errors.join("\n  ")}`);
     console.log(`WebGL: ${out.renderer} · paralel ${out.parallel} · ${out.frames} kare · ${out.timeouts} zaman aşımı`);
     console.log(`Süreler: ${JSON.stringify(out.timings)} · kuyruk ${((s.delayTime ?? 0) / 1000).toFixed(0)} sn, çalışma ${((s.executionTime ?? 0) / 1000).toFixed(0)} sn`);
     break;

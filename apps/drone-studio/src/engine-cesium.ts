@@ -52,7 +52,7 @@ function fenceTexture() {
   return c;
 }
 
-export function cesiumEngine(opts: { sse?: number; fov?: number } = {}) {
+export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number } = {}) {
   let C: any;
   let viewer: any;
   let tileset: any;
@@ -145,13 +145,14 @@ export function cesiumEngine(opts: { sse?: number; fov?: number } = {}) {
       });
       viewer.useDefaultRenderLoop = false;
       const scene = viewer.scene;
+      scene.canvas.addEventListener("webglcontextlost", () => console.error("[cesium] WebGL bağlamı kaybedildi"));
       // Çizim hatası kareyi kaybettirmesin: panel gösterme, hatayı fırlat (settle yakalar ve tekrar dener).
       viewer.cesiumWidget.showRenderLoopErrors = false;
       scene.rethrowRenderErrors = true;
       scene.globe.show = false;
       scene.skyAtmosphere.show = true;
       scene.fog.enabled = true;
-      scene.msaaSamples = 4;
+      scene.msaaSamples = opts.msaa ?? 4;
       scene.postProcessStages.fxaa.enabled = true;
       viewer.camera.frustum.fov = C.Math.toRadians(opts.fov ?? 42);
       tileset = await C.Cesium3DTileset.fromUrl(`https://tile.googleapis.com/v1/3dtiles/root.json?key=${encodeURIComponent(key)}`, {
