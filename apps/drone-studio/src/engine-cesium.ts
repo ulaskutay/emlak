@@ -158,7 +158,20 @@ export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number }
       scene.msaaSamples = opts.msaa ?? 4;
       scene.postProcessStages.fxaa.enabled = true;
       viewer.camera.frustum.fov = C.Math.toRadians(opts.fov ?? 42);
-      tileset = await C.Cesium3DTileset.fromUrl(`https://tile.googleapis.com/v1/3dtiles/root.json?key=${encodeURIComponent(key)}`, {
+      // Birden çok worker × sayfa aynı anda Google'a karo istiyor: 429 (istek sınırı) gelirse bekleyip tekrar dene;
+      // yoksa karo delik kalır (zemin boş görünür). Alt karolar bu ayarları kaynaktan devralır.
+      C.RequestScheduler.requestsByServer["tile.googleapis.com:443"] = 8;
+      const root = new C.Resource({
+        url: `https://tile.googleapis.com/v1/3dtiles/root.json?key=${encodeURIComponent(key)}`,
+        retryAttempts: 6,
+        retryCallback: (_res: unknown, err: any) =>
+          new Promise<boolean>((r) => {
+            const code = err?.statusCode;
+            if (code && code !== 429 && code < 500) return r(false);
+            setTimeout(() => r(true), 400 + Math.random() * 1200);
+          }),
+      });
+      tileset = await C.Cesium3DTileset.fromUrl(root, {
         showCreditsOnScreen: true,
         maximumScreenSpaceError: opts.sse ?? 4,
         // Ufka bakan alçak planlarda uzak karolar düşük detayla (sis zaten örter): yükleme ve bellek düşer.
