@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Bricolage_Grotesque, Instrument_Sans } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin", "latin-ext"], variable: "--font-inter" });
+const bricolage = Bricolage_Grotesque({ subsets: ["latin", "latin-ext"], variable: "--font-bricolage" });
+const instrument = Instrument_Sans({ subsets: ["latin", "latin-ext"], variable: "--font-instrument" });
 
 export const metadata: Metadata = {
-  title: "Arsa Video Stüdyo",
-  description: "TKGM parselinden seslendirmeli drone tanıtım videosu",
+  title: "Arsa Video",
+  description: "Emlak için şablonlu tanıtım videoları",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="tr" className={inter.variable}>
+    <html lang="tr" className={`${bricolage.variable} ${instrument.variable}`}>
       <body className="min-h-dvh font-sans antialiased">{children}</body>
     </html>
   );

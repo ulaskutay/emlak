@@ -16,10 +16,10 @@ type Summary = {
   mahalle?: string;
   centroid: { lat: number; lng: number };
 };
-type Parsed = { fileName: string; text: string; summary: Summary; ring: { lat: number; lng: number }[]; hook: string };
+export type Parsed = { fileName: string; text: string; summary: Summary; ring: { lat: number; lng: number }[]; hook: string };
 
 const STEPS = ["Parsel dosyası", "Yakın noktalar", "İlan bilgileri", "Ses ve müzik"];
-const OFFICE_KEY = "arsa-video:office";
+export const OFFICE_KEY = "arsa-video:office";
 
 export function Wizard() {
   const router = useRouter();
@@ -53,6 +53,7 @@ export function Wizard() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        template: "arsa-drone",
         parcelFileName: parcel.fileName,
         parcelText: parcel.text,
         listing: {
@@ -74,7 +75,7 @@ export function Wizard() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="text-2xl font-extrabold">Yeni arsa videosu</h1>
+      <h1 className="font-display text-3xl font-bold tracking-[-0.025em]">Arsa drone turu</h1>
       <ol className="mt-5 mb-6 flex gap-2">
         {STEPS.map((s, i) => (
           <li key={s} className={`flex-1 rounded-xl border px-3 py-2 text-sm ${i === step ? "border-neon/60 bg-neon/10 text-white" : i < step ? "border-line text-neon" : "border-line text-mute"}`}>
@@ -152,7 +153,7 @@ export function Wizard() {
               <span className="block font-semibold">Fon müziği</span>
               <span className="text-sm text-mute">Sinematik müzik; anlatım sırasında otomatik kısılır</span>
             </span>
-            <input type="checkbox" className="h-5 w-5 accent-[#00e5ff]" checked={music} onChange={(e) => setMusic(e.target.checked)} />
+            <input type="checkbox" className="h-5 w-5 accent-[#ffc24d]" checked={music} onChange={(e) => setMusic(e.target.checked)} />
           </label>
           {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
           <div className="flex justify-between">
@@ -165,7 +166,7 @@ export function Wizard() {
   );
 }
 
-function ParcelStep({ parcel, onParsed, onNext }: { parcel: Parsed | null; onParsed: (p: Parsed | null) => void; onNext: () => void }) {
+export function ParcelStep({ parcel, onParsed, onNext }: { parcel: Parsed | null; onParsed: (p: Parsed | null) => void; onNext: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);

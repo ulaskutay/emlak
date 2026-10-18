@@ -1,0 +1,201 @@
+{
+  "meta": {
+    "name": "Arsa Video — Pafta",
+    "description": "Pazarlama sitesi ve panel için tasarım DNA'sı. Kaynak: rakip/benchmark analizi (Land id, Pedra, Reelsy, Runway, Linear, Higgsfield, Synthesia, Revid, VirtualStagingAI) + ürünün kendi drone render çıktısı. Rakiplerin ölçülen paletleri meta.source_references altında.",
+    "source_references": [
+      { "site": "https://id.land", "measured": ["#ffffff 88%", "#212321 6%", "#6d4fe0 1%"], "takeaway": "Parsel verisi + 3D tur; beyaz zemin, siyah ağır grotesk, kırmızı CTA. Ürün ekranı hero'nun hemen altında." },
+      { "site": "https://pedra.ai", "measured": ["#f5f5f5 74%", "#1c1a18 3%"], "takeaway": "Emlak AI; önce/sonra hero, fiyat hero'da (29€/ay), 'The old way' karşılaştırması, sayılı gerçek sonuçlar, uzun SSS." },
+      { "site": "https://www.autoreel.io (Reelsy)", "measured": ["#fbfbf9 86%", "#121013 3%", "#5043eb 1%"], "takeaway": "Grotesk + italik serif ikili başlık; video kartları." },
+      { "site": "https://runwayml.com", "measured": ["#030605 49%", "#ffffff 30%"], "takeaway": "Tam genişlik video hero, sade beyaz chrome; ürün çıktısı = görsel." },
+      { "site": "https://linear.app", "measured": ["#08090a 58%", "#18191a 38%"], "takeaway": "Koyu, disiplinli tipografi; referans olarak panel için." },
+      { "site": "https://higgsfield.ai", "measured": ["#141515 65%"], "takeaway": "Asit yeşili + siyah; kalabalık. Kaçınılacak yön." },
+      { "site": "https://www.synthesia.io", "measured": ["#fcfcfd 79%", "#0d0f27 4%"], "takeaway": "Kurumsal; 'videonu e-postayla al' ücretsiz deneme kancası." },
+      { "site": "https://www.revid.ai", "measured": ["#0d0f10 85%"], "takeaway": "Koyu, sosyal kanıt sayıları, 4 adım." },
+      { "site": "https://www.virtualstagingai.app", "measured": ["#141a30 45%"], "takeaway": "Tek tık vaadi, önce/sonra galerisi." }
+    ],
+    "created_at": "2026-10-18"
+  },
+  "design_system": {
+    "color": {
+      "palette_type": "analogous (yeşil-gri harita tonları) + tek sinyal vurgusu",
+      "primary": { "hex": "#1E2A23", "role": "Mürekkep — metin, ana buton zemini, logo" },
+      "secondary": { "hex": "#5B6B3A", "role": "Zeytin — ikincil bilgi, harita katmanı, bağlantı alt çizgisi" },
+      "accent": { "hex": "#FFC24D", "role": "Parsel sarısı — videodaki parsel konturu ile aynı renk; birincil CTA zemini, parsel çizgileri, vurgu dolguları. Açık zeminde metin rengi olarak kullanılmaz." },
+      "neutral": {
+        "scale": ["#F7F8F3", "#EDEFE8", "#D9DDD2", "#B4BBAE", "#7E877A", "#4D5650", "#1E2A23", "#121A16"],
+        "usage": "Açık uç zemin/kart; #7E877A yardımcı metin (4.5:1 için yalnız #F7F8F3 üstünde ≥16px); #1E2A23 gövde metni; #121A16 video çevresi koyu bantlar."
+      },
+      "semantic": { "success": "#2F7D4F", "warning": "#C98A0B", "error": "#B3362B", "info": "#2C6E8F" },
+      "surface": { "background": "#EDEFE8", "card": "#F7F8F3", "elevated": "#FFFFFF" },
+      "contrast_strategy": "Açık pafta zemin üzerinde koyu mürekkep; video/drone bölümleri #121A16 koyu bantlarda. Sarı yalnızca dolgu ve çizgi."
+    },
+    "typography": {
+      "type_scale": {
+        "display": { "size": "clamp(3rem, 7vw, 6rem)", "weight": "700", "line_height": "0.95", "tracking": "-0.035em" },
+        "heading_1": { "size": "clamp(2.25rem, 4.5vw, 3.75rem)", "weight": "700", "line_height": "1.02", "tracking": "-0.03em" },
+        "heading_2": { "size": "clamp(1.75rem, 3vw, 2.5rem)", "weight": "650", "line_height": "1.1", "tracking": "-0.02em" },
+        "heading_3": { "size": "1.375rem", "weight": "600", "line_height": "1.25", "tracking": "-0.01em" },
+        "body": { "size": "1.0625rem", "weight": "400", "line_height": "1.6", "tracking": "0" },
+        "body_small": { "size": "0.9375rem", "weight": "400", "line_height": "1.55", "tracking": "0" },
+        "caption": { "size": "0.8125rem", "weight": "500", "line_height": "1.4", "tracking": "0.005em" },
+        "overline": { "size": "0.8125rem", "weight": "600", "line_height": "1.3", "tracking": "0" }
+      },
+      "font_families": {
+        "heading": "Bricolage Grotesque (Google Fonts, latin-ext — ğ ş ı İ desteği; opsz/wdth ekseniyle büyük boyda dar, karakterli)",
+        "body": "Instrument Sans (Google Fonts, latin-ext)",
+        "mono": "Yok — ada/parsel, m², süre gibi veriler gövde fontunun tabular-nums özelliğiyle"
+      },
+      "font_style_notes": "Başlıklar büyük ve sıkı; ada/parsel numaraları tipografik öğe olarak kullanılır (ör. '230 ada 3 parsel' büyük yazılır). Tümü büyük harf etiket yok, tek kelime renklendirme yok."
+    },
+    "spacing": {
+      "base_unit": "4px",
+      "scale": ["4", "8", "12", "16", "24", "32", "48", "64", "96", "144"],
+      "content_density": "comfortable (pazarlama), compact (panel)",
+      "section_rhythm": "Açık bölümler 96–144px; koyu video bantları kenardan kenara, iç boşluk yok — görüntü taşır."
+    },
+    "layout": {
+      "grid_system": "12 sütun, metin sola hizalı",
+      "max_content_width": "1240px (metin satırı en çok 68ch)",
+      "columns": "12 / 8 / 4",
+      "gutter": "24px (mobil 16px kenar)",
+      "breakpoints": { "sm": "640px", "md": "900px", "lg": "1240px" },
+      "alignment_tendency": "asymmetric — metin sola, video/telefon çerçevesi sağa veya tam genişlik"
+    },
+    "shape": {
+      "border_radius": { "small": "6px", "medium": "12px", "large": "20px (yalnız telefon/video çerçeveleri)", "pill": "999px (yalnız durum rozetleri)" },
+      "border_usage": "subtle 1px #D9DDD2; parsel çizgisi motifi 2px sarı",
+      "divider_style": "1px #D9DDD2, bölüm ayrımı çoğunlukla zemin değişimiyle"
+    },
+    "elevation": {
+      "shadow_style": "neredeyse yok; yalnız video çerçeveleri",
+      "levels": { "low": "none", "medium": "0 1px 0 #D9DDD2", "high": "0 30px 60px -20px rgba(18,26,22,.35)" },
+      "depth_cues": "Zemin tonu değişimi + koyu video bantları"
+    },
+    "iconography": { "style": "çizgi, harita/ölçüm sembolleri", "stroke_weight": "1.75px", "size_scale": ["16", "20", "24"], "preferred_set": "Lucide (map-pin, ruler, route, mountain, waves)" },
+    "motion": {
+      "easing": "cubic-bezier(.2,.7,.1,1)",
+      "duration_scale": { "micro": "120ms", "normal": "240ms", "macro": "700ms" },
+      "entrance_pattern": "Bölüm girişleri animasyonsuz; tek orkestre an: hero'da parsel çizgisinin çizilmesi.",
+      "exit_pattern": "fade 120ms",
+      "philosophy": "cinematic ama tek yerde — hareket videonun kendisinde"
+    },
+    "components": {
+      "button_style": "Birincil: sarı dolgu, mürekkep metin, 12px radius, 48px yükseklik. İkincil: mürekkep 1px çerçeve. Metne ok eklenmez.",
+      "input_style": "Beyaz zemin, 1px #B4BBAE, odakta 2px sarı halka + mürekkep çerçeve",
+      "card_style": "Kart kiti yok: içerik zemin üstünde serbest, yalnız video çerçeveleri kutulu",
+      "navigation_pattern": "Üstte ince bar: logo, Örnekler, Fiyatlar, SSS, Giriş, birincil CTA. Mobilde tam ekran menü.",
+      "modal_style": "Ortada, #F7F8F3, video önizleme için koyu tam ekran",
+      "list_style": "Özellikler kısa satırlar + ölçü değeri (ör. 'Okula 650 m')",
+      "component_notes": "İmza bileşen: 'Parsel künyesi' — il/ilçe/mahalle, ada/parsel, m², nitelik; tapu künyesi gibi dizilmiş satırlar. Hem sitede hem panelde kullanılır."
+    }
+  },
+  "design_style": {
+    "aesthetic": {
+      "mood": ["güven veren", "net", "havadan bakış", "yerel"],
+      "visual_metaphor": "Kadastro paftası + drone vizörü: kâğıt üstünde ölçülü bilgi, koyu ekranda canlı uçuş",
+      "era_influence": "Çağdaş harita/ölçüm arayüzleri, harita mühendisi paftaları",
+      "genre": "dikey (emlak) SaaS, ürün çıktısı öncelikli",
+      "personality_traits": ["işini bilen", "sade", "sonuç gösteren"],
+      "adjectives": ["ölçülü", "toprak", "aydınlık", "somut"]
+    },
+    "visual_language": {
+      "complexity": "moderate",
+      "ornamentation": "none — tek motif parsel konturu",
+      "whitespace_usage": "cömert, metin blokları dar",
+      "visual_weight_distribution": "Ağırlık video bantlarında",
+      "focal_strategy": "single hero element (drone videosu + parsel çizgisi)",
+      "contrast_level": "high",
+      "texture_usage": "Çok hafif kontur çizgisi deseni yalnız hero arkasında (eş yükselti eğrileri)"
+    },
+    "composition": {
+      "hierarchy_method": "scale contrast",
+      "balance_type": "asymmetric",
+      "flow_direction": "Yukarıdan aşağı: gör → anla → dene → öde",
+      "grouping_strategy": "Zemin tonu değişimiyle",
+      "negative_space_role": "Videoyu nefes aldırmak"
+    },
+    "imagery": {
+      "photo_treatment": "Yalnız gerçek ürün çıktıları (drone render kareleri, reels). Stok fotoğraf yok.",
+      "illustration_style": "Yok; gerekirse parsel çizimleri (GeoJSON'dan SVG)",
+      "graphic_elements": "Parsel konturu, mesafe çizgileri, pusula oku",
+      "pattern_usage": "Eş yükselti eğrisi deseni, %6 opaklık",
+      "image_shape": "9:16 telefon çerçevesi ve 16:9 tam genişlik"
+    },
+    "interaction_feel": {
+      "feedback_style": "Anında, metinli",
+      "hover_behavior": "Video kartında oynatma; diğer yerlerde yalnız renk",
+      "transition_personality": "smooth glide",
+      "loading_style": "Gerçek aşama adları ile ilerleme (Parsel okunuyor → Çevre taranıyor → Uçuş çekiliyor → Seslendirme)",
+      "microinteraction_density": "low"
+    },
+    "brand_voice_in_ui": {
+      "tone": "Emlakçıyla emlakçı dilinde konuşan; ada/parsel, imar, tapu terimleri",
+      "formality": "siz, samimi",
+      "cta_style": "direct imperative — 'Parselinizi yazın', 'Videoyu oluşturun'",
+      "empty_state_approach": "Tek eylem: 'İlk parselinizi yükleyin'",
+      "error_tone": "Ne oldu + ne yapmalı: 'Bu KML'de parsel sınırı yok. TKGM'den indirdiğiniz dosyayı yükleyin.'"
+    }
+  },
+  "visual_effects": {
+    "overview": {
+      "effect_intensity": "subtle-accent",
+      "performance_tier": "medium",
+      "fallback_strategy": "Mobil/reduced-motion: video yerine poster kare, çizim animasyonu yerine son hali",
+      "primary_technology": "video + SVG path-draw + scroll ile kare dizisi (Canvas 2D)"
+    },
+    "background_effects": {
+      "type": "video-bg",
+      "description": "Hero'da gerçek drone çıktısı (sessiz, döngü, 6–8 sn)",
+      "technology": "<video> AV1/H.264, R2/CDN",
+      "params": { "color_palette": "doğal uydu görüntüsü", "speed": "1x", "density": "n/a", "opacity": "1", "blend_mode": "normal" }
+    },
+    "particle_systems": {
+      "enabled": false, "type": "none", "description": "Yok", "technology": "n/a",
+      "params": { "count": "0", "shape": "n/a", "size_range": "n/a", "movement_pattern": "n/a", "color_behavior": "n/a", "interaction": "none", "spawn_area": "n/a" }
+    },
+    "3d_elements": {
+      "enabled": false,
+      "type": "scene-bg",
+      "description": "Faz 4'te isteğe bağlı: canlı Cesium parsel önizlemesi (drone-studio motoru tarayıcıda). Maliyet ve hız nedeniyle başlangıçta önceden render edilmiş kareler.",
+      "technology": "CesiumJS + Google Photorealistic 3D Tiles",
+      "params": { "renderer": "WebGL", "lighting": "güneş", "camera": "yörünge", "materials": "3D tiles", "geometry": "parsel poligonu", "post_processing": [], "interaction_model": "yok (otomatik uçuş)" }
+    },
+    "shader_effects": {
+      "enabled": false, "type": "none", "description": "Yok", "technology": "n/a",
+      "params": { "uniforms": "n/a", "vertex_manipulation": "n/a", "fragment_output": "n/a", "noise_type": "n/a", "distortion": "n/a" }
+    },
+    "scroll_effects": {
+      "parallax": { "enabled": false, "layers": "0", "depth_range": "n/a", "speed_curve": "n/a" },
+      "scroll_triggered_animations": { "enabled": true, "trigger_points": "Yalnız 'Nasıl çalışır' bölümü", "animation_type": "draw-SVG + kare dizisi", "scrub_behavior": "Scroll'a bağlı (scrub): parsel çizilir → kamera yükselir → çevre noktaları belirir" },
+      "scroll_morphing": { "enabled": false, "description": "Yok" }
+    },
+    "text_effects": {
+      "type": "none", "description": "Başlıklar statik", "technology": "n/a",
+      "params": { "split_strategy": "n/a", "animation_per_unit": "n/a", "stagger": "n/a", "effect_style": "n/a" }
+    },
+    "cursor_effects": {
+      "enabled": false, "type": "none", "description": "Yok",
+      "params": { "shape": "n/a", "size": "n/a", "blend_mode": "n/a", "trail": "n/a", "interaction_zone": "n/a" }
+    },
+    "image_effects": {
+      "type": "reveal-clip", "description": "Önce/sonra: ilan fotoğrafı ↔ drone videosu sürgüsü", "technology": "CSS clip-path + pointer",
+      "params": { "filter_pipeline": "yok", "hover_transform": "yok", "reveal_animation": "kullanıcı sürükler", "distortion_type": "none" }
+    },
+    "glassmorphism_neumorphism": {
+      "enabled": false, "style": "none",
+      "params": { "blur_radius": "0", "transparency": "0", "border_treatment": "n/a", "shadow_type": "n/a", "light_source_angle": "n/a" }
+    },
+    "canvas_drawings": {
+      "enabled": true, "type": "data-visualization",
+      "description": "Scroll'a bağlı drone kare dizisi (ürünün kendi render motoruyla üretilmiş ~120 kare WebP)",
+      "technology": "Canvas 2D",
+      "params": { "draw_method": "drawImage kare dizisi", "animation_loop": "scroll-scrub", "color_scheme": "doğal", "responsiveness": "mobilde 9:16 dizi", "interaction": "scroll" }
+    },
+    "svg_animations": {
+      "enabled": true, "type": "path-draw",
+      "description": "Gerçek bir parselin (Ezine 230/3) GeoJSON sınırından üretilen SVG; sayfa açılışında sarı kontur bir kez çizilir",
+      "params": { "animation_method": "stroke-dashoffset", "path_morphing": "yok", "stroke_animation": "1 kez, 900ms", "filter_effects": "hafif glow (drop-shadow sarı %40)" }
+    },
+    "composite_notes": "Sitenin tek imza hareketi: parsel çizgisinin çizilmesi ve kameranın havalanması. Bu, ürünün videosunda zaten olan hareketin aynısı — site ile çıktı aynı dili konuşur. Hero videosu ve kare dizisi kendi render hattımızla üretilir, dış stok yok."
+  }
+}

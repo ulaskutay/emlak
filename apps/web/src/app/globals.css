@@ -1,19 +1,49 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #070a0f;
-  --color-panel: #0d1219;
-  --color-line: #1c2531;
-  --color-mute: #8a97a8;
-  --color-neon: #00e5ff;
-  --color-amber: #ffc83d;
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* Panel ve galeri — "Gece" (docs/design-dna.json): koyu çam zemin, parsel sarısı vurgu */
+  --color-ink: #121a16;
+  --color-panel: #18221d;
+  --color-line: #2a3630;
+  --color-mute: #8f988c;
+  --color-neon: #ffc24d;
+  --color-amber: #ffc24d;
+
+  /* Pazarlama sitesi — "Pafta" (docs/design-dna.json) */
+  --color-pafta: #edefe8;
+  --color-kagit: #f7f8f3;
+  --color-murekkep: #1e2a23;
+  --color-zeytin: #5b6b3a;
+  --color-sari: #ffc24d;
+  --color-gece: #121a16;
+  --color-cizgi: #d9ddd2;
+  --color-sinir: #b4bbae;
+  --color-soluk: #4d5650;
+}
+
+/* Font değişkenleri .site öğesinde tanımlı; inline ile yardımcı sınıfa doğrudan yazılır. */
+@theme inline {
+  --font-sans: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
 }
 
 html,
 body {
   background: var(--color-ink);
-  color: #e8eef5;
+  color: #edefe8;
+}
+
+/* Site sayfaları açık pafta zeminde (panel koyu kalır). */
+html:has(.site),
+body:has(.site) {
+  background: var(--color-pafta);
+  color: var(--color-murekkep);
+}
+html:has(.site-koyu),
+body:has(.site-koyu) {
+  background: var(--color-gece);
+  color: #edefe8;
 }
 
 @utility card {
@@ -32,5 +62,53 @@ body {
   @apply w-full rounded-xl border border-line bg-ink px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-mute/70 focus:border-neon/70;
 }
 @utility label {
-  @apply mb-1.5 block text-xs font-semibold tracking-wide text-mute uppercase;
+  @apply mb-1.5 block text-sm font-semibold text-mute;
+}
+
+/* ——— Site bileşenleri ——— */
+@utility site-btn {
+  @apply inline-flex h-12 items-center justify-center gap-2 rounded-xl px-5 text-[0.9375rem] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+}
+@utility site-btn-primary {
+  @apply site-btn bg-sari text-murekkep hover:bg-[#ffb21a];
+}
+@utility site-btn-secondary {
+  @apply site-btn border border-murekkep/80 text-murekkep hover:bg-murekkep hover:text-kagit;
+}
+@utility site-input {
+  @apply h-12 w-full rounded-xl border border-sinir bg-white px-4 text-base text-murekkep outline-none placeholder:text-soluk/60 focus:border-murekkep focus:ring-2 focus:ring-sari;
+}
+@utility site-label {
+  @apply mb-1.5 block text-sm font-semibold text-murekkep;
+}
+
+.site :focus-visible {
+  outline: 2px solid var(--color-murekkep);
+  outline-offset: 3px;
+}
+.site .bg-gece :focus-visible {
+  outline-color: var(--color-sari);
+}
+
+/* Parsel sınırının açılışta bir kez çizilmesi */
+@keyframes parsel-ciz {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes parsel-belir {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.parsel-cizgi {
+  stroke-dasharray: 1;
+  animation: parsel-ciz 1.6s cubic-bezier(0.2, 0.7, 0.1, 1) 0.2s both;
+}
+.parsel-etiket {
+  animation: parsel-belir 0.5s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .parsel-cizgi,
+  .parsel-etiket {
+    animation: none;
+  }
 }

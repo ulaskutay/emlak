@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { desc, eq, getDb, videos } from "@arsa/db";
-import { ReelOrder } from "@arsa/shared";
+import { TemplateOrder } from "@arsa/shared";
 import { NextResponse } from "next/server";
 import { apiUser, badRequest, unauthorized } from "@/lib/api";
 import { summarizeParcel } from "@/lib/parcel";
@@ -13,6 +13,7 @@ export async function GET() {
   const rows = await getDb()
     .select({
       id: videos.id,
+      template: videos.template,
       status: videos.status,
       stage: videos.stage,
       progress: videos.progress,
@@ -26,30 +27,32 @@ export async function GET() {
   return NextResponse.json({ videos: rows });
 }
 
-/** Yeni video siparişi: doğrula, kaydet, kuyruğa at. */
+/** Yeni video siparişi: şablona göre doğrula, kaydet, kuyruğa at. */
 export async function POST(req: Request) {
   const user = await apiUser();
   if (!user) return unauthorized();
-  const parsed = ReelOrder.safeParse(await req.json().catch(() => null));
+  const parsed = TemplateOrder.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return badRequest(parsed.error.issues[0]?.message ?? "Geçersiz istek");
   const order = parsed.data;
-  let summary;
-  try {
-    summary = summarizeParcel(order.parcelText).summary;
-  } catch (e) {
-    return badRequest(e instanceof Error ? e.message : String(e));
-  }
   const id = randomUUID();
-  await getDb().insert(videos).values({
-    id,
-    userId: user.id,
-    parcelFileName: order.parcelFileName,
-    parcelText: order.parcelText,
-    parcelSummary: summary,
-    listing: order.listing,
-    voiceId: order.voiceId ?? null,
-    music: order.music,
-  });
+  const base = { id, userId: user.id, template: order.template, listing: order.listing, music: order.music };
+
+  if (order.template === "ilan-videosu") {
+    // Fotoğraflar yalnızca kullanıcının kendi yüklemeleri olabilir.
+    if (order.photos.some((p) => !p.key.startsWith(`uploads/${user.id}/`))) return badRequest("Geçersiz fotoğraf");
+    await getDb().insert(videos).values({ ...base, input: { photos: order.photos } });
+  } else {
+    let summary;
+    try {
+      summary = summarizeParcel(order.parcelText).summary;
+    } catch (e) {
+      return badRequest(e instanceof Error ? e.message : String(e));
+    }
+    const parcel = { parcelFileName: order.parcelFileName, parcelText: order.parcelText, parcelSummary: summary };
+    if (order.template === "bitmis-hali")
+      await getDb().insert(videos).values({ ...base, ...parcel, input: { building: order.building, floors: order.floors } });
+    else await getDb().insert(videos).values({ ...base, ...parcel, voiceId: order.voiceId ?? null });
+  }
   await enqueueReel(id);
   return NextResponse.json({ id }, { status: 201 });
 }

@@ -1,4 +1,4 @@
-import type { ReelListing, ReelStage, ReelStatus } from "@arsa/shared";
+import type { ReelListing, ReelStatus, TemplateId, TemplateInput } from "@arsa/shared";
 import { boolean, index, integer, jsonb, pgTable, real, text, timestamp } from "drizzle-orm/pg-core";
 
 // ---- Better Auth (e-posta + şifre) — alan adları Better Auth'un beklediğiyle aynı ----
@@ -72,13 +72,19 @@ export const videos = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    /** Şablon (packages/shared/src/templates.ts). */
+    template: text("template").$type<TemplateId>().notNull().default("arsa-drone"),
+    /** Şablona özgü girdi (ilan fotoğrafları, yapı tipi…). */
+    input: jsonb("input").$type<TemplateInput>().notNull().default({}),
     status: text("status").$type<ReelStatus>().notNull().default("queued"),
-    stage: text("stage").$type<ReelStage>(),
+    /** Şablonun aşama kimliği (TEMPLATES[template].stages). */
+    stage: text("stage"),
     /** Aşama içi ilerleme 0..1 (render'da kare oranı). */
     progress: real("progress").notNull().default(0),
-    parcelFileName: text("parcel_file_name").notNull(),
-    parcelText: text("parcel_text").notNull(),
-    parcelSummary: jsonb("parcel_summary").$type<ParcelSummary>().notNull(),
+    /** Parsel kullanan şablonlarda dolu (ilan videosunda boş). */
+    parcelFileName: text("parcel_file_name"),
+    parcelText: text("parcel_text"),
+    parcelSummary: jsonb("parcel_summary").$type<ParcelSummary>(),
     listing: jsonb("listing").$type<ReelListing>().notNull().default({}),
     voiceId: text("voice_id"),
     music: boolean("music").notNull().default(true),

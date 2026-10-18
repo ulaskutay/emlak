@@ -108,7 +108,7 @@ export function PoiStep({
           gestureHandling: "cooperative", // tekerlek sayfayı kaydırır; yakınlaştırma Ctrl+tekerlek ya da +/-
           clickableIcons: false,
         });
-        new Polygon({ map: map.current, paths: ring, strokeColor: "#00e5ff", strokeWeight: 3, fillColor: "#00e5ff", fillOpacity: 0.25 });
+        new Polygon({ map: map.current, paths: ring, strokeColor: "#ffc24d", strokeWeight: 3, fillColor: "#ffc24d", fillOpacity: 0.25 });
         map.current.addListener("click", (e: any) =>
           setDraft({ position: { lat: e.latLng.lat(), lng: e.latLng.lng() }, category: "custom", name: "" }),
         );
@@ -137,7 +137,7 @@ export function PoiStep({
         const el = document.createElement("div");
         el.textContent = `${p.emoji} ${p.name ?? p.label}`;
         el.style.cssText = `padding:4px 9px;border-radius:999px;font:600 12px system-ui;white-space:nowrap;cursor:pointer;
-          background:${on ? "#ffc83d" : "rgba(13,18,25,.85)"};color:${on ? "#070a0f" : "#fff"};border:2px solid ${on ? "#fff" : "rgba(255,255,255,.35)"}`;
+          background:${on ? "#ffc24d" : "rgba(18,26,22,.85)"};color:${on ? "#121a16" : "#fff"};border:2px solid ${on ? "#fff" : "rgba(255,255,255,.35)"}`;
         const m = new AdvancedMarkerElement({ map: map.current, position: p.position, content: el, zIndex: on ? 2 : 1, title: `${p.label} · ${formatDistance(p.distanceM)}` });
         m.addListener("click", () => toggle(p));
         return m;

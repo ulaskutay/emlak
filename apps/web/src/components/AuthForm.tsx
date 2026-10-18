@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
-import { Logo } from "./Logo";
+import { SiteLogo } from "./site/SiteLogo";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
@@ -42,8 +42,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     <main className="grid min-h-dvh place-items-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <Logo className="text-2xl" />
-          <p className="mt-3 text-sm text-mute">TKGM parselinden seslendirmeli drone tanıtım videosu</p>
+          <Link href="/" aria-label="Ana sayfa"><SiteLogo tone="dark" /></Link>
+          <p className="mt-3 text-sm text-mute">Şablonu seçin, bilgileri girin, video birkaç dakikada hazır</p>
         </div>
         <form onSubmit={submit} className="card space-y-4 p-6">
           <h1 className="text-lg font-bold">{signup ? "Hesap oluştur" : "Giriş yap"}</h1>

@@ -12,8 +12,8 @@ export function ParcelShape({ ring, className = "" }: { ring: { lat: number; lng
   const d = pts.map((p) => `${(ox + (p.x - minX) * s).toFixed(2)},${(oy + (p.y - minY) * s).toFixed(2)}`).join(" ");
   return (
     <svg viewBox="-8 -8 116 116" className={className} aria-label="Parsel sınırı">
-      <polygon points={d} fill="rgba(0,229,255,.12)" stroke="#00e5ff" strokeWidth="2.2" strokeLinejoin="round"
-        style={{ filter: "drop-shadow(0 0 4px rgba(0,229,255,.8))" }} />
+      <polygon points={d} fill="rgba(255,194,77,.14)" stroke="#ffc24d" strokeWidth="2.2" strokeLinejoin="round"
+        style={{ filter: "drop-shadow(0 0 4px rgba(255,194,77,.7))" }} />
     </svg>
   );
 }

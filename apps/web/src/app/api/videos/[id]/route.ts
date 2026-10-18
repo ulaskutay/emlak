@@ -17,7 +17,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   let urls: { play?: string; download?: string; poster?: string } = {};
   if (v.status === "done" && v.reelKey) {
     const s = r2();
-    const name = `arsa-${v.parcelSummary.ada ?? ""}-${v.parcelSummary.parsel ?? ""}.mp4`.replace(/-+/g, "-");
+    const name = v.parcelSummary
+      ? `${v.template}-${v.parcelSummary.ada ?? ""}-${v.parcelSummary.parsel ?? ""}.mp4`.replace(/-+/g, "-").replace("-.mp4", ".mp4")
+      : `${v.template}-${v.id.slice(0, 8)}.mp4`;
     urls = {
       play: await s.url(v.reelKey, 6 * 3600),
       download: await s.url(v.reelKey, 3600, name),

@@ -1,6 +1,6 @@
-import { Wizard } from "./Wizard";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Yeni video · Arsa Video Stüdyo" };
+/** Eski bağlantı: şablon seçimi panel ana sayfasında. */
 export default function Page() {
-  return <Wizard />;
+  redirect("/panel");
 }

@@ -1,0 +1,109 @@
+"use client";
+import { BUILDING_LABELS, BuildingType } from "@arsa/shared";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { ListingFields, listingPayload, type ListingValues } from "./ListingFields";
+import { ParcelStep, type Parsed } from "./Wizard";
+
+const TYPES = BuildingType.options;
+const HINTS: Record<BuildingType, string> = {
+  konut: "Kat sayısını siz seçersiniz",
+  villa: "İki katlı, havuzlu tek villa",
+  villa_sitesi: "Büyük arsalar için birden çok villa",
+  ticari: "Cam cepheli ofis, zeminde dükkânlar",
+};
+
+export function BitmisForm() {
+  const router = useRouter();
+  const [parcel, setParcel] = useState<Parsed | null>(null);
+  const [step, setStep] = useState(0);
+  const [building, setBuilding] = useState<BuildingType>("konut");
+  const [floors, setFloors] = useState(4);
+  const [listing, setListing] = useState<ListingValues>({ price: "", officeName: "", phone: "" });
+  const [music, setMusic] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (!parcel) return;
+    setBusy(true);
+    setError(null);
+    const res = await fetch("/api/videos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        template: "bitmis-hali",
+        parcelFileName: parcel.fileName,
+        parcelText: parcel.text,
+        building,
+        floors,
+        listing: listingPayload(listing),
+        music,
+      }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) return setError(data.error ?? "Video oluşturulamadı");
+    router.push(`/panel/videolar/${data.id}`);
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div>
+        <h1 className="font-display text-3xl font-bold tracking-[-0.025em]">Arsanın bitmiş hali</h1>
+        <p className="mt-2 text-mute">
+          Parselin drone çekiminin ardından, aynı kareden seçtiğiniz yapının yükseldiği bir inşaat sahnesi. Görüntü temsilidir; videoda bu yazılır.
+        </p>
+      </div>
+
+      {step === 0 && <ParcelStep parcel={parcel} onParsed={setParcel} onNext={() => setStep(1)} />}
+
+      {step === 1 && parcel && (
+        <>
+          <fieldset className="card p-6">
+            <legend className="sr-only">Yapı tipi</legend>
+            <div className="mb-4 font-semibold">Arsaya ne yapılsın?</div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {TYPES.map((t) => (
+                <label key={t}
+                  className={`flex cursor-pointer flex-col rounded-xl border p-4 transition ${building === t ? "border-neon bg-neon/10" : "border-line hover:border-neon/50"}`}>
+                  <input type="radio" name="building" value={t} className="sr-only" checked={building === t} onChange={() => setBuilding(t)} />
+                  <span className="font-semibold">{BUILDING_LABELS[t]}</span>
+                  <span className="mt-1 text-sm text-mute">{HINTS[t]}</span>
+                </label>
+              ))}
+            </div>
+            {(building === "konut" || building === "ticari") && (
+              <div className="mt-5 max-w-xs">
+                <label className="label" htmlFor="floors">Kat sayısı</label>
+                <select id="floors" className="input" value={floors} onChange={(e) => setFloors(Number(e.target.value))}>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>{n} kat</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </fieldset>
+
+          <div className="card space-y-4 p-6">
+            <p className="text-sm text-mute">Hepsi isteğe bağlı; videonun sonundaki kartta yazar. Fiyat girmezseniz arsanın alanı yazar.</p>
+            <ListingFields value={listing} onChange={setListing} />
+            <label className="flex cursor-pointer items-center justify-between border-t border-line pt-4">
+              <span>
+                <span className="block font-semibold">Fon müziği</span>
+                <span className="text-sm text-mute">Sinematik, sözsüz müzik</span>
+              </span>
+              <input type="checkbox" className="h-5 w-5 accent-[#ffc24d]" checked={music} onChange={(e) => setMusic(e.target.checked)} />
+            </label>
+          </div>
+
+          {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
+          <div className="flex justify-between">
+            <button className="btn-ghost" onClick={() => setStep(0)}>Geri</button>
+            <button className="btn-primary" disabled={busy} onClick={submit}>{busy ? "Gönderiliyor…" : "Videoyu oluştur"}</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

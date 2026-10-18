@@ -73,7 +73,7 @@ function run(cmd: string, argv: string[]): Promise<void> {
 }
 
 /** Emlak tanıtım müziği: zarif, sıcak, güven veren; yakın çekimde sakin, uzaklaşırken yükselir, temiz biter. */
-const MUSIC_PROMPT =
+export const MUSIC_PROMPT =
   "Elegant luxury real estate showcase background music. Warm felt piano melody over soft lush strings and gentle " +
   "fingerpicked acoustic guitar, airy pads. Calm and aspirational at the start, light modern percussion and a subtle " +
   "pulse join after about 10 seconds, gradual uplifting build to a confident, inspiring peak near the end, then a " +

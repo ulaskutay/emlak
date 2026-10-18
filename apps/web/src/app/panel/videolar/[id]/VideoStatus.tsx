@@ -1,15 +1,17 @@
 "use client";
-import { REEL_STAGES, type ReelListing, type ReelStage, type ReelStatus } from "@arsa/shared";
+import { TEMPLATES, type ReelListing, type ReelStatus, type TemplateId } from "@arsa/shared";
 import { useCallback, useEffect, useState } from "react";
-import { overallProgress, statusLabel, statusTone } from "@/components/status";
-import { formatArea, formatDate, parcelPlace, parcelTitle } from "@/lib/format";
+import { overallProgress, statusLabel, statusTone, videoTitle } from "@/components/status";
+import { formatArea, formatDate, parcelPlace } from "@/lib/format";
 
 type Video = {
   id: string;
+  template: TemplateId;
+  input: unknown;
   status: ReelStatus;
-  stage: ReelStage | null;
+  stage: string | null;
   progress: number;
-  parcelSummary: { areaM2: number; ada?: string; parsel?: string; nitelik?: string; il?: string; ilce?: string; mahalle?: string };
+  parcelSummary: { areaM2: number; ada?: string; parsel?: string; nitelik?: string; il?: string; ilce?: string; mahalle?: string } | null;
   listing: ReelListing;
   durationSec: number | null;
   error: string | null;
@@ -40,13 +42,14 @@ export function VideoStatus({ id }: { id: string }) {
 
   if (!data) return <div className="text-mute">Yükleniyor…</div>;
   const v = data.video;
-  const pct = Math.round(overallProgress(v.status, v.stage, v.progress) * 100);
-  const stageIndex = v.status === "done" ? REEL_STAGES.length : REEL_STAGES.findIndex((s) => s.id === v.stage);
+  const stages = (TEMPLATES[v.template] ?? TEMPLATES["arsa-drone"]).stages;
+  const pct = Math.round(overallProgress(v.status, v.stage, v.progress, v.template) * 100);
+  const stageIndex = v.status === "done" ? stages.length : stages.findIndex((s) => s.id === v.stage);
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,380px)_1fr]">
       <div className="card overflow-hidden">
-        <div className="relative aspect-[9/16] bg-gradient-to-b from-[#0e1a24] to-ink">
+        <div className="relative aspect-[9/16] bg-gradient-to-b from-[#1d2a23] to-ink">
           {v.status === "done" && data.urls.play ? (
             <video src={data.urls.play} poster={data.urls.poster} controls playsInline className="h-full w-full object-cover" />
           ) : (
@@ -57,7 +60,7 @@ export function VideoStatus({ id }: { id: string }) {
                 <div>
                   <div className="mx-auto h-14 w-14 animate-spin rounded-full border-4 border-neon/20 border-t-neon" />
                   <div className="mt-5 text-4xl font-black text-neon">%{pct}</div>
-                  <div className="mt-1 text-sm text-mute">{statusLabel(v.status, v.stage)}</div>
+                  <div className="mt-1 text-sm text-mute">{statusLabel(v.status, v.stage, v.template)}</div>
                 </div>
               )}
             </div>
@@ -67,9 +70,12 @@ export function VideoStatus({ id }: { id: string }) {
 
       <div className="space-y-6">
         <div>
-          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusTone[v.status]}`}>{statusLabel(v.status, v.stage)}</span>
-          <h1 className="mt-3 text-2xl font-extrabold">{parcelTitle(v.parcelSummary)}</h1>
-          <div className="text-mute">{parcelPlace(v.parcelSummary)} · {formatArea(v.parcelSummary.areaM2)}</div>
+          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusTone[v.status]}`}>{statusLabel(v.status, v.stage, v.template)}</span>
+          <div className="mt-3 text-sm text-mute">{TEMPLATES[v.template]?.name}</div>
+          <h1 className="mt-1 font-display text-2xl font-bold tracking-[-0.02em]">{videoTitle(v)}</h1>
+          {v.parcelSummary && (
+            <div className="text-mute">{parcelPlace(v.parcelSummary)} · {formatArea(v.parcelSummary.areaM2)}</div>
+          )}
           <div className="mt-1 text-xs text-mute">
             {formatDate(v.createdAt)}
             {v.durationSec ? ` · ${v.durationSec.toFixed(0)} sn video` : ""}
@@ -77,7 +83,7 @@ export function VideoStatus({ id }: { id: string }) {
         </div>
 
         {v.status === "done" && data.urls.download && (
-          <a href={data.urls.download} className="btn-primary">⬇ Videoyu indir (1080×1920)</a>
+          <a href={data.urls.download} className="btn-primary">Videoyu indirin (1080×1920)</a>
         )}
 
         {v.status === "failed" && (
@@ -96,7 +102,7 @@ export function VideoStatus({ id }: { id: string }) {
         )}
 
         <ol className="card divide-y divide-line">
-          {REEL_STAGES.map((s, i) => {
+          {stages.map((s, i) => {
             const done = i < stageIndex || v.status === "done";
             const active = i === stageIndex && v.status === "running";
             return (
@@ -105,8 +111,8 @@ export function VideoStatus({ id }: { id: string }) {
                   {done ? "✓" : i + 1}
                 </span>
                 <span className={done || active ? "text-white" : "text-mute"}>{s.label}</span>
-                {active && s.id === "render" && <span className="ml-auto text-sm text-neon">%{Math.round(v.progress * 100)}</span>}
-                {active && s.id !== "render" && <span className="ml-auto h-2 w-2 animate-pulse rounded-full bg-neon" />}
+                {active && v.progress > 0 && <span className="ml-auto text-sm text-neon">%{Math.round(v.progress * 100)}</span>}
+                {active && !(v.progress > 0) && <span className="ml-auto h-2 w-2 animate-pulse rounded-full bg-neon" />}
               </li>
             );
           })}
