@@ -1,8 +1,7 @@
 /**
- * İnşaat şablonları: parselin drone çekimi (seslendirmesiz) → son kareden Wan 2.2 inşaat timelapse'i
- * → drone + inşaat + kapanış kartı + müzik.
- *   bitmis-hali:    son kareye AI ile yapı eklenir (Qwen-Image-Edit), Wan ilk/son kare arasında geçiş yapar.
- *   insaat-videosu: bitiş karesi yok; Wan yalnız ilk kare + prompt'la inşaatı kendisi kurar (daha hızlı ve ucuz).
+ * Arsanın bitmiş hali: parselin drone çekimi (seslendirmesiz) → son kareye AI ile yapı eklenir (Qwen-Image-Edit)
+ * → Wan 2.2 ilk/son kare inşaat timelapse'i → drone + inşaat + kapanış kartı + müzik.
+ * (Arsadan inşaat videosu ayrı hat: insaat-videosu.ts.)
  */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -27,7 +26,6 @@ const OUT_FPS = 30;
 const OUTRO_SECONDS = 3;
 
 export const bitmisHali = (ctx: JobContext) => construction(ctx, true);
-export const insaatVideosu = (ctx: JobContext) => construction(ctx, false);
 
 async function construction(ctx: JobContext, endFrame: boolean): Promise<JobResult> {
   const v = ctx.video;

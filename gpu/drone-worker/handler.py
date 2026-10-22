@@ -211,6 +211,25 @@ def handler(job):
         report["cpu_container"] = container_cpus()
         return report
 
+    # Yan kare (inşaat videosunun başlangıcı): yandan yakın tek kare, PNG (Qwen girdisi, JPEG kaybı olmasın).
+    if inp.get("still"):
+        st = inp["still"] if isinstance(inp["still"], dict) else {}
+        cmd = [*TSX, "scripts/worker-still.ts", "--in", src, "--out", work]
+        if inp.get("context"):
+            cmd += ["--context", os.path.join(work, "context.json")]
+        for k in ("heading", "dist", "height"):
+            if st.get(k) is not None:
+                cmd += [f"--{k}", str(st[k])]
+        t0 = time.time()
+        result = json.loads(run_streaming(cmd, env, 420, job))
+        prefix = inp.get("output_prefix", f"drone/{job['id']}")
+        return {
+            "still": publish(result["still"], f"{prefix}/side.png", "image/png"),
+            "shot": result["shot"],
+            "parcel": result["parcel"],
+            "timings": {"still": result["seconds"], "handler_total": round(time.time() - t0, 1)},
+        }
+
     parallel = int(inp.get("parallel") or max(2, min(8, container_cpus() // 2)))
     cmd = [*TSX, "scripts/worker-render.ts", "--in", src, "--out", work, *ctx_args,
            "--fps", str(inp.get("fps", 30)), "--parallel", str(parallel), "--crf", str(inp.get("crf", 22))]

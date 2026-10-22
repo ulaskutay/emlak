@@ -91,21 +91,33 @@ export const TEMPLATES: Record<TemplateId, TemplateInfo> = {
   "insaat-videosu": {
     id: "insaat-videosu",
     name: "Arsadan inşaat videosu",
-    tagline: "Drone karesinden doğrudan yapay zekâ inşaat sahnesi",
+    tagline: "Boş arsada kazıdan bitmiş binaya, imar bilgisiyle seslendirilen inşaat",
     description:
-      "Parselin drone çekiminin son karesinden yapay zekâ inşaatı kendisi kurar: kazı, kaba inşaat, cephe ve bitmiş yapı tek sahnede. Bitmiş hali şablonundan daha hızlı hazırlanır. Görüntü temsilidir ve videoda bu yazılır.",
+      "Arsa yandan, yakından görünür; yapay zekâ önce temeli kazar, sonra binayı kat kat yükseltir ve peyzajı tamamlar. Emsal, inşaat alanı ve TAKS ekranda yazar ve seslendirilir, inşaat sesleri ve müzikle. Sonunda emlakçı kartı. Görüntü temsilidir ve videoda bu yazılır.",
     category: "Proje",
-    needs: ["TKGM parsel dosyası (KML ya da GeoJSON)", "Yapı tipi ve kat sayısı", "Fiyat ve ofis telefonu (isteğe bağlı)"],
-    includes: ["Parselin drone çekimi", "AI inşaat sahnesi (temsili)", "Proje ve fiyat kartı", "Müzik"],
-    duration: "20–30 sn",
-    preview: { poster: "/media/sablon-bitmis-poster.jpg" },
+    needs: [
+      "TKGM parsel dosyası (KML ya da GeoJSON)",
+      "Yapı tipi ve kat sayısı",
+      "İmar durumu: emsal ve TAKS",
+      "Fiyat, emlakçı fotoğrafı ve ofis logosu (isteğe bağlı)",
+    ],
+    includes: [
+      "Arsanın yandan yakın çekimi",
+      "Kazıdan bitmiş yapıya inşaat timelapse'i (temsili)",
+      "Alan, emsal ve TAKS kartları",
+      "Türkçe seslendirme, inşaat sesleri ve müzik",
+      "Emlakçı kapanış kartı",
+    ],
+    duration: "~24 sn",
+    preview: { video: "/media/sablon-insaat.mp4", poster: "/media/sablon-insaat-poster.jpg" },
     badge: "Yeni",
-    hidden: true,
     stages: [
       { id: "parcel", label: "Parsel" },
-      { id: "render", label: "Drone çekimi" },
+      { id: "side", label: "Yan çekim" },
+      { id: "build", label: "Bitmiş hali" },
       { id: "timelapse", label: "İnşaat sahnesi" },
       { id: "compose", label: "Kurgu" },
+      { id: "sound", label: "Ses" },
       { id: "done", label: "Hazır" },
     ],
   },
@@ -189,9 +201,6 @@ export const BitmisOrder = z.object({
 });
 export type BitmisOrder = z.infer<typeof BitmisOrder>;
 
-/** Arsadan inşaat videosu: bitmiş haliyle aynı girdi, bitiş karesi üretilmez. */
-export const InsaatOrder = BitmisOrder.extend({ template: z.literal("insaat-videosu") });
-export type InsaatOrder = z.infer<typeof InsaatOrder>;
 
 export const RoomType = z.enum(["salon", "yatak_odasi", "cocuk_odasi", "mutfak", "yemek_odasi", "calisma_odasi", "banyo", "balkon"]);
 export type RoomType = z.infer<typeof RoomType>;
@@ -247,6 +256,31 @@ export const DosemeOrder = z.object({
 });
 export type DosemeOrder = z.infer<typeof DosemeOrder>;
 
+/** İmar durumu (imar durumu belgesinden): seslendirilir ve ekranda kartla yazar. */
+export const Zoning = z.object({
+  /** İmar türü, ör. "Konut", "Ticari", "Turizm". */
+  use: z.string().trim().min(2, "İmar türünü yazın").max(30),
+  /** Emsal (KAKS): inşaat alanı = arsa alanı × emsal. */
+  emsal: z.coerce.number().min(0.05, "Emsal 0,05 ile 10 arasında olmalı").max(10, "Emsal 0,05 ile 10 arasında olmalı"),
+  taks: z.coerce.number().min(0.01, "TAKS 0,01 ile 1 arasında olmalı").max(1, "TAKS 0,01 ile 1 arasında olmalı").optional(),
+});
+export type Zoning = z.infer<typeof Zoning>;
+
+/** Arsadan inşaat videosu: parsel + yapı tipi + imar; sonunda emlakçı kartı (döşeme şablonundaki gibi). */
+export const InsaatOrder = z.object({
+  template: z.literal("insaat-videosu"),
+  parcelFileName: z.string().trim().min(1).max(200),
+  parcelText: z.string().min(20).max(2_000_000),
+  building: BuildingType,
+  floors: z.coerce.number().int().min(1).max(12).default(4),
+  zoning: Zoning,
+  agent: DosemeOrder.shape.agent,
+  listing: ReelListing.pick({ priceTry: true, officeName: true, phone: true }).default({}),
+  voiceId: ReelOrder.shape.voiceId,
+  music: z.boolean().default(true),
+});
+export type InsaatOrder = z.infer<typeof InsaatOrder>;
+
 /** API'nin kabul ettiği sipariş. Şablonsuz eski istek arsa drone turu sayılır. */
 export const TemplateOrder = z.preprocess(
   (v) => (v && typeof v === "object" && !("template" in v) ? { ...v, template: "arsa-drone" } : v),
@@ -259,6 +293,7 @@ export type TemplateInput =
   | { photos: IlanPhoto[] }
   | { photos: RoomPhoto[]; style: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; voice?: boolean }
   | { building: BuildingType; floors: number }
+  | { building: BuildingType; floors: number; zoning: Zoning; agent?: DosemeOrder["agent"] }
   | Record<string, never>;
 
 /** Yapı tipine göre görüntü düzenleme tarifi ve videodaki proje adı. */

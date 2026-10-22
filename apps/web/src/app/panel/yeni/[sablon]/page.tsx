@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { BitmisForm } from "../BitmisForm";
 import { DosemeForm } from "../DosemeForm";
 import { IlanForm } from "../IlanForm";
+import { InsaatForm } from "../InsaatForm";
 import { Wizard } from "../Wizard";
 
 export async function generateMetadata({ params }: { params: Promise<{ sablon: string }> }) {
@@ -21,7 +22,8 @@ export default async function Page({ params }: { params: Promise<{ sablon: strin
       </Link>
       {id.data === "arsa-drone" && <Wizard />}
       {id.data === "ilan-videosu" && <IlanForm />}
-      {(id.data === "bitmis-hali" || id.data === "insaat-videosu") && <BitmisForm template={id.data} />}
+      {id.data === "bitmis-hali" && <BitmisForm template={id.data} />}
+      {id.data === "insaat-videosu" && <InsaatForm />}
       {id.data === "dosenmis-ev" && <DosemeForm />}
     </>
   );

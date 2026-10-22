@@ -14,10 +14,11 @@ import { r2FromEnv } from "@arsa/providers";
 import type { TemplateId } from "@arsa/shared";
 import { Worker } from "bullmq";
 import { arsaDrone } from "./templates/arsa-drone.js";
-import { bitmisHali, insaatVideosu } from "./templates/bitmis-hali.js";
+import { bitmisHali } from "./templates/bitmis-hali.js";
 import { ffmpeg, type JobContext, type JobResult } from "./templates/common.js";
 import { dosenmisEv } from "./templates/dosenmis-ev.js";
 import { ilanVideosu } from "./templates/ilan-videosu.js";
+import { insaatVideosu } from "./templates/insaat-videosu.js";
 
 const QUEUE = "reel";
 const CONCURRENCY = Number(process.env.REEL_CONCURRENCY ?? 2);

@@ -54,8 +54,15 @@ export async function POST(req: Request) {
       return badRequest(e instanceof Error ? e.message : String(e));
     }
     const parcel = { parcelFileName: order.parcelFileName, parcelText: order.parcelText, parcelSummary: summary };
-    if (order.template === "bitmis-hali" || order.template === "insaat-videosu")
+    if (order.template === "bitmis-hali")
       await getDb().insert(videos).values({ ...base, ...parcel, input: { building: order.building, floors: order.floors } });
+    else if (order.template === "insaat-videosu") {
+      const own = (k?: string) => !k || k.startsWith(`uploads/${user.id}/`);
+      if (!own(order.agent.photoKey) || !own(order.agent.logoKey)) return badRequest("Geçersiz görsel");
+      await getDb()
+        .insert(videos)
+        .values({ ...base, ...parcel, input: { building: order.building, floors: order.floors, zoning: order.zoning, agent: order.agent }, voiceId: order.voiceId ?? null });
+    }
     else await getDb().insert(videos).values({ ...base, ...parcel, voiceId: order.voiceId ?? null });
   }
   await enqueueReel(id);
