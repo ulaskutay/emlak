@@ -116,9 +116,9 @@ export const TEMPLATES: Record<TemplateId, TemplateInfo> = {
     description:
       "Boş ya da eşyası eskimiş odaların ilan fotoğraflarını yükleyin, oda tipini ve döşeme tarzını seçin. Yapay zekâ her odayı döşer; videoda boş oda gözünüzün önünde eşyalanır. Duvar, pencere ve zemin aynı kalır. Görüntü temsilidir ve videoda bu yazılır.",
     category: "Konut",
-    needs: ["2–6 boş oda fotoğrafı (sahibinden.com ilanındaki fotoğraflar olur)", "Her fotoğraf için oda tipi", "Döşeme tarzı", "İlan sayfasının metni (seslendirme için, isteğe bağlı)"],
+    needs: ["2–4 boş oda fotoğrafı (sahibinden.com ilanındaki fotoğraflar olur)", "Her fotoğraf için oda tipi", "Döşeme tarzı", "İlan sayfasının metni (seslendirme için, isteğe bağlı)"],
     includes: ["Oda başına döşenme sahnesi (temsili)", "İlan bilgisinden Türkçe seslendirme", "Oda başlıkları", "Fiyat ve iletişim kartı", "Müzik"],
-    duration: "20–40 sn",
+    duration: "21 sn",
     preview: { video: "/media/sablon-dosenmis.mp4", poster: "/media/sablon-dosenmis-poster.jpg" },
     badge: "Yeni",
     stages: [
@@ -221,10 +221,20 @@ export const STYLE_LABELS: Record<StagingStyle, string> = {
 export const RoomPhoto = IlanPhoto.pick({ key: true, title: true }).extend({ room: RoomType });
 export type RoomPhoto = z.infer<typeof RoomPhoto>;
 
+const AgentAsset = z.string().regex(/^uploads\/[\w-]+\/[\w-]+\.(jpg|png)$/, "Geçersiz görsel");
+
 export const DosemeOrder = z.object({
   template: z.literal("dosenmis-ev"),
-  photos: z.array(RoomPhoto).min(2, "En az 2 fotoğraf seçin").max(6, "En fazla 6 fotoğraf"),
+  photos: z.array(RoomPhoto).min(2, "En az 2 fotoğraf seçin").max(4, "En fazla 4 fotoğraf"),
   style: StagingStyle,
+  /** Kapanış kartındaki emlakçı (ilan aktarmadan): profil fotoğrafı ve ofis logosu kullanıcının yüklemeleri. */
+  agent: z
+    .object({
+      name: z.string().trim().max(60).optional(),
+      photoKey: AgentAsset.optional(),
+      logoKey: AgentAsset.optional(),
+    })
+    .default({}),
   listing: ReelListing.pick({ priceTry: true, officeName: true, phone: true }).default({}),
   details: ListingDetails.default({}),
   voice: z.boolean().default(true),
@@ -243,7 +253,7 @@ export type TemplateOrder = z.infer<typeof TemplateOrder>;
 /** Şablona özgü, satırda saklanan girdi (parsel ve ilan bilgisi ayrı sütunlarda). */
 export type TemplateInput =
   | { photos: IlanPhoto[] }
-  | { photos: RoomPhoto[]; style: StagingStyle; details?: ListingDetails; voice?: boolean }
+  | { photos: RoomPhoto[]; style: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; voice?: boolean }
   | { building: BuildingType; floors: number }
   | Record<string, never>;
 

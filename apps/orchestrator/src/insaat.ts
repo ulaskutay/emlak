@@ -8,10 +8,13 @@
  * Kabadan inceye:
  *   1) Qwen: başlangıç karesine bitmiş yapı eklenir (hedef kare; kat sayısı ve peyzaj burada sabitlenir).
  *      Qwen kat sayısını her seed'de tutturamıyor; adaylardan doğru olanı seçilir.
- *   2) Kaba klip: Wan ilk/son kare, boş arsa → bitmiş yapı (~5 sn, bütün aşamalar hızlıca).
- *   3) Ara kareler: kaba klipte toplam görüntü değişimi N eşit parçaya bölünür (Wan binayı erken kurduğu için
+ *   2) Qwen: hedef kareden kazı karesi (bina yerine temel çukuru, iş makineleri; ikinci geçişte peyzaj çayıra döner);
+ *      1. klip boş arsa → kazı.
+ *   3) Kaba klip: Wan ilk/son kare, kazı → bitmiş yapı (~5 sn, bütün aşamalar hızlıca).
+ *   4) Ara kareler: kaba klipte toplam görüntü değişimi eşit parçalara bölünür (Wan binayı erken kurduğu için
  *      zamanda eşit aralık videonun ikinci yarısını durağan bırakıyordu).
- *   4) İnce klipler: ardışık iki ara kare arasında Wan ilk/son kare (paralel), uç uca → --clips × ~5 sn.
+ *   5) İnce klipler: ardışık iki ara kare arasında Wan ilk/son kare (paralel), uç uca → --clips × ~5 sn.
+ *   6) Klip içi tempo: ara kare üretimi + değişime göre kare seçimi (Wan değişimi klibin başına yığıyor).
  * Her klibin başı ve sonu sabit olduğundan zincirde kayma birikmez (yalnız ilk kareden zincirde bina bozuluyordu).
  * Wan klipleri ham (büyütmesiz) üretilir, büyütme en sonda bir kez: her klibi büyütüp tekrar Wan'a vermek
  * keskinleştirmeyi katlıyor, görüntü yağlı boyaya dönüyordu.
@@ -19,7 +22,8 @@
  */
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs, promisify } from "node:util";
 import { RunpodClient } from "@arsa/providers";
@@ -67,13 +71,28 @@ const f = (name: string) => base(`s${seed}-${name}`);
 const dataUrl = async (path: string) => `data:image/png;base64,${(await readFile(path)).toString("base64")}`;
 const t0 = Date.now();
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Geçici ağ hatalarında tekrar dener: paralel büyük (base64) isteklerde RunPod HTTP/2 akışı kesebiliyor (ENHANCE_YOUR_CALM). */
+async function retry<T>(what: string, fn: () => Promise<T>, tries = 5): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i >= tries) throw e;
+      console.log(`[${what}] ağ hatası, ${i * 5} sn sonra tekrar: ${String((e as Error).cause ?? e).split("\n")[0]}`);
+      await sleep(i * 5000);
+    }
+  }
+}
+
 async function runJob(client: RunpodClient, input: unknown, label: string) {
   const ts = Date.now();
-  const job = await client.run(input);
+  const job = await retry(label, () => client.run(input));
   console.log(`[${label}] gönderildi: ${job.id}`);
   for (;;) {
-    await new Promise((r) => setTimeout(r, 3000));
-    const s = await client.status(job.id);
+    await sleep(3000);
+    const s = await retry(label, () => client.status(job.id));
     if (s.status === "COMPLETED") {
       const out = s.output as Record<string, any>;
       console.log(`[${label}] tamam: ${((Date.now() - ts) / 1000).toFixed(0)} sn (gpu ${out.timings?.generate_seconds} sn)`);
@@ -144,23 +163,67 @@ if (!existsSync(end)) {
   else await qwenEnd(seed, end);
 }
 
-// 2) Kaba klip: bütün inşaat hızlıca
+// 2) Kazı karesi: hedef kareden geri gidilir (bina ve bahçe kaldırılır, yerine temel çukuru), böylece temel
+//    binanın tam oturduğu yerde olur. Kazı/temel aşaması ayrı klip: yoksa Wan boş arsadan doğrudan karkasa atlıyordu.
+const kaziHam = f("kazi-ham.png");
+if (!existsSync(kaziHam)) {
+  const r = await runJob(
+    qwen,
+    {
+      image_url: await dataUrl(end),
+      width: W,
+      height: H,
+      seed,
+      true_cfg_scale: 3,
+      prompt:
+        "Remove the building, its garden, paths and parking lot and turn that area into an early-stage construction site seen from the same drone camera: " +
+        "a large excavated rectangular foundation pit of bare brown soil exactly where the building stood, with the first grey concrete foundation slab and steel rebar inside, " +
+        "two yellow excavators, a dump truck and piles of excavated earth beside the pit, and the base of a yellow tower crane. No building above the ground yet. " +
+        "Everything outside the construction site stays exactly unchanged: the dry grassland with olive trees, the dirt roads, the forest, the village and the hills, with the same natural colors and light. " +
+        "Photorealistic aerial drone photo.",
+    },
+    "qwen kazı",
+  );
+  await writeFile(kaziHam, Buffer.from(r.image_base64, "base64"));
+}
+// Qwen ilk geçişte bahçe ve otoparkı bırakıyor (kazı başlarken peyzaj bitmiş görünüyordu): ikinci geçişte çayıra çevrilir.
+const kazi = f("kazi.png");
+if (!existsSync(kazi)) {
+  const r = await runJob(
+    qwen,
+    {
+      image_url: await dataUrl(kaziHam),
+      width: W,
+      height: H,
+      seed,
+      true_cfg_scale: 3,
+      prompt:
+        "Replace all green lawns, small planted trees, paved paths, fences and the parking lot with the same dry yellow grassland with a few scattered olive trees as the rest of the field. " +
+        "Keep the excavation pit, the concrete foundation, the excavators, the dump truck, the earth piles and the tower crane exactly unchanged. " +
+        "Keep the camera angle, the dirt roads, the forest, the village and the hills exactly unchanged. Photorealistic aerial drone photo.",
+    },
+    "qwen kazı temizlik",
+  );
+  await writeFile(kazi, Buffer.from(r.image_base64, "base64"));
+}
+
+// 3) Kaba klip: temelden bitmiş yapıya hızlıca (ara kareler buradan seçilir)
 const coarse = await wanClip(
-  start,
+  kazi,
   end,
-  "Fast construction time-lapse. On the empty plot, excavators dig the foundation and a tower crane is erected, " +
-    "a reinforced concrete frame rises floor by floor with scaffolding, the walls, windows and facade are completed, the crane and scaffolding are removed " +
+  "Fast construction time-lapse. From the foundation pit, a reinforced concrete frame rises floor by floor with scaffolding and a tower crane, " +
+    "the walls, windows and facade are completed, the crane, scaffolding and machines are removed " +
     `and the site is landscaped, revealing ${spec.edit}. Workers and trucks move quickly. ` + CAMERA,
-  f("kaba.mp4"),
+  f("kaba-kazi.mp4"),
   "wan kaba",
 );
 
-// 3) Ara kareler: kaba klipte kare farklarının toplamı N eşit parçaya bölünür; her ince klip benzer miktarda değişim taşır.
-async function changeAnchors(video: string, n: number): Promise<number[]> {
+/** Ardışık kare farklarının birikimli toplamı (küçük gri kareler üzerinden): klipte ne zaman ne kadar değişim var. */
+async function changeCurve(video: string): Promise<number[]> {
   const w = 72, h = 128;
   const { stdout } = await run("ffmpeg", ["-v", "error", "-i", video, "-vf", `scale=${w}:${h},format=gray`, "-f", "rawvideo", "-"], {
     encoding: "buffer",
-    maxBuffer: 64 * 1024 * 1024,
+    maxBuffer: 256 * 1024 * 1024,
   });
   const buf = stdout as unknown as Buffer;
   const size = w * h;
@@ -171,6 +234,13 @@ async function changeAnchors(video: string, n: number): Promise<number[]> {
     for (let j = 0; j < size; j++) d += Math.abs(buf[i * size + j]! - buf[(i - 1) * size + j]!);
     cum.push(cum[i - 1]! + d / size);
   }
+  return cum;
+}
+
+// 4) Ara kareler: kaba klipte toplam değişim (N-1) eşit parçaya bölünür; her ince klip benzer miktarda değişim taşır.
+async function changeAnchors(video: string, n: number): Promise<number[]> {
+  const cum = await changeCurve(video);
+  const frames = cum.length;
   const total = cum[frames - 1]!;
   const picks: number[] = [];
   for (let k = 1; k < n; k++) {
@@ -181,49 +251,82 @@ async function changeAnchors(video: string, n: number): Promise<number[]> {
   }
   return picks;
 }
-const picks = await changeAnchors(coarse, N);
+const picks = await changeAnchors(coarse, N - 1);
 console.log(`ara kareler (kaba klipte kare no): ${picks.join(", ")}`);
-const anchors = [start];
+const anchors = [start, kazi];
 for (const [k, n] of picks.entries()) {
-  const path = f(`ara-${k + 1}.png`);
+  const path = f(`kazi-ara-${k + 1}.png`);
   if (!existsSync(path)) await run("ffmpeg", ["-v", "error", "-y", "-i", coarse, "-vf", `select=eq(n\\,${n})`, "-frames:v", "1", "-update", "1", path]);
   anchors.push(path);
 }
 anchors.push(end);
 
-// 4) İnce klipler: her biri inşaatın bir dilimi; prompt hareketi tarif eder, başı/sonu ara karelerle sabit.
+// 5) İnce klipler: 1. klip kazı ve temel; kalanlar karkastan bitmiş yapıya. Prompt hareketi tarif eder, başı/sonu sabit.
+const FIRST_STAGE =
+  "excavators, bulldozers and dump trucks clear the land and dig the foundation pit, a tower crane is erected, steel rebar is laid and the concrete foundation is poured";
 const STAGES = [
-  "excavators, bulldozers and dump trucks clear the land and dig the foundation pit, a tower crane is erected",
-  "concrete foundations are poured and the first reinforced concrete columns and slabs rise, with rebar and formwork",
+  "the first reinforced concrete columns and slabs rise from the foundation, with rebar and formwork",
   "the concrete frame rises floor by floor with scaffolding and the tower crane lifting materials",
   "the frame reaches its full height, brick walls are built and window openings appear",
   "the facade, windows and balconies are completed and the scaffolding is taken down",
   "the crane and machines leave, the soil is levelled, lawns, trees, paths and parking are laid out",
 ];
-/** Klibin kapsadığı aşamalar birleştirilir: 6'dan az klipte hiçbir aşama atlanmaz (ör. 4 klip = 20 sn). */
+/** Klibin kapsadığı aşamalar birleştirilir: az klipte hiçbir aşama atlanmaz (ör. 4 klip = 20 sn). */
 const stageFor = (i: number) => {
-  const from = Math.floor((i * STAGES.length) / N);
-  const to = Math.max(from + 1, Math.floor(((i + 1) * STAGES.length) / N));
+  if (i === 0) return FIRST_STAGE;
+  const m = N - 1;
+  const from = Math.floor(((i - 1) * STAGES.length) / m);
+  const to = Math.max(from + 1, Math.floor((i * STAGES.length) / m));
   return STAGES.slice(from, to).join(", then ");
 };
-const parts = await Promise.all(
+const raw = await Promise.all(
+  // Gönderimler 3 sn arayla: aynı anda 4 büyük istek RunPod'un HTTP/2 sınırına takılıyordu.
   Array.from({ length: N }, (_, i) =>
+    sleep(i * 3000).then(() =>
     wanClip(
       anchors[i]!,
       anchors[i + 1]!,
       `Construction time-lapse of ${spec.edit}: ${stageFor(i)}. Workers and trucks move steadily, sunlight and shadows shift slowly. ` + CAMERA,
-      f(`klip-${i + 1}.mp4`),
+      f(`kazi-klip-${i + 1}.mp4`),
       `wan ${i + 1}/${N}`,
-    ),
+    )),
   ),
 );
 
-// 5) Birleştirme: her klibin ilk karesi bir öncekinin son karesiyle aynı, tekrar etmesin diye atlanır.
-const final = f(`${N * 5}sn.mp4`);
+// 6) Klip içi tempo: Wan ilk/son kare modunda değişimi klibin başına yığıp sonra bekliyor.
+//    Klip ara karelerle 4 kat sıklaştırılır (minterpolate), sonra kareler değişim zamana yayılacak şekilde seçilir.
+//    Tam eşit değişim durağan anları tamamen atıp sarsıntı yapar; zamanla yarı yarıya karıştırılır.
+const OUT_FPS = 30;
+async function retime(input: string, out: string) {
+  if (existsSync(out)) return out;
+  const dense = out.replace(/\.mp4$/, "-mi.mp4");
+  await run("ffmpeg", ["-v", "error", "-y", "-i", input, "-vf", `minterpolate=fps=${FPS * 4}:mi_mode=mci:mc_mode=aobmc:vsbmc=1`, "-c:v", "libx264", "-crf", "14", "-preset", "fast", dense]);
+  const cum = await changeCurve(dense);
+  const n = cum.length;
+  const total = cum[n - 1]! || 1;
+  const g = cum.map((c, i) => 0.5 * (i / (n - 1)) + 0.5 * (c / total));
+  const M = Math.round((FRAMES / FPS) * OUT_FPS);
+  const idx = Array.from({ length: M }, (_, k) => Math.max(0, g.findIndex((v) => v >= k / (M - 1) - 1e-9)));
+  const framesDir = await mkdtemp(join(tmpdir(), "insaat-"));
+  try {
+    await run("ffmpeg", ["-v", "error", "-y", "-i", dense, "-q:v", "2", join(framesDir, "%05d.jpg")]);
+    const list = ["ffconcat version 1.0", ...idx.flatMap((i) => [`file '${String(i + 1).padStart(5, "0")}.jpg'`, `duration ${1 / OUT_FPS}`])];
+    await writeFile(join(framesDir, "list.txt"), list.join("\n"));
+    await run("ffmpeg", ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", join(framesDir, "list.txt"), "-vf", `fps=${OUT_FPS},format=yuv420p`, "-c:v", "libx264", "-crf", "14", "-preset", "fast", out]);
+  } finally {
+    await rm(framesDir, { recursive: true, force: true });
+    await rm(dense, { force: true });
+  }
+  return out;
+}
+const parts = await Promise.all(raw.map((p) => retime(p, p.replace(/\.mp4$/, "-tempo.mp4"))));
+
+// 7) Birleştirme: her klibin ilk karesi bir öncekinin son karesiyle aynı, tekrar etmesin diye atlanır. Büyütme burada bir kez.
+const final = f(`kazi-${N * 5}sn.mp4`);
 const chain = parts.map((_, i) => `[${i}:v]${i > 0 ? "trim=start_frame=1,setpts=PTS-STARTPTS," : ""}setsar=1[s${i}]`).join(";");
 await run("ffmpeg", [
   "-v", "error", "-y", ...parts.flatMap((p) => ["-i", p]),
-  "-filter_complex", `${chain};${parts.map((_, i) => `[s${i}]`).join("")}concat=n=${parts.length}:v=1:a=0,fps=30,scale=${W}:${H}:flags=lanczos,format=yuv420p[out]`,
+  "-filter_complex", `${chain};${parts.map((_, i) => `[s${i}]`).join("")}concat=n=${parts.length}:v=1:a=0,fps=${OUT_FPS},scale=${W}:${H}:flags=lanczos,format=yuv420p[out]`,
   "-map", "[out]", "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-movflags", "+faststart", final,
 ]);
 console.log(`Video hazır: ${final} (toplam ${((Date.now() - t0) / 1000).toFixed(0)} sn)`);

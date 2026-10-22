@@ -9,7 +9,7 @@ import { VoiceStep } from "./Wizard";
 type Photo = { id: string; key?: string; preview: string; room?: RoomType; title: string; error?: string };
 
 const MIN = 2;
-const MAX = 6;
+const MAX = 4;
 const ROOMS = RoomType.options;
 const STYLES = StagingStyle.options;
 
@@ -30,7 +30,18 @@ function detailsPayload(d: Details) {
 }
 
 /** İlan aktarma: butonun ilan sayfasından gönderdiği veri (postMessage ya da panoya kopyalanan JSON). */
-type IlanPayload = { type: "arsa-ilan"; url: string; text: string; photos: string[] };
+type IlanPayload = {
+  type: "arsa-ilan";
+  url: string;
+  text: string;
+  photos: string[];
+  agent?: { name?: string; office?: string; photo?: string; logo?: string; phone?: string };
+};
+type Asset = { key: string; url: string };
+type Agent = { name: string; photo?: Asset; logo?: Asset };
+
+/** "0 (537) 790 07 85" → "0537 790 07 85" */
+const tidyPhone = (p: string) => p.replace(/^0\s*\((\d{3})\)\s*/, "0$1 ").replace(/\s+/g, " ").trim();
 const isPayload = (d: unknown): d is IlanPayload =>
   !!d && typeof d === "object" && (d as IlanPayload).type === "arsa-ilan" && typeof (d as IlanPayload).text === "string" && Array.isArray((d as IlanPayload).photos);
 const SAHIBINDEN = /^https:\/\/(www\.)?sahibinden\.com$/;
@@ -41,7 +52,7 @@ const SAHIBINDEN = /^https:\/\/(www\.)?sahibinden\.com$/;
  */
 function bookmarklet(origin: string) {
   // Yalnız bu ilanın (linkteki ilan no) JPEG fotoğrafları, her fotoğraf bir kez (boy öneki ve uzantı atılarak), sayfadaki sırayla.
-  const code = `(()=>{const id=(location.pathname.match(/(\\d{6,})/)||[])[1]||'';const m=new Map();document.querySelectorAll('img,[data-src],[data-source],a[href]').forEach(e=>{for(const v of [e.currentSrc,e.src,e.getAttribute('data-src'),e.getAttribute('data-source'),e.getAttribute('href')]){if(!v||!v.includes('shbdn.com/photos/')||!v.includes(id)||!/\\.jpe?g/i.test(v))continue;const u=new URL(v,location.href).href,k=u.replace(/\\/[a-z0-9]+_/,'/');if(!m.has(k))m.set(k,u)}});const s=[...m.values()];const d={type:'arsa-ilan',url:location.href,text:document.body.innerText.slice(0,60000),photos:s.slice(0,60)};try{navigator.clipboard.writeText(JSON.stringify(d))}catch(e){}const o='${origin}';window.open(o+'/panel/yeni/dosenmis-ev?aktar=1','_blank');const h=e=>{if(e.origin===o&&e.data==='arsa-hazir'){e.source.postMessage(d,o);removeEventListener('message',h)}};addEventListener('message',h)})()`;
+  const code = `(()=>{const id=(location.pathname.match(/(\\d{6,})/)||[])[1]||'';const m=new Map();document.querySelectorAll('img,[data-src],[data-source],a[href]').forEach(e=>{for(const v of [e.currentSrc,e.src,e.getAttribute('data-src'),e.getAttribute('data-source'),e.getAttribute('href')]){if(!v||!v.includes('shbdn.com/photos/')||!v.includes(id)||!/\\.jpe?g/i.test(v))continue;const u=new URL(v,location.href).href,k=u.replace(/\\/[a-z0-9]+_/,'/');if(!m.has(k))m.set(k,u)}});const s=[...m.values()];const q=x=>document.querySelector(x),lg=q('.user-info-store-logo img'),ph=q('img.user-info-agent-logo'),tel=((q('.user-info-phones')||document.body).innerText.match(/0\\s?\\(\\d{3}\\)\\s?\\d{3}\\s?\\d{2}\\s?\\d{2}/)||[''])[0];const ag={name:((q('.user-info-agent')||{}).innerText||'').split('\\n')[0].trim(),office:lg?lg.alt:'',photo:ph?ph.src:'',logo:lg?lg.src:'',phone:tel};const d={type:'arsa-ilan',url:location.href,text:document.body.innerText.slice(0,60000),photos:s.slice(0,60),agent:ag};try{navigator.clipboard.writeText(JSON.stringify(d))}catch(e){}const o='${origin}';window.open(o+'/panel/yeni/dosenmis-ev?aktar=1','_blank');const h=e=>{if(e.origin===o&&e.data==='arsa-hazir'){e.source.postMessage(d,o);removeEventListener('message',h)}};addEventListener('message',h)})()`;
   return `javascript:${encodeURIComponent(code)}`;
 }
 
@@ -65,7 +76,8 @@ export function DosemeForm() {
   const [parsed, setParsed] = useState<string | null>(null);
   const [voice, setVoice] = useState(true);
   const [voiceId, setVoiceId] = useState<string | null>(null);
-  const [imported, setImported] = useState<{ key: string; url: string }[]>([]);
+  const [imported, setImported] = useState<Asset[]>([]);
+  const [agent, setAgent] = useState<Agent>({ name: "" });
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const bm = useRef<HTMLAnchorElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +109,7 @@ export function DosemeForm() {
       location: d.location ?? details.location,
       highlights: d.highlights.length ? d.highlights.join("\n") : details.highlights,
     });
-    if (r.priceTry && !listing.price) setListing({ ...listing, price: r.priceTry.toLocaleString("tr-TR") });
+    if (r.priceTry) setListing((l) => (l.price ? l : { ...l, price: r.priceTry!.toLocaleString("tr-TR") }));
     setParsed(`${found} bilgi bulundu. Kontrol edip düzeltebilirsiniz.`);
   }
 
@@ -105,10 +117,18 @@ export function DosemeForm() {
     setPaste(d.text);
     readListing(d.text);
     setImportMsg(`İlan aktarıldı, ${d.photos.length} fotoğraf indiriliyor…`);
-    const res = await fetch("/api/imports/ilan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ photos: d.photos }) });
+    const a = d.agent ?? {};
+    // Kapanış kartı ilandaki emlakçıyla: ofis adı ve telefon da ondan.
+    setListing((l) => ({ ...l, officeName: a.office?.slice(0, 60) || l.officeName, phone: a.phone ? tidyPhone(a.phone) : l.phone }));
+    const res = await fetch("/api/imports/ilan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ photos: d.photos, agent: { ...(a.photo && { photo: a.photo }), ...(a.logo && { logo: a.logo }) } }),
+    });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return setImportMsg(data.error ?? "Fotoğraflar aktarılamadı");
     setImported(data.photos);
+    setAgent({ name: a.name?.slice(0, 60) ?? "", photo: data.agent?.photo, logo: data.agent?.logo });
     setImportMsg(`İlandan ${data.photos.length} fotoğraf geldi. Kullanmak istediğiniz boş odalara tıklayın (en fazla ${MAX}).`);
   }
 
@@ -186,6 +206,7 @@ export function DosemeForm() {
         photos: ready.map((p) => ({ key: p.key, room: p.room, ...(p.title.trim() ? { title: p.title.trim() } : {}) })),
         style,
         details: detailsPayload(details),
+        agent: { ...(agent.name.trim() && { name: agent.name.trim() }), ...(agent.photo && { photoKey: agent.photo.key }), ...(agent.logo && { logoKey: agent.logo.key }) },
         listing: listingPayload(listing),
         voice,
         ...(voice && voiceId ? { voiceId } : {}),
@@ -264,7 +285,7 @@ export function DosemeForm() {
         <input ref={input} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files && (add(e.target.files), (e.target.value = ""))} />
         <div className="font-semibold">Oda fotoğraflarını sürükleyin ya da seçin</div>
         <div className="mt-1 text-sm text-mute">
-          {photos.length}/{MAX} fotoğraf · yalnız iç mekân; odayı geniş açıdan gören fotoğraflar en iyi sonucu verir
+          {photos.length}/{MAX} fotoğraf · video 21 saniye · yalnız iç mekân; odayı geniş açıdan gören fotoğraflar en iyi sonucu verir
         </div>
       </div>
 
@@ -379,7 +400,35 @@ export function DosemeForm() {
       {voice && <VoiceStep hook={narration.rooms[0] ?? "Bu evi bir de eşyalı hayal edin."} voiceId={voiceId} onSelect={setVoiceId} />}
 
       <div className="card space-y-4 p-6">
-        <p className="text-sm text-mute">Hepsi isteğe bağlı; girdikleriniz videonun sonundaki kartta yazar.</p>
+        <div>
+          <div className="font-semibold">Kapanış kartı</div>
+          <p className="mt-1 text-sm text-mute">Videonun son 3,5 saniyesi: fiyat, emlakçı, telefon ve ofis logosu. İlandan aktarınca kendiliğinden dolar.</p>
+        </div>
+        {(agent.photo || agent.logo) && (
+          <div className="flex flex-wrap items-center gap-4">
+            {agent.photo && (
+              <span className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={agent.photo.url} alt="Emlakçı" className="h-16 w-16 rounded-full object-cover" />
+                <button type="button" aria-label="Fotoğrafı kaldır" onClick={() => setAgent({ ...agent, photo: undefined })}
+                  className="absolute -top-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-white/20 text-xs hover:bg-red-500">✕</button>
+              </span>
+            )}
+            {agent.logo && (
+              <span className="relative rounded-lg bg-white p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={agent.logo.url} alt="Ofis logosu" className="h-12 w-auto" />
+                <button type="button" aria-label="Logoyu kaldır" onClick={() => setAgent({ ...agent, logo: undefined })}
+                  className="absolute -top-2 -right-2 grid h-5 w-5 place-items-center rounded-full bg-black/60 text-xs text-white hover:bg-red-500">✕</button>
+              </span>
+            )}
+          </div>
+        )}
+        <div className="max-w-xs">
+          <label className="label" htmlFor="agent">Emlakçı adı</label>
+          <input id="agent" className="input" maxLength={60} placeholder="Örn. Ümit G." value={agent.name}
+            onChange={(e) => setAgent({ ...agent, name: e.target.value })} />
+        </div>
         <ListingFields value={listing} onChange={setListing} />
         <label className="flex cursor-pointer items-center justify-between border-t border-line pt-4">
           <span>

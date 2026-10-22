@@ -1,7 +1,8 @@
 /**
  * Boş evi döşe: her oda fotoğrafı Qwen-Image-Edit ile döşenir, Wan 2.2 ilk/son kare (boş → döşenmiş)
- * eşyaların yerleştiği sahneyi üretir; sahneler oda başlıkları ve kapanış kartıyla birleşir, ilan bilgisinden
- * kurulan Türkçe anlatım ve müzik eklenir. Sahne anlatımdan kısaysa döşenmiş son kare anlatım bitene kadar bekletilir.
+ * eşyaların yerleştiği sahneyi üretir; sahneler oda başlıkları ve emlakçı kartıyla birleşir, ilan bilgisinden
+ * kurulan Türkçe anlatım ve müzik eklenir. Video oda sayısından bağımsız TOTAL_SECONDS sürer: odalar süreyi
+ * eşit paylaşır, geçiş sahnesi gerekirse yavaşlatılır/hızlandırılır, sonunda döşenmiş kare kısa bekletilir.
  */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -32,12 +33,17 @@ import {
 } from "./common.js";
 
 const OUT_FPS = 30;
-const OUTRO_SECONDS = 3;
-/** Döşenmiş son kare sahnenin sonunda bu kadar bekletilir (izleyici sonucu görsün). */
-const HOLD_SECONDS = 1.2;
-/** Anlatım sahne başından bu kadar sonra başlar, bittikten sonra bu kadar boşluk kalır. */
+const TOTAL_SECONDS = 21;
+const OUTRO_SECONDS = 3.5;
+/** Döşenmiş son kare her sahnenin sonunda bu kadar bekletilir (izleyici sonucu görsün). */
+const HOLD_SECONDS = 0.7;
+/** Geçiş sahnesinin hız sınırları (Wan klibi ~5 sn; 2 odada yavaşlar, 4 odada hızlanır). */
+const MIN_SPEED = 0.6;
+const MAX_SPEED = 1.5;
+/** Anlatım: ilk cümle bu saniyede başlar, cümleler arası boşluk; sığmazsa ses en fazla bu kadar hızlandırılır. */
 const VOICE_LEAD = 0.4;
-const VOICE_TAIL = 0.6;
+const VOICE_GAP = 0.25;
+const MAX_VOICE_TEMPO = 1.15;
 /** Qwen girdisi: dikey videoya kırpılmış kare; Wan aynı oranda (480x832) okur, iki kare hizalı kalır. */
 const EDIT_W = 720;
 const EDIT_H = 1280;
@@ -46,7 +52,13 @@ const dataUrl = async (path: string, mime: string) => `data:${mime};base64,${(aw
 
 export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
   const v = ctx.video;
-  const { photos, style, details, voice } = v.input as { photos?: RoomPhoto[]; style?: StagingStyle; details?: ListingDetails; voice?: boolean };
+  const { photos, style, details, agent, voice } = v.input as {
+    photos?: RoomPhoto[];
+    style?: StagingStyle;
+    details?: ListingDetails;
+    agent?: { name?: string; photoKey?: string; logoKey?: string };
+    voice?: boolean;
+  };
   if (!photos?.length || !style) throw new Error("Fotoğraf ya da döşeme tarzı yok");
 
   const apiKey = process.env.RUNPOD_API_KEY;
@@ -62,7 +74,7 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
   const speech =
     voice === false
       ? Promise.resolve(null)
-      : speakLines([...narration.rooms, narration.outro], v.voiceId, ctx).catch((e) => {
+      : speakLines([...narration.rooms, narration.outro].filter(Boolean), v.voiceId, ctx).catch((e) => {
           ctx.log(`! seslendirme üretilemedi: ${String(e).slice(0, 200)}`);
           return null;
         });
@@ -120,53 +132,131 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
     }),
   );
 
-  // 4) Kurgu: sahne süresi = max(klip + bekleme, anlatım). Oda başlığı üstte, "temsili" notu altta; kapanış kartı.
+  // 4) Kurgu
   await ctx.stage("compose");
   const voices = await speech;
-  const clipDur = await Promise.all(clips.map((c) => probeDuration(c)));
-  const need = (i: number) => (voices ? VOICE_LEAD + voices[i]!.duration + VOICE_TAIL : 0);
-  const sceneDur = clips.map((_, i) => Math.max(clipDur[i]! + HOLD_SECONDS, need(i)));
-  const outro = [priceText(v.listing.priceTry), v.listing.officeName, v.listing.phone].filter(Boolean) as string[];
-  const outroDur = voices ? Math.max(OUTRO_SECONDS, need(clips.length)) : outro.length ? OUTRO_SECONDS : 0;
-
   const titleSize = Math.round(W * 0.075);
   const subSize = Math.round(W * 0.045);
+  const scene = (TOTAL_SECONDS - OUTRO_SECONDS) / clips.length;
+  const clipDur = await Promise.all(clips.map((c) => probeDuration(c)));
+  // Klibin oynama süresi: sahneden bekleme payı düşülür, hız sınırları içinde kalır.
+  const play = clipDur.map((d) => Math.min(d / MIN_SPEED, Math.max(d / MAX_SPEED, scene - HOLD_SECONDS)));
   const filters = clips.map(
     (_, i) =>
-      `[${i}:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=${OUT_FPS},format=yuv420p,` +
-      `tpad=stop_mode=clone:stop_duration=${(sceneDur[i]! - clipDur[i]!).toFixed(3)},trim=duration=${sceneDur[i]!.toFixed(3)},` +
+      `[${i}:v]setpts=PTS*${(play[i]! / clipDur[i]!).toFixed(4)},scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=${OUT_FPS},format=yuv420p,` +
+      `tpad=stop_mode=clone:stop_duration=${scene.toFixed(3)},trim=duration=${scene.toFixed(3)},setpts=PTS-STARTPTS,` +
       `${drawText(photos[i]!.title || ROOM_LABELS[photos[i]!.room], titleSize, "h*0.10", "white", 0.3)},` +
       `${drawText("Temsili döşemedir", Math.round(subSize * 0.7), "h*0.93", "white@0.8")}[v${i}]`,
   );
-  let count = clips.length;
-  if (outroDur) {
-    const lines = outro.length ? outro : ["Detaylar için arayın"];
-    const lineH = Math.round(titleSize * 1.5);
-    const top = Math.round(H / 2 - (lines.length * lineH) / 2);
-    filters.push(
-      `color=c=0x121a16:s=${W}x${H}:r=${OUT_FPS}:d=${outroDur.toFixed(3)},format=yuv420p,` +
-        lines.map((l, j) => drawText(l, j === 0 ? titleSize : subSize, String(top + j * lineH), j === 0 ? "0xFFC24D" : "white", j * 0.2)).join(",") +
-        `[v${count}]`,
-    );
-    count += 1;
-  }
-  filters.push(`${Array.from({ length: count }, (_, i) => `[v${i}]`).join("")}concat=n=${count}:v=1:a=0[out]`);
+  const outroFile = await agentCard(ctx, {
+    price: priceText(v.listing.priceTry),
+    rent: /kiralık/i.test(details?.kind ?? ""),
+    name: agent?.name,
+    office: v.listing.officeName,
+    phone: v.listing.phone,
+    photoKey: agent?.photoKey,
+    logoKey: agent?.logoKey,
+  });
+  const n = clips.length;
+  filters.push(`[${n}:v]fps=${OUT_FPS},format=yuv420p,setsar=1[v${n}]`);
+  filters.push(`${Array.from({ length: n + 1 }, (_, i) => `[v${i}]`).join("")}concat=n=${n + 1}:v=1:a=0[out]`);
   const silent = join(ctx.workDir, "dosenmis-sessiz.mp4");
   await ffmpeg([
     ...clips.flatMap((c) => ["-i", c]),
+    "-i", outroFile,
     "-filter_complex", filters.join(";"),
-    "-map", "[out]", "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-movflags", "+faststart", silent,
+    "-map", "[out]", "-t", String(TOTAL_SECONDS), "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-movflags", "+faststart", silent,
   ]);
   const duration = await probeDuration(silent);
-  const starts = [...sceneDur, 0].map((_, i) => sceneDur.slice(0, i).reduce((a, b) => a + b, 0));
-  const cues = voices ? voices.map((s, i) => ({ at: starts[i]! + VOICE_LEAD, file: s.file })) : [];
+
+  // Anlatım yerleşimi: her cümle kendi sahnesinin başında, önceki bitmeden değil; sona sığmazsa ses hızlandırılır.
+  const all = [...narration.rooms, narration.outro];
+  const starts = [...clips.map((_, i) => i * scene), TOTAL_SECONDS - OUTRO_SECONDS];
+  let cues: { at: number; file: string }[] = [];
+  if (voices) {
+    const spoken = all.map((t, i) => ({ t, at: starts[i]! })).filter((x) => x.t);
+    const place = (tempo: number) => {
+      let end = 0;
+      const out = spoken.map((x, k) => {
+        const at = Math.max(x.at + VOICE_LEAD, end + (k ? VOICE_GAP : 0));
+        end = at + voices[k]!.duration / tempo;
+        return { at, file: voices[k]!.file };
+      });
+      return { out, end };
+    };
+    let tempo = 1;
+    let placed = place(tempo);
+    if (placed.end > duration - 0.3) {
+      tempo = Math.min(MAX_VOICE_TEMPO, voices.reduce((a, s) => a + s.duration, 0) / (duration - 0.3 - VOICE_LEAD - VOICE_GAP * (voices.length - 1)));
+      placed = place(Math.max(1, tempo));
+      ctx.log(`anlatım ${tempo.toFixed(2)}x hızlandırıldı`);
+    }
+    cues = tempo > 1 ? await Promise.all(placed.out.map(async (c, k) => ({ at: c.at, file: await speedUp(c.file, tempo, join(ctx.workDir, `ses-${k}.m4a`)) }))) : placed.out;
+  }
   const music = v.music ? await backgroundMusic(duration, ctx) : null;
   const final = await mixAudio(silent, cues, music, duration, join(ctx.workDir, "dosenmis.mp4"));
-  // Kapak: ilk odanın döşenmiş hali
   return {
     videoPath: final,
     durationSec: duration,
-    posterAt: clipDur[0]! + 0.3,
-    stats: { rooms: photos.length, style, narration: [...narration.rooms, narration.outro], voiced: !!voices },
+    posterAt: play[0]! + 0.2,
+    stats: { rooms: photos.length, style, narration: all, voiced: !!voices },
   };
+}
+
+const speedUp = async (file: string, tempo: number, out: string) => (await ffmpeg(["-i", file, "-af", `atempo=${tempo.toFixed(3)}`, "-c:a", "aac", out]), out);
+
+/**
+ * Kapanış kartı (OUTRO_SECONDS): fiyat, emlakçının yuvarlak fotoğrafı, adı, ofisi, telefonu ve ofis logosu.
+ * Olmayan parça atlanır; hiçbiri yoksa yalnız çağrı yazar.
+ */
+async function agentCard(
+  ctx: JobContext,
+  a: { price?: string; rent: boolean; name?: string; office?: string; phone?: string; photoKey?: string; logoKey?: string },
+) {
+  const { width: W, height: H } = FORMAT_SPECS.reels_9x16;
+  const big = Math.round(W * 0.085);
+  const mid = Math.round(W * 0.05);
+  const small = Math.round(W * 0.036);
+  const inputs = ["-f", "lavfi", "-i", `color=c=0x121a16:s=${W}x${H}:r=${OUT_FPS}:d=${OUTRO_SECONDS}`];
+  const f: string[] = [];
+  let last = "[0:v]";
+  let k = 1;
+  const D = 380; // fotoğraf çapı
+  const photo = a.photoKey ? await download(await ctx.r2.url(a.photoKey, 600), join(ctx.workDir, "emlakci.jpg")).catch(() => null) : null;
+  const logo = a.logoKey ? await download(await ctx.r2.url(a.logoKey, 600), join(ctx.workDir, "logo.png")).catch(() => null) : null;
+  if (photo) {
+    inputs.push("-i", photo);
+    f.push(
+      `[${k}:v]scale=${D}:${D}:force_original_aspect_ratio=increase,crop=${D}:${D},format=rgba,` +
+        `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='if(lte(hypot(X-${D / 2},Y-${D / 2}),${D / 2 - 2}),255,0)'[ph]`,
+      `${last}[ph]overlay=(W-w)/2:${Math.round(H * 0.25)}[b${k}]`,
+    );
+    last = `[b${k}]`;
+    k++;
+  }
+  if (logo) {
+    inputs.push("-i", logo);
+    // Logo en fazla 480x210, beyaz zeminli kutuda (koyu logolar koyu arka planda kaybolmasın).
+    f.push(
+      `[${k}:v]scale=w='min(480,iw*210/ih)':h=-1,format=rgba,pad=iw+40:ih+30:20:15:color=white@1[lg]`,
+      `${last}[lg]overlay=(W-w)/2:${Math.round(H * 0.74)}[b${k}]`,
+    );
+    last = `[b${k}]`;
+    k++;
+  }
+  const texts: string[] = [];
+  const y = (r: number) => String(Math.round(H * r));
+  if (a.price) {
+    texts.push(drawText(a.price, big, y(0.1), "0xFFC24D", 0));
+    if (a.rent) texts.push(drawText("aylık kira", small, y(0.1 + 0.055), "white@0.85", 0.1));
+  }
+  const top = photo ? 0.25 + D / H + 0.025 : 0.3;
+  if (a.name) texts.push(drawText(a.name, mid, y(top), "white", 0.2));
+  if (a.office) texts.push(drawText(a.office, small, y(top + 0.04), "white@0.8", 0.25));
+  if (a.phone) texts.push(drawText(a.phone, big, y(top + 0.09), "white", 0.3));
+  if (!texts.length) texts.push(drawText("Detaylar için arayın", big, y(0.45), "white", 0));
+  f.push(`${last}${texts.join(",")},format=yuv420p[out]`);
+  const out = join(ctx.workDir, "kapanis.mp4");
+  await ffmpeg([...inputs, "-filter_complex", f.join(";"), "-map", "[out]", "-t", String(OUTRO_SECONDS), "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", out]);
+  return out;
 }

@@ -107,9 +107,14 @@ export const ROOM_LINES = {
   balkon: "Sabah kahvenizi içeceğiniz huzurlu bir balkon.",
 } as const;
 
+/** Anlatımın kelime bütçesi: seslendirme ~2,2 kelime/sn, 21 sn'lik videoda boşluklarla birlikte ~40 kelime sığar. */
+export const NARRATION_WORDS = 40;
+const words = (t: string) => t.split(/\s+/).filter(Boolean).length;
+
 /**
- * Sahne sahne anlatım. İlk oda: ilanın kimliği (yer, tip, oda sayısı, m²). Sonraki odalar: öne çıkan
- * özellikler sırayla, bitince odanın kendi cümlesi. Kalan özellikler ve fiyat kapanışta.
+ * Sahne sahne anlatım (toplam NARRATION_WORDS kelimeyi aşmaz). İlk oda: ilanın kimliği (yer, tip, oda sayısı, m²).
+ * Sonraki odalar: öne çıkan özellikler sırayla, sığarsa odanın kendi cümlesi; sığmayan sahne sessiz geçer.
+ * Kapanış: fiyat ve çağrı.
  */
 export function stagingNarration(rooms: (keyof typeof ROOM_LINES)[], d: Partial<ListingDetails> = {}, priceTry?: number) {
   // "Satılık Villa" → "satılık, dört artı bir, iki yüz yirmi metrekare villa"
@@ -119,14 +124,19 @@ export function stagingNarration(rooms: (keyof typeof ROOM_LINES)[], d: Partial<
   const name = (isDeal ? noun.join(" ") : [deal, ...noun].join(" ")) || "daire";
   const where = d.location ? `${locative(d.location)} ` : "";
   const opener = d.location || d.rooms || d.netM2 ? `${where}${attrs} ${name}. Eşyalı halini görün!` : "Bu evi bir de eşyalı hayal edin.";
+  const price = priceTry ? `${deal === "kiralık" ? "Aylık kirası" : "Fiyatı"} ${spokenPrice(priceTry)} lira.` : "";
+  const outro = price ? `${price} Hemen arayın!` : "Detaylar için hemen arayın!";
+
+  let left = NARRATION_WORDS - words(opener) - words(outro);
   const highlights = [...(d.highlights ?? [])];
-  // Kısa özellik cümlesi odanın cümlesiyle birlikte söylenir (sahne ~6 sn; uzarsa kurgu sahneyi uzatır).
+  const take = (t: string) => (words(t) <= left ? ((left -= words(t)), t) : "");
   const lines = rooms.map((r, i) => {
     if (i === 0) return opener;
     const h = highlights.shift();
-    return h ? (h.length <= 32 ? `${h} ${ROOM_LINES[r]}` : h) : ROOM_LINES[r];
+    const line = (h && take(h)) || "";
+    // Özellik kısaysa ve bütçe kalırsa odanın cümlesi de eklenir; özellik yoksa yalnız odanın cümlesi.
+    const room = !h || line ? take(ROOM_LINES[r]) : "";
+    return [line, room].filter(Boolean).join(" ");
   });
-  const price = priceTry ? `${deal === "kiralık" ? "Aylık kirası" : "Fiyatı"} ${spokenPrice(priceTry)} lira.` : "";
-  const outro = [...highlights.slice(0, 2), price, "Detaylar için hemen arayın!"].filter(Boolean).join(" ");
   return { rooms: lines, outro };
 }

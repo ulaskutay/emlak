@@ -43,8 +43,9 @@ export async function POST(req: Request) {
     if (order.photos.some((p) => !p.key.startsWith(`uploads/${user.id}/`))) return badRequest("Geçersiz fotoğraf");
     await getDb().insert(videos).values({ ...base, input: { photos: order.photos } });
   } else if (order.template === "dosenmis-ev") {
-    if (order.photos.some((p) => !p.key.startsWith(`uploads/${user.id}/`))) return badRequest("Geçersiz fotoğraf");
-    await getDb().insert(videos).values({ ...base, input: { photos: order.photos, style: order.style, details: order.details, voice: order.voice }, voiceId: order.voiceId ?? null });
+    const own = (k?: string) => !k || k.startsWith(`uploads/${user.id}/`);
+    if (order.photos.some((p) => !own(p.key)) || !own(order.agent.photoKey) || !own(order.agent.logoKey)) return badRequest("Geçersiz fotoğraf");
+    await getDb().insert(videos).values({ ...base, input: { photos: order.photos, style: order.style, details: order.details, agent: order.agent, voice: order.voice }, voiceId: order.voiceId ?? null });
   } else {
     let summary;
     try {
