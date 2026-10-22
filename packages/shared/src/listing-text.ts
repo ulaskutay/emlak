@@ -56,8 +56,13 @@ export function parseListingText(text: string): { details: ListingDetails; price
   const rooms = field(t, "Oda Sayısı")?.match(/(\d{1,2}(?:[.,]5)?)\s*\+\s*(\d{1,2})/);
   const net = field(t, "m²\\s*\\(Net\\)") ?? field(t, "Net m²");
   const kind = field(t, "Emlak Tipi")?.match(/(Satılık|Kiralık)\s+(\S+(?:\s+Ev)?)/i);
-  // Konum satırı: "Ankara / Etimesgut / Bağlıca Mh."
-  const loc = t.match(/([A-ZÇĞİÖŞÜ][\wçğıöşü]+)\s*\/\s*([A-ZÇĞİÖŞÜ][\wçğıöşü]+)\s*\/\s*([^\n/]+)/);
+  // Konum satırı: tam üç parça, "İl / İlçe / Mahalle" ("Ankara / Etimesgut / Bağlıca Mh."). Sayfanın gezinme satırı
+  // ("Emlak / Konut / Kiralık / Daire") dört parçalıdır; mahalle içeren satır önceliklidir.
+  const three = t
+    .split("\n")
+    .map((l) => l.match(/^\s*([^/\t]+?)\s*\/\s*([^/\t]+?)\s*\/\s*([^/\t]+?)\s*$/))
+    .filter((m): m is RegExpMatchArray => !!m && !/^emlak$/i.test(m[1]!.trim()));
+  const loc = three.find((m) => /\b(Mh\.?|Mah\.?|Mahallesi|Köyü?)$/i.test(m[3]!)) ?? three[0];
   const price = t.match(/(\d{1,3}(?:\.\d{3}){1,3})\s*(?:TL|₺)/);
 
   const highlights: string[] = [];
