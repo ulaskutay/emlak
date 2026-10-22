@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { apiUser, badRequest, unauthorized } from "@/lib/api";
+import { autoFocus } from "@/lib/focus";
 import { r2 } from "@/lib/r2";
 
 const MAX_BYTES = 6_000_000;
@@ -19,5 +20,5 @@ export async function POST(req: Request) {
   if (buf[0] !== 0xff || buf[1] !== 0xd8 || buf[2] !== 0xff) return badRequest("Geçersiz JPEG dosyası");
   const key = `uploads/${user.id}/${randomUUID()}.jpg`;
   await r2().put(key, buf, "image/jpeg");
-  return NextResponse.json({ key, url: await r2().url(key, 3600) }, { status: 201 });
+  return NextResponse.json({ key, url: await r2().url(key, 3600), focusX: await autoFocus(buf) }, { status: 201 });
 }

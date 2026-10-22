@@ -3,10 +3,10 @@ import { parseListingText, ROOM_LABELS, RoomType, stagingNarration, STYLE_LABELS
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ListingFields, listingPayload, type ListingValues } from "./ListingFields";
-import { uploadPhoto } from "./photoUpload";
+import { uploadPhotoWithFocus } from "./photoUpload";
 import { VoiceStep } from "./Wizard";
 
-type Photo = { id: string; key?: string; preview: string; room?: RoomType; title: string; error?: string };
+type Photo = { id: string; key?: string; preview: string; room?: RoomType; title: string; focusX: number; error?: string };
 
 const MIN = 2;
 const MAX = 4;
@@ -38,6 +38,7 @@ type IlanPayload = {
   agent?: { name?: string; office?: string; photo?: string; logo?: string; phone?: string };
 };
 type Asset = { key: string; url: string };
+type ImportedPhoto = Asset & { focusX: number };
 type Agent = { name: string; photo?: Asset; logo?: Asset };
 
 /** "0 (537) 790 07 85" → "0537 790 07 85" */
@@ -76,7 +77,7 @@ export function DosemeForm() {
   const [parsed, setParsed] = useState<string | null>(null);
   const [voice, setVoice] = useState(true);
   const [voiceId, setVoiceId] = useState<string | null>(null);
-  const [imported, setImported] = useState<Asset[]>([]);
+  const [imported, setImported] = useState<ImportedPhoto[]>([]);
   const [agent, setAgent] = useState<Agent>({ name: "" });
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [link, setLink] = useState("");
@@ -154,11 +155,11 @@ export function DosemeForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function togglePick(img: { key: string; url: string }) {
+  function togglePick(img: ImportedPhoto) {
     setError(null);
     if (photos.some((p) => p.key === img.key)) return setPhotos((ps) => ps.filter((p) => p.key !== img.key));
     if (photos.length >= MAX) return setError(`En fazla ${MAX} fotoğraf`);
-    setPhotos((ps) => [...ps, { id: img.key, key: img.key, preview: img.url, title: "" }]);
+    setPhotos((ps) => [...ps, { id: img.key, key: img.key, preview: img.url, title: "", focusX: img.focusX }]);
   }
 
   async function add(files: FileList | File[]) {
@@ -169,13 +170,14 @@ export function DosemeForm() {
       id: `${Date.now()}-${i}-${f.name}`,
       preview: URL.createObjectURL(f),
       title: "",
+      focusX: 0.5,
     }));
     setPhotos((ps) => [...ps, ...items]);
     await Promise.all(
       list.map(async (f, i) => {
         const id = items[i]!.id;
         try {
-          update(id, { key: await uploadPhoto(f) });
+          update(id, await uploadPhotoWithFocus(f));
         } catch (e) {
           update(id, { error: e instanceof Error ? e.message : "Yüklenemedi" });
         }
@@ -202,7 +204,7 @@ export function DosemeForm() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         template: "dosenmis-ev",
-        photos: ready.map((p) => ({ key: p.key, room: p.room, ...(p.title.trim() ? { title: p.title.trim() } : {}) })),
+        photos: ready.map((p) => ({ key: p.key, room: p.room, focusX: p.focusX, ...(p.title.trim() ? { title: p.title.trim() } : {}) })),
         style,
         details: detailsPayload(details),
         agent: { ...(agent.name.trim() && { name: agent.name.trim() }), ...(agent.photo && { photoKey: agent.photo.key }), ...(agent.logo && { logoKey: agent.logo.key }) },
@@ -308,7 +310,15 @@ export function DosemeForm() {
           {photos.map((p, i) => (
             <li key={p.id} className="card flex gap-3 p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.preview} alt={`Fotoğraf ${i + 1}`} className="h-28 w-20 shrink-0 rounded-lg object-cover" />
+              <div className="shrink-0 space-y-1">
+                {/* Önizleme videonun dikey kadrajını birebir gösterir (object-position = kırpma konumu). */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.preview} alt={`Fotoğraf ${i + 1}`} className="aspect-[9/16] w-[72px] rounded-lg object-cover"
+                  style={{ objectPosition: `${p.focusX * 100}% 50%` }} />
+                <input type="range" min={0} max={100} value={Math.round(p.focusX * 100)} aria-label={`${i + 1}. fotoğrafın kadrajı`}
+                  title="Kadrajı sola/sağa kaydırın" className="w-[72px] accent-[#ffc24d]"
+                  onChange={(e) => update(p.id, { focusX: Number(e.target.value) / 100 })} />
+              </div>
               <div className="min-w-0 flex-1 space-y-2">
                 <div className="flex items-center justify-between gap-2 text-xs text-mute">
                   <span>

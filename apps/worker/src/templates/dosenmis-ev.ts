@@ -82,8 +82,16 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
 
   // 1) Boş oda fotoğrafları
   await ctx.stage("photos");
+  // Dikey kadraj burada kırpılır (kullanıcının seçtiği yatay konumla); GPU tarafı yalnız ölçekler.
   const empty = await Promise.all(
-    photos.map(async (p, i) => dataUrl(await download(await ctx.r2.url(p.key, 3600), join(ctx.workDir, `bos-${i + 1}.jpg`)), "image/jpeg")),
+    photos.map(async (p, i) => {
+      const raw = await download(await ctx.r2.url(p.key, 3600), join(ctx.workDir, `ham-${i + 1}.jpg`));
+      const crop = join(ctx.workDir, `bos-${i + 1}.jpg`);
+      const cw = "min(iw\\,ih*9/16)";
+      const ch = "min(ih\\,iw*16/9)";
+      await ffmpeg(["-i", raw, "-vf", `crop=${cw}:${ch}:(iw-${cw})*${p.focusX ?? 0.5}:(ih-${ch})/2`, "-q:v", "2", crop]);
+      return dataUrl(crop, "image/jpeg");
+    }),
   );
 
   // 2) Döşeme: her oda paralel

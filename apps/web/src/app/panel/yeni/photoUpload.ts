@@ -14,12 +14,15 @@ async function toJpeg(file: File): Promise<Blob> {
   return new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error("Fotoğraf dönüştürülemedi"))), "image/jpeg", 0.88));
 }
 
-/** Fotoğrafı küçültüp yükler, R2 anahtarını döner. */
-export async function uploadPhoto(file: File): Promise<string> {
+/** Fotoğrafı küçültüp yükler; R2 anahtarı ve dikey kırpma için önerilen yatay konum. */
+export async function uploadPhotoWithFocus(file: File): Promise<{ key: string; focusX: number }> {
   const fd = new FormData();
   fd.append("file", await toJpeg(file), "foto.jpg");
   const res = await fetch("/api/uploads", { method: "POST", body: fd });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Yüklenemedi");
-  return data.key;
+  return { key: data.key, focusX: typeof data.focusX === "number" ? data.focusX : 0.5 };
 }
+
+/** Fotoğrafı küçültüp yükler, R2 anahtarını döner. */
+export const uploadPhoto = async (file: File) => (await uploadPhotoWithFocus(file)).key;

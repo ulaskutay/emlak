@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { apiUser, badRequest, unauthorized } from "@/lib/api";
+import { autoFocus } from "@/lib/focus";
 import { r2 } from "@/lib/r2";
 
 /**
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
   };
   const agentAssets = Promise.all([save(parsed.data.agent?.photo, "jpg"), save(parsed.data.agent?.logo, "png")]);
 
-  const photos: { key: string; url: string }[] = [];
+  const photos: { key: string; url: string; focusX: number }[] = [];
   const list = urls.slice(0, MAX_PHOTOS);
   for (let i = 0; i < list.length; i += 4) {
     const batch = await Promise.all(
@@ -96,10 +97,10 @@ export async function POST(req: Request) {
         if (!jpg) return null;
         const key = `uploads/${user.id}/${randomUUID()}.jpg`;
         await r2().put(key, jpg, "image/jpeg");
-        return { key, url: await r2().url(key, 3600) };
+        return { key, url: await r2().url(key, 3600), focusX: await autoFocus(jpg) };
       }),
     );
-    photos.push(...(batch.filter(Boolean) as { key: string; url: string }[]));
+    photos.push(...(batch.filter(Boolean) as { key: string; url: string; focusX: number }[]));
   }
   if (!photos.length) return badRequest("Fotoğraflar indirilemedi");
   const [photo, logo] = await agentAssets;

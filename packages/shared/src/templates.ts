@@ -218,7 +218,11 @@ export const STYLE_LABELS: Record<StagingStyle, string> = {
   dogal: "Doğal / bohem",
 };
 
-export const RoomPhoto = IlanPhoto.pick({ key: true, title: true }).extend({ room: RoomType });
+export const RoomPhoto = IlanPhoto.pick({ key: true, title: true }).extend({
+  room: RoomType,
+  /** Dikey kırpmanın yatay konumu: 0 sol, 1 sağ (pencere kadraja girsin diye). */
+  focusX: z.number().min(0).max(1).default(0.5),
+});
 export type RoomPhoto = z.infer<typeof RoomPhoto>;
 
 const AgentAsset = z.string().regex(/^uploads\/[\w-]+\/[\w-]+\.(jpg|png)$/, "Geçersiz görsel");
