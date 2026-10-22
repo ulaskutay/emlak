@@ -92,7 +92,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
       <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-6">
         <h2 className="font-display text-2xl font-semibold tracking-[-0.02em]">Diğer şablonlar</h2>
-        <div className="mt-6 grid grid-cols-2 gap-x-5 gap-y-8 md:grid-cols-4">
+        <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
           {others.map((o) => (
             <TemplateCard key={o.id} t={o} href={`/sablonlar/${o.id}`} />
           ))}

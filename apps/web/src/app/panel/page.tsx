@@ -1,8 +1,7 @@
-import { templateList } from "@arsa/shared";
 import Link from "next/link";
 import { VideoGrid } from "@/components/panel/VideoGrid";
 import { userVideos } from "@/components/panel/videos";
-import { TemplateCard } from "@/components/templates/TemplateCard";
+import { TemplateGallery } from "@/components/templates/TemplateGallery";
 import { requireUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -17,10 +16,8 @@ export default async function PanelHome() {
         Hangi videoyu hazırlayalım?
       </h1>
       <p className="mt-2 text-mute">Şablonu seçin; gereken bilgileri o şablon soracak.</p>
-      <div className="mt-8 grid grid-cols-1 gap-x-6 gap-y-10 min-[480px]:grid-cols-2 lg:grid-cols-3">
-        {templateList.map((t, i) => (
-          <TemplateCard key={t.id} t={t} href={`/panel/yeni/${t.id}`} priority={i < 3} />
-        ))}
+      <div className="mt-8">
+        <TemplateGallery tone="dark" hrefBase="/panel/yeni/" />
       </div>
 
       {recent.length > 0 && (

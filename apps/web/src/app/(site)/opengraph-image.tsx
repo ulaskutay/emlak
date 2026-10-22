@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { parselCizimi } from "@/lib/ornek-parsel";
 
-export const alt = "Arsa Video — Drone uçurmadan arsanızın drone videosu";
+export const alt = "Arsa Video — Emlak ilanları için video şablonları";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -13,9 +13,9 @@ export default function Image() {
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", width: 620 }}>
           <div style={{ fontSize: 34, fontWeight: 700 }}>Arsa Video</div>
           <div style={{ fontSize: 76, fontWeight: 800, lineHeight: 1, letterSpacing: -3 }}>
-            Drone uçurmadan arsanızın drone videosu.
+            İlanınızı videoya çeviren şablonlar.
           </div>
-          <div style={{ fontSize: 28, color: "#4d5650" }}>TKGM parsel dosyasından Reels videosu</div>
+          <div style={{ fontSize: 28, color: "#4d5650" }}>Arsa, konut ve proje ilanları için</div>
         </div>
         <svg width="460" height="486" viewBox="0 0 560 560" style={{ marginLeft: 20 }}>
           <polygon points={points} fill="rgba(255,194,77,.18)" stroke="#1e2a23" strokeWidth="12" strokeLinejoin="round" />

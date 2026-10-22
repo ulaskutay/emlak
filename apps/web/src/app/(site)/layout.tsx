@@ -6,7 +6,7 @@ import { site } from "@/lib/site";
 
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
-  title: { default: "Arsa Video — Drone uçurmadan arsanızın drone videosu", template: "%s · Arsa Video" },
+  title: { default: "Arsa Video — Emlak ilanları için video şablonları", template: "%s · Arsa Video" },
   description: site.description,
   openGraph: { type: "website", locale: "tr_TR", siteName: site.name },
 };

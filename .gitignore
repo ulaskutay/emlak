@@ -10,4 +10,4 @@ bench/compare
 .next
 *.tsbuildinfo
 next-env.d.ts
-!apps/web/public/media/*.mp4
+!apps/web/public/media/**/*.mp4

@@ -9,13 +9,16 @@ export const TEMPLATE_IDS = ["arsa-drone", "ilan-videosu", "bitmis-hali"] as con
 export const TemplateId = z.enum(TEMPLATE_IDS);
 export type TemplateId = z.infer<typeof TemplateId>;
 
+export const TEMPLATE_CATEGORIES = ["Arsa", "Konut", "Proje", "Sosyal medya"] as const;
+export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number];
+
 export interface TemplateInfo {
   id: TemplateId;
   name: string;
   /** Galeri kartındaki tek cümle. */
   tagline: string;
   description: string;
-  category: "Arsa" | "Konut" | "Proje";
+  category: TemplateCategory;
   /** Kullanıcının hazırlaması gerekenler. */
   needs: string[];
   /** Videoda neler var. */
@@ -85,6 +88,21 @@ export const TEMPLATES: Record<TemplateId, TemplateInfo> = {
 };
 
 export const templateList = TEMPLATE_IDS.map((id) => TEMPLATES[id]);
+
+/** Galeride "Yakında" olarak görünen, henüz sipariş alınmayan şablonlar (sayfası ve formu yok). */
+export interface SoonTemplate {
+  slug: string;
+  name: string;
+  tagline: string;
+  category: TemplateCategory;
+}
+
+export const SOON_TEMPLATES: SoonTemplate[] = [
+  { slug: "once-sonra", name: "Önce / sonra", tagline: "Boş odanın fotoğrafı döşenmiş haliyle yan yana", category: "Konut" },
+  { slug: "mahalle-rehberi", name: "Mahalle rehberi", tagline: "Okul, market, ulaşım: ilanın çevresini anlatan tur", category: "Konut" },
+  { slug: "satildi", name: "Satıldı paylaşımı", tagline: "Satılan ilan için ofisinizin imzasıyla kısa duyuru", category: "Sosyal medya" },
+  { slug: "fiyat-guncellemesi", name: "Fiyat güncellemesi", tagline: "Fiyatı düşen ilanı öne çıkaran dikey video", category: "Sosyal medya" },
+];
 
 // ——— Sipariş şemaları ———
 
