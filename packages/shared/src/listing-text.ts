@@ -10,7 +10,7 @@ export const ListingDetails = z.object({
   /** "Satılık Daire", "Kiralık Villa"… */
   kind: z.string().trim().max(40).optional(),
   /** "2+1" */
-  rooms: z.string().trim().regex(/^\d{1,2}\s*\+\s*\d{1,2}$/, "Oda sayısı 2+1 biçiminde olmalı").optional(),
+  rooms: z.string().trim().regex(/^\d{1,2}(?:[.,]5)?\s*\+\s*\d{1,2}$/, "Oda sayısı 2+1 biçiminde olmalı").optional(),
   netM2: z.coerce.number().int().min(10).max(5000).optional(),
   /** "Etimesgut Bağlıca" */
   location: z.string().trim().max(60).optional(),
@@ -25,12 +25,35 @@ function field(text: string, label: string) {
   return m?.[1]?.trim();
 }
 
-const yes = (v?: string) => !!v && /^evet/i.test(v);
+const yes = (v?: string) => !!v && /^(evet|var)\b/i.test(v);
 const strip = (s: string) => s.replace(/\s+(Mah\.?|Mh\.?|Mahallesi)$/i, "").trim();
+
+/** Büyük harfli ilan satırını cümleye çevirir: "EBEVEYN BANYOLU - 20.KAT" → "Ebeveyn banyolu, 20. kat." */
+function sentence(line: string) {
+  let t = line.replace(/[\u200b-\u200d\ufeff]/g, "").trim().replace(/\s+-\s+/g, ", ").replace(/\s{2,}/g, " ");
+  if (t === t.toLocaleUpperCase("tr")) t = t.toLocaleLowerCase("tr");
+  t = t.replace(/(\d)\.(\p{L})/gu, "$1. $2");
+  t = t.charAt(0).toLocaleUpperCase("tr") + t.slice(1);
+  return /[.!?]$/.test(t) ? t : `${t}.`;
+}
+
+/** Açıklamadaki madde işaretli Türkçe satırlar (emlakçının öne çıkardıkları); İngilizce tekrarları atlanır. */
+function descriptionBullets(text: string) {
+  const at = text.search(/\nAçıklama\s*\n/);
+  if (at < 0) return [];
+  return text
+    .slice(at)
+    .split("\n")
+    .map((l) => l.match(/^\s*[-•*–]\s*(.{4,70})$/)?.[1])
+    .filter((l): l is string => !!l && !/\b(the|and|with|rooms?|bedrooms?|ready|square|meters?|bathrooms?)\b/i.test(l))
+    // Oda sayısı ve metrekare zaten ilk cümlede (tablodan, net alanla) söylenir.
+    .filter((l) => !/metrekare|m²|m2\b|\d\s*\+\s*\d|\boda\b.*\bsalon\b/i.test(l))
+    .map(sentence);
+}
 
 export function parseListingText(text: string): { details: ListingDetails; priceTry?: number } {
   const t = text.replace(/\r/g, "").replace(/ /g, " ");
-  const rooms = field(t, "Oda Sayısı")?.match(/(\d{1,2})\s*\+\s*(\d{1,2})/);
+  const rooms = field(t, "Oda Sayısı")?.match(/(\d{1,2}(?:[.,]5)?)\s*\+\s*(\d{1,2})/);
   const net = field(t, "m²\\s*\\(Net\\)") ?? field(t, "Net m²");
   const kind = field(t, "Emlak Tipi")?.match(/(Satılık|Kiralık)\s+(\S+(?:\s+Ev)?)/i);
   // Konum satırı: "Ankara / Etimesgut / Bağlıca Mh."
@@ -40,7 +63,8 @@ export function parseListingText(text: string): { details: ListingDetails; price
   const highlights: string[] = [];
   const age = field(t, "Bina Yaşı");
   if (age && /^0\b/.test(age)) highlights.push("Sıfır, hiç oturulmamış.");
-  if (yes(field(t, "Site İçerisinde"))) highlights.push("Site içinde, güvenli bir yaşam.");
+  const site = field(t, "Site Adı");
+  if (yes(field(t, "Site İçerisinde"))) highlights.push(site && site.length <= 40 ? `${site} içinde.` : "Site içinde, güvenli bir yaşam.");
   const heat = field(t, "Isıtma") ?? "";
   if (/yerden/i.test(heat)) highlights.push("Yerden ısıtmalı.");
   else if (/kombi/i.test(heat)) highlights.push("Doğalgaz kombili.");
@@ -48,20 +72,28 @@ export function parseListingText(text: string): { details: ListingDetails; price
   if (/kapalı/i.test(field(t, "Otopark") ?? "")) highlights.push("Kapalı otoparklı.");
   if (yes(field(t, "Krediye Uygun"))) highlights.push("Krediye uygun.");
 
+  // Tablodan en fazla 2 özellik, kalanı emlakçının açıklamadaki maddeleri.
+  const picked = [...highlights.slice(0, 2)];
+  for (const b of descriptionBullets(t)) if (picked.length < 5 && !picked.includes(b)) picked.push(b);
+
   return {
     details: {
       kind: kind ? `${kind[1]} ${kind[2]}` : undefined,
-      rooms: rooms ? `${rooms[1]}+${rooms[2]}` : undefined,
+      rooms: rooms ? `${rooms[1]!.replace(",", ".")}+${rooms[2]}` : undefined,
       netM2: net && /^\d+/.test(net) ? Number(net.match(/^\d+/)![0]) : undefined,
       location: loc ? `${loc[2]} ${strip(loc[3]!)}` : undefined,
-      highlights: highlights.slice(0, 5),
+      highlights: picked,
     },
     priceTry: price ? Number(price[1]!.replace(/\./g, "")) : undefined,
   };
 }
 
-/** "2+1" → "iki artı bir" */
-const spokenRooms = (r: string) => r.split("+").map((x) => numberWords(Number(x))).join(" artı ");
+/** "2+1" → "iki artı bir", "2.5+1" → "iki buçuk artı bir" */
+const spokenRooms = (r: string) =>
+  r
+    .split("+")
+    .map((x) => (Number(x) % 1 ? `${numberWords(Math.floor(Number(x)))} buçuk` : numberWords(Number(x))))
+    .join(" artı ");
 
 /** Oda başına bir cümle; ilan bilgisi yoksa sahnede bu söylenir. */
 export const ROOM_LINES = {
@@ -94,6 +126,7 @@ export function stagingNarration(rooms: (keyof typeof ROOM_LINES)[], d: Partial<
     const h = highlights.shift();
     return h ? (h.length <= 32 ? `${h} ${ROOM_LINES[r]}` : h) : ROOM_LINES[r];
   });
-  const outro = [...highlights.slice(0, 2), priceTry ? `Fiyatı ${spokenPrice(priceTry)} lira.` : "", "Detaylar için hemen arayın!"].filter(Boolean).join(" ");
+  const price = priceTry ? `${deal === "kiralık" ? "Aylık kirası" : "Fiyatı"} ${spokenPrice(priceTry)} lira.` : "";
+  const outro = [...highlights.slice(0, 2), price, "Detaylar için hemen arayın!"].filter(Boolean).join(" ");
   return { rooms: lines, outro };
 }

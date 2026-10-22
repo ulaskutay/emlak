@@ -1,7 +1,7 @@
 /**
  * 30 sn'lik inşaat videosu: arsanın yandan yakın çekiminden bitmiş yapıya.
  *
- *   pnpm insaat -- --parcel assets/parcels/<ad> [--start side-net.png] [--type konut] [--floors 4] [--clips 6] [--res 720]
+ *   pnpm insaat -- --parcel assets/parcels/<ad> [--start side-net.png] [--type konut] [--floors 4] [--clips 4] [--res 720]
  *     --candidates 4      hedef kare için farklı seed'lerle Qwen adayları üretip durur (insaat-…-aday-s<seed>.png)
  *     --pick <seed>       seçilen adayla videoyu üretir
  *
@@ -35,7 +35,7 @@ const { values: args } = parseArgs({
     start: { type: "string", default: "side-net.png" },
     type: { type: "string", default: "konut" },
     floors: { type: "string", default: "4" },
-    clips: { type: "string", default: "6" },
+    clips: { type: "string", default: "4" }, // 4 × ~5 sn = 20 sn
     res: { type: "string", default: "720" },
     seed: { type: "string", default: "7" },
     candidates: { type: "string" },
@@ -200,7 +200,12 @@ const STAGES = [
   "the facade, windows and balconies are completed and the scaffolding is taken down",
   "the crane and machines leave, the soil is levelled, lawns, trees, paths and parking are laid out",
 ];
-const stageFor = (i: number) => STAGES[Math.min(STAGES.length - 1, Math.floor((i * STAGES.length) / N))]!;
+/** Klibin kapsadığı aşamalar birleştirilir: 6'dan az klipte hiçbir aşama atlanmaz (ör. 4 klip = 20 sn). */
+const stageFor = (i: number) => {
+  const from = Math.floor((i * STAGES.length) / N);
+  const to = Math.max(from + 1, Math.floor(((i + 1) * STAGES.length) / N));
+  return STAGES.slice(from, to).join(", then ");
+};
 const parts = await Promise.all(
   Array.from({ length: N }, (_, i) =>
     wanClip(

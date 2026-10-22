@@ -1,7 +1,7 @@
 "use client";
 import { parseListingText, ROOM_LABELS, RoomType, stagingNarration, STYLE_LABELS, StagingStyle } from "@arsa/shared";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ListingFields, listingPayload, type ListingValues } from "./ListingFields";
 import { uploadPhoto } from "./photoUpload";
 import { VoiceStep } from "./Wizard";
@@ -29,6 +29,22 @@ function detailsPayload(d: Details) {
   };
 }
 
+/** İlan aktarma: butonun ilan sayfasından gönderdiği veri (postMessage ya da panoya kopyalanan JSON). */
+type IlanPayload = { type: "arsa-ilan"; url: string; text: string; photos: string[] };
+const isPayload = (d: unknown): d is IlanPayload =>
+  !!d && typeof d === "object" && (d as IlanPayload).type === "arsa-ilan" && typeof (d as IlanPayload).text === "string" && Array.isArray((d as IlanPayload).photos);
+const SAHIBINDEN = /^https:\/\/(www\.)?sahibinden\.com$/;
+
+/**
+ * Yer imi butonu: ilan sayfasında (kullanıcının kendi tarayıcısında) metni ve fotoğraf linklerini toplar,
+ * paneli yeni sekmede açıp veriyi gönderir; sekmeler arası bağ kesilirse diye veriyi panoya da kopyalar.
+ */
+function bookmarklet(origin: string) {
+  // Yalnız bu ilanın (linkteki ilan no) JPEG fotoğrafları, her fotoğraf bir kez (boy öneki ve uzantı atılarak), sayfadaki sırayla.
+  const code = `(()=>{const id=(location.pathname.match(/(\\d{6,})/)||[])[1]||'';const m=new Map();document.querySelectorAll('img,[data-src],[data-source],a[href]').forEach(e=>{for(const v of [e.currentSrc,e.src,e.getAttribute('data-src'),e.getAttribute('data-source'),e.getAttribute('href')]){if(!v||!v.includes('shbdn.com/photos/')||!v.includes(id)||!/\\.jpe?g/i.test(v))continue;const u=new URL(v,location.href).href,k=u.replace(/\\/[a-z0-9]+_/,'/');if(!m.has(k))m.set(k,u)}});const s=[...m.values()];const d={type:'arsa-ilan',url:location.href,text:document.body.innerText.slice(0,60000),photos:s.slice(0,60)};try{navigator.clipboard.writeText(JSON.stringify(d))}catch(e){}const o='${origin}';window.open(o+'/panel/yeni/dosenmis-ev?aktar=1','_blank');const h=e=>{if(e.origin===o&&e.data==='arsa-hazir'){e.source.postMessage(d,o);removeEventListener('message',h)}};addEventListener('message',h)})()`;
+  return `javascript:${encodeURIComponent(code)}`;
+}
+
 const STYLE_HINTS: Record<StagingStyle, string> = {
   modern: "Açık gri, meşe, sade çizgiler",
   iskandinav: "Açık ahşap, beyaz tekstil, ferah",
@@ -49,6 +65,9 @@ export function DosemeForm() {
   const [parsed, setParsed] = useState<string | null>(null);
   const [voice, setVoice] = useState(true);
   const [voiceId, setVoiceId] = useState<string | null>(null);
+  const [imported, setImported] = useState<{ key: string; url: string }[]>([]);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const bm = useRef<HTMLAnchorElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
@@ -66,8 +85,8 @@ export function DosemeForm() {
     priceTry,
   );
 
-  function readListing() {
-    const r = parseListingText(paste);
+  function readListing(text = paste) {
+    const r = parseListingText(text);
     const d = r.details;
     const found = [d.kind, d.rooms, d.netM2, d.location].filter(Boolean).length + d.highlights.length + (r.priceTry ? 1 : 0);
     if (!found) return setParsed("Metinde ilan bilgisi bulunamadı; alanları elle doldurabilirsiniz.");
@@ -80,6 +99,47 @@ export function DosemeForm() {
     });
     if (r.priceTry && !listing.price) setListing({ ...listing, price: r.priceTry.toLocaleString("tr-TR") });
     setParsed(`${found} bilgi bulundu. Kontrol edip düzeltebilirsiniz.`);
+  }
+
+  async function importListing(d: IlanPayload) {
+    setPaste(d.text);
+    readListing(d.text);
+    setImportMsg(`İlan aktarıldı, ${d.photos.length} fotoğraf indiriliyor…`);
+    const res = await fetch("/api/imports/ilan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ photos: d.photos }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return setImportMsg(data.error ?? "Fotoğraflar aktarılamadı");
+    setImported(data.photos);
+    setImportMsg(`İlandan ${data.photos.length} fotoğraf geldi. Kullanmak istediğiniz boş odalara tıklayın (en fazla ${MAX}).`);
+  }
+
+  // React javascript: linkini engeller; yer imi butonunun adresi elle verilir.
+  useEffect(() => {
+    bm.current?.setAttribute("href", bookmarklet(window.location.origin));
+  }, []);
+
+  // Buton paneli açtıysa ilan sekmesine hazır olduğunu bildirir, veriyi bekler.
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (SAHIBINDEN.test(e.origin) && isPayload(e.data)) importListing(e.data);
+    };
+    window.addEventListener("message", onMessage);
+    if (window.opener && new URLSearchParams(window.location.search).has("aktar")) {
+      for (const o of ["https://www.sahibinden.com", "https://sahibinden.com"]) {
+        try {
+          window.opener.postMessage("arsa-hazir", o);
+        } catch {}
+      }
+      setImportMsg("İlan bekleniyor… Gelmezse buraya Ctrl+V ile yapıştırın.");
+    }
+    return () => window.removeEventListener("message", onMessage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function togglePick(img: { key: string; url: string }) {
+    setError(null);
+    if (photos.some((p) => p.key === img.key)) return setPhotos((ps) => ps.filter((p) => p.key !== img.key));
+    if (photos.length >= MAX) return setError(`En fazla ${MAX} fotoğraf`);
+    setPhotos((ps) => [...ps, { id: img.key, key: img.key, preview: img.url, title: "" }]);
   }
 
   async function add(files: FileList | File[]) {
@@ -146,6 +206,45 @@ export function DosemeForm() {
           İlandaki boş odaların fotoğraflarını yükleyin ({MIN}–{MAX} oda). Yapay zekâ her odayı seçtiğiniz tarzda döşer; videoda oda gözünüzün önünde
           eşyalanır. Duvar, pencere ve zemin aynı kalır. Görüntü temsilidir; videoda bu yazılır.
         </p>
+      </div>
+
+      <div className="card space-y-3 p-6" onPaste={(e) => {
+        const t = e.clipboardData.getData("text");
+        if (!t.startsWith('{"type":"arsa-ilan"')) return;
+        e.preventDefault();
+        try {
+          const d = JSON.parse(t);
+          if (isPayload(d)) importListing(d);
+        } catch {}
+      }} tabIndex={-1}>
+        <div className="font-semibold">sahibinden.com ilanından aktar</div>
+        <ol className="list-decimal space-y-1 pl-5 text-sm text-mute">
+          <li>
+            Bu butonu tarayıcınızın yer imleri çubuğuna sürükleyin (bir kez):{" "}
+            {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
+            <a ref={bm} onClick={(e) => e.preventDefault()} className="ml-1 inline-block rounded-lg bg-neon px-3 py-1 font-semibold text-ink">
+              Arsa Video&apos;ya aktar
+            </a>
+          </li>
+          <li>sahibinden.com&apos;da ilanı açın ve yer imindeki butona basın; bu sayfa ilan bilgileri ve fotoğraflarıyla açılır.</li>
+          <li>Açılmazsa buraya tıklayıp Ctrl+V yapın (buton bilgileri panoya da kopyalar).</li>
+        </ol>
+        {importMsg && <p className="text-sm text-neon">{importMsg}</p>}
+        {imported.length > 0 && (
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+            {imported.map((img) => {
+              const picked = photos.some((p) => p.key === img.key);
+              return (
+                <button key={img.key} type="button" onClick={() => togglePick(img)} aria-pressed={picked}
+                  className={`relative overflow-hidden rounded-lg border-2 ${picked ? "border-neon" : "border-transparent opacity-80 hover:opacity-100"}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.url} alt="İlan fotoğrafı" className="aspect-[3/4] w-full object-cover" />
+                  {picked && <span className="absolute top-1 right-1 grid h-6 w-6 place-items-center rounded-full bg-neon text-xs font-bold text-ink">✓</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div
@@ -226,7 +325,7 @@ export function DosemeForm() {
         <textarea className="input min-h-24 py-2 text-sm" placeholder="İlan sayfasının metnini yapıştırın" value={paste}
           aria-label="İlan sayfası metni" onChange={(e) => setPaste(e.target.value)} />
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" className="btn-ghost" disabled={paste.trim().length < 20} onClick={readListing}>Bilgileri ayıkla</button>
+          <button type="button" className="btn-ghost" disabled={paste.trim().length < 20} onClick={() => readListing()}>Bilgileri ayıkla</button>
           {parsed && <span className="text-sm text-mute">{parsed}</span>}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
