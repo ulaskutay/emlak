@@ -41,6 +41,41 @@ type Asset = { key: string; url: string };
 type ImportedPhoto = Asset & { focusX: number };
 type Agent = { name: string; photo?: Asset; logo?: Asset };
 
+/**
+ * İlan sayfasında Ctrl+A / Ctrl+C ile kopyalanan içerikten aktarma verisi: panodaki HTML'de ilanın fotoğrafları,
+ * emlakçının profil fotoğrafı ve ofis logosu bulunur; metin ilan bilgilerini ve telefonu verir.
+ */
+function payloadFromCopy(html: string, text: string): IlanPayload | null {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const id = text.match(/İlan No\s*(\d{6,})/)?.[1] ?? "";
+  const srcs = [...doc.querySelectorAll("img")].map((i) => ({ src: i.getAttribute("src") || i.getAttribute("data-src") || "", alt: i.getAttribute("alt") || "" }));
+  const photos = new Map<string, string>();
+  for (const { src } of srcs) {
+    if (!src.includes("shbdn.com/photos/") || (id && !src.includes(id)) || !/\.jpe?g/i.test(src)) continue;
+    const k = src.replace(/\/[a-z0-9]+_/, "/");
+    if (!photos.has(k)) photos.set(k, src);
+  }
+  if (!photos.size) return null;
+  const logo = srcs.find((i) => i.src.includes("/stores/logos/"));
+  const face = srcs.find((i) => /\/users\/.*profile/.test(i.src));
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const at = lines.findIndex((l) => /^Tüm ilanları/.test(l));
+  const lic = lines.findIndex((l) => /^Yetki Belge No/.test(l));
+  return {
+    type: "arsa-ilan",
+    url: "",
+    text,
+    photos: [...photos.values()].slice(0, 60),
+    agent: {
+      name: at > 0 ? lines[at - 1] : undefined,
+      office: logo?.alt || (lic > 0 ? lines[lic - 1] : undefined),
+      photo: face?.src,
+      logo: logo?.src,
+      phone: text.match(/0\s?\(\d{3}\)\s?\d{3}\s?\d{2}\s?\d{2}/)?.[0],
+    },
+  };
+}
+
 /** "0 (537) 790 07 85" → "0537 790 07 85" */
 const tidyPhone = (p: string) => p.replace(/^0\s*\((\d{3})\)\s*/, "0$1 ").replace(/\s+/g, " ").trim();
 const isPayload = (d: unknown): d is IlanPayload =>
@@ -140,6 +175,27 @@ export function DosemeForm() {
     bm.current?.setAttribute("href", bookmarklet(window.location.origin));
   }, []);
 
+  // Sayfanın herhangi bir yerinde Ctrl+V: ilan sayfasından kopyalanan içerik (ya da butonun panoya koyduğu veri) aktarılır.
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const t = e.clipboardData?.getData("text/plain") ?? "";
+      const h = e.clipboardData?.getData("text/html") ?? "";
+      let d: unknown = null;
+      if (t.startsWith('{"type":"arsa-ilan"')) {
+        try {
+          d = JSON.parse(t);
+        } catch {}
+      } else if (h.includes("shbdn.com/photos/")) d = payloadFromCopy(h, t);
+      if (isPayload(d)) {
+        e.preventDefault();
+        importListing(d);
+      }
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Buton paneli veriyle (#aktar=…) açtıysa ilanı içeri al; adres temizlenir ki yenilemede tekrar aktarılmasın.
   useEffect(() => {
     const h = window.location.hash;
@@ -230,20 +286,12 @@ export function DosemeForm() {
         </p>
       </div>
 
-      <div className="card space-y-3 p-6" onPaste={(e) => {
-        const t = e.clipboardData.getData("text");
-        if (!t.startsWith('{"type":"arsa-ilan"')) return;
-        e.preventDefault();
-        try {
-          const d = JSON.parse(t);
-          if (isPayload(d)) importListing(d);
-        } catch {}
-      }} tabIndex={-1}>
+      <div className="card space-y-3 p-6">
         <div>
           <div className="font-semibold">sahibinden.com ilanından aktar</div>
           <p className="mt-1 text-sm text-mute">
-            sahibinden ilan sayfalarını sunucumuzun okumasına izin vermiyor (bot doğrulaması). Bu yüzden aktarmayı, ilan sizin tarayıcınızda
-            açıkken yer imindeki buton yapar: fotoğraflar, ilan bilgileri, fiyat ve emlakçı bu sayfaya gelir.
+            sahibinden ilan sayfalarını sunucumuzun okumasına izin vermiyor (bot doğrulaması); ilanı sizin tarayıcınızdan kopyalarız.
+            Fotoğraflar, ilan bilgileri, fiyat ve emlakçı bu sayfaya gelir.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -254,18 +302,25 @@ export function DosemeForm() {
           </button>
         </div>
         <ol className="list-decimal space-y-1 pl-5 text-sm text-mute">
+          <li>Linki yukarıya yapıştırıp &quot;İlanı aç&quot;a basın (ya da ilanı sahibinden&apos;de kendiniz açın).</li>
           <li>
-            Bu butonu bir kez tarayıcınızın yer imleri çubuğuna sürükleyin:{" "}
+            İlan sayfasında <b className="text-white">Ctrl+A</b>, ardından <b className="text-white">Ctrl+C</b> yapın (Mac&apos;te Cmd+A, Cmd+C).
+          </li>
+          <li>
+            Bu sayfaya dönüp <b className="text-white">Ctrl+V</b> yapın (Mac&apos;te Cmd+V). Bir kutuya tıklamanız gerekmez.
+          </li>
+        </ol>
+        <details className="text-sm text-mute">
+          <summary className="cursor-pointer">Tek tıkla aktarma butonu (isteğe bağlı)</summary>
+          <p className="mt-2">
+            Bu butonu tarayıcınızın yer imleri çubuğuna sürükleyin; ilan sayfasındayken basınca bu panel ilanla birlikte yeni sekmede açılır:{" "}
             {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
             <a ref={bm} onClick={(e) => e.preventDefault()} className="ml-1 inline-block rounded-lg bg-neon px-3 py-1 font-semibold text-ink">
               Arsa Video&apos;ya aktar
             </a>
             <span className="block text-xs">Yer imleri çubuğu görünmüyorsa: Ctrl+Shift+B (Mac&apos;te Cmd+Shift+B).</span>
-          </li>
-          <li>Linki yukarıya yapıştırıp &quot;İlanı aç&quot;a basın (ya da ilanı sahibinden&apos;de kendiniz açın).</li>
-          <li>İlan sayfasındayken yer imindeki &quot;Arsa Video&apos;ya aktar&quot;a basın; bu panel ilanla birlikte yeni sekmede açılır.</li>
-          <li>Açılmazsa bu sayfada boş bir yere tıklayıp Ctrl+V yapın (buton bilgileri panoya da kopyalar).</li>
-        </ol>
+          </p>
+        </details>
         {importMsg && <p className="text-sm text-neon">{importMsg}</p>}
         {imported.length > 0 && (
           <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
@@ -363,8 +418,7 @@ export function DosemeForm() {
         <div>
           <div className="font-semibold">İlan bilgileri</div>
           <p className="mt-1 text-sm text-mute">
-            Seslendirme bunlardan kurulur. sahibinden.com ilan sayfasında tümünü seçip (Ctrl+A) kopyalayın ve buraya yapıştırın; oda sayısı, metrekare,
-            konum ve öne çıkan özellikler ayıklanır.
+            Seslendirme bunlardan kurulur. İlanı yukarıdan aktardıysanız dolu gelir; düzeltebilirsiniz.
           </p>
         </div>
         <textarea className="input min-h-24 py-2 text-sm" placeholder="İlan sayfasının metnini yapıştırın" value={paste}
