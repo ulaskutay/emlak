@@ -66,7 +66,6 @@ export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number }
   const ents: Record<string, any> = {};
   let rings: any[] = [];
   let grid: any[] = [];
-  let edges: any[] = [];
 
   const log = (m: string) => console.log(`[cesium] ${m}`);
 
@@ -307,13 +306,6 @@ export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number }
           },
         }),
       );
-      // Kenar ölçüleri
-      edges = g.edges.map((e) =>
-        E.add({
-          position: posXY(g.toXY(e.mid), 6),
-          billboard: { image: labelCanvas(`${Math.round(e.len)} m`, GOLD, { size: 30 }), verticalOrigin: C.VerticalOrigin.BOTTOM, disableDepthTestDistance: Number.POSITIVE_INFINITY },
-        }),
-      );
       // Çit duvarı: yerden yükselir, üst kenarında parlak çizgi.
       const fenceH = Math.min(30, Math.max(9, p.radiusM * 0.22));
       const ringClosed = [...g.ringXY, g.ringXY[0]!];
@@ -351,7 +343,6 @@ export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number }
       show(ents.scanLine, !!s.scan && s.scan.line > 0.02);
       const nGrid = s.scan && s.scan.grid > 0.02 ? g.scanFrame(s.scan.progress).grid.length : 0;
       grid.forEach((e, i) => show(e, i < nGrid));
-      edges.forEach((e) => show(e, (s.edges ?? 0) > 0.05));
       show(ents.fence, (s.fence ?? 0) > 0.01);
       show(ents.fenceTop, (s.fence ?? 0) > 0.01);
       show(ents.outline, s.neon > 0);

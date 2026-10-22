@@ -4,7 +4,7 @@
  *   1 Kanca     alçaktan, hızlı ve gerçekçi drone yaklaşması + yörünge; büyük başlık, neon kontur çizilir
  *   2 Bölge     kesme → yüksek plan: mahalle sınırı çizilir, parsele pin düşer, dalga halkaları, konum etiketi
  *   3 Tarama    aynı plan içinde parsele dalış, kuşbakışı tarama çizgisi + ızgara, m² sayacı taramayla sayar
- *   4 Özellik   kesme → alçak yörünge (kenar ölçüleri) / kesme → vinç yükselişi; özellik kutucukları sırayla gelir
+ *   4 Özellik   kesme → alçak yörünge / kesme → vinç yükselişi; özellik kutucukları sırayla gelir
  *   5 Kapanış   kesme → kahraman plan, m² + konum, fiyat ve iletişim kartı
  *
  * Süreler seslendirmeye göre uzar (anlatım kesilmez). Çekimler arasında kesme + parlama + whoosh;
@@ -125,7 +125,7 @@ export function buildTimeline(p: ParcelInfo, story?: Story) {
     { start: t1, end: tDive, keys: [K(t1, regionView.center, regionView.range * 1.1, 20, h0 - 25), K(tDive, regionView.center, regionView.range, 14, h0 - 8)] },
     // 3 Dalış → tarama (bölgeyle kesintisiz): parselin tam üstüne, kuşbakışı.
     { start: tDive, end: t3, keys: [K(tDive, regionView.center, regionView.range, 14, h0 - 8), K(tScan, P, r * 5.4, 6, h0), K(t3, P, r * 4.8, 4, h0 + 9)] },
-    // 4a Alçak yörünge: kenar ölçüleri, ilk kutucuklar.
+    // 4a Alçak yörünge: ilk kutucuklar.
     { start: t3, end: tMid, keys: [K(t3, P, r * 5.6, 66, h0 + 35), K(tMid, P, r * 4.6, 63, h0 + 105)] },
     // 4b Vinç: karşı açıdan alçaktan yükselen plan.
     { start: tMid, end: t4, keys: [K(tMid, P, r * 3.4, 54, h0 + 245), K(t4, P, r * 7.5, 40, h0 + 285)] },
@@ -182,7 +182,6 @@ export function buildTimeline(p: ParcelInfo, story?: Story) {
       scan: t >= tScan && t < t3 ? { progress: scanP, line: Math.min(span(t, tScan, tScan + 0.2), 1 - span(t, tScan + 2.3, tScan + 2.6)), grid: span(t, tScan, tScan + 0.3) } : null,
       // Çit duvarı: özellik bölümünde yerden yükselir, sonuna kadar kalır.
       fence: span(t, t3 + 0.15, t3 + 1.1),
-      edges: t >= t3 && t < tMid ? Math.min(span(t, t3 + 0.2, t3 + 0.6), 1 - span(t, tMid - 0.3, tMid)) : 0,
       hook: hookLines.length ? { lines: hookLines, progress: Math.min(span(t, 0.15, 0.6), 1 - span(t, t1 - 0.35, t1)) } : null,
       place: story?.place ? { ...story.place, progress: Math.min(span(t, t1 + 1.3, t1 + 1.8), 1 - span(t, tDive + 0.2, tDive + 0.6)) } : null,
       area: {

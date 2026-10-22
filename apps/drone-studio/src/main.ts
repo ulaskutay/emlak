@@ -83,7 +83,6 @@ if (file) {
         mode: "SATELLITE",
         neon: 1,
         fill: 1,
-        edges: 1,
         fence: 1,
       }),
     )

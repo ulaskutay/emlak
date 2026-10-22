@@ -55,8 +55,6 @@ export interface FrameState {
   scan?: { progress: number; line: number; grid: number } | null;
   /** Parselin etrafında yükselen ışıklı çit duvarı (0..1 yükselme). */
   fence?: number;
-  /** Kenar ölçüleri (metre etiketleri) görünürlüğü. */
-  edges?: number;
   /** Büyük açılış başlığı (kanca). */
   hook?: { lines: string[]; progress: number } | null;
   /** Mahalle / konum etiketi. */

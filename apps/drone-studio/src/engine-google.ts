@@ -42,7 +42,6 @@ export function googleEngine() {
   let fillEl: any, outlineEl: any, hoodLineEl: any, hoodFillEl: any, pinEl: any, scanLineEl: any, scanFillEl: any;
   let ringEls: any[] = [];
   let gridEls: any[] = [];
-  let edgeEls: any[] = [];
   const shown = new Set<any>();
   let steady = false;
   const steadyWaiters: (() => void)[] = [];
@@ -113,11 +112,6 @@ export function googleEngine() {
       gridEls = Array.from({ length: g.gridMax }, () =>
         new lib.Polyline3DElement({ path: [at(p.centroid, 1), at(p.centroid, 1)], altitudeMode: AltitudeMode.RELATIVE_TO_MESH, strokeColor: "rgba(255,236,190,.75)", strokeWidth: 3, drawsOccludedSegments: true }),
       );
-      edgeEls = g.edges.map((e) => {
-        const m = new Marker3DElement({ position: at(e.mid, 6), altitudeMode: AltitudeMode.RELATIVE_TO_GROUND, sizePreserved: true, drawsWhenOccluded: true });
-        m.append(template(labelCanvas(`${Math.round(e.len)} m`, GOLD, { size: 30 })));
-        return m;
-      });
       await waitSteady(60000);
       return `${formatArea(p.areaM2)} · ${p.hood?.name ?? "mahalle sınırı yok"}`;
     },
@@ -176,7 +170,6 @@ export function googleEngine() {
           if (seg) (el.path = seg.map((q) => at(g.toLL(q), 1.7))), (el.strokeColor = rgba("#ffecbe", 0.7 * sc.grid));
         });
       } else [scanLineEl, ...gridEls].forEach((el) => toggle(el, false));
-      edgeEls.forEach((m) => toggle(m, (s.edges ?? 0) > 0.05));
       return waitSteady(timeoutMs);
     },
 

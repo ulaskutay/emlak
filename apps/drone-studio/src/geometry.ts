@@ -4,7 +4,6 @@
  *
  *   kısmi çizim    halka uzunluk boyunca p oranında (neon kontur, mahalle sınırı)
  *   tarama         tarama ekseni u (en uzun kenar yönü), taranan bölge, tarama çizgisi, ızgara (parsele kırpılmış)
- *   kenarlar       kenar ortaları ve uzunlukları
  */
 import type { ParcelInfo } from "./types.js";
 
@@ -117,17 +116,6 @@ export function makeGeometry(parcel: ParcelInfo) {
     };
   }
 
-  /** 8 m'den uzun kenarlar (en uzun 8): orta nokta ve uzunluk. */
-  const edges = parcel.ring
-    .map((a, i) => {
-      const b = parcel.ring[(i + 1) % parcel.ring.length]!;
-      const [pa, pb] = [toXY(a), toXY(b)];
-      return { mid: toLL({ x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 }), len: Math.hypot(pb.x - pa.x, pb.y - pa.y) };
-    })
-    .filter((e) => e.len >= 8)
-    .sort((a, b) => b.len - a.len)
-    .slice(0, 8);
-
   /** Parsel merkezli çember (pin dalga halkası). */
   const circle = (radius: number, n = 48): LL[] =>
     Array.from({ length: n + 1 }, (_, i) => toLL({ x: Math.cos((i / n) * Math.PI * 2) * radius, y: Math.sin((i / n) * Math.PI * 2) * radius }));
@@ -140,7 +128,6 @@ export function makeGeometry(parcel: ParcelInfo) {
     gridMax,
     parcelPath: progressive(parcel.ring),
     hoodPath: parcel.hood?.ring.length ? progressive(parcel.hood.ring) : null,
-    edges,
     circle,
   };
 }
