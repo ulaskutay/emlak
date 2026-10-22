@@ -14,8 +14,9 @@ import { r2FromEnv } from "@arsa/providers";
 import type { TemplateId } from "@arsa/shared";
 import { Worker } from "bullmq";
 import { arsaDrone } from "./templates/arsa-drone.js";
-import { bitmisHali } from "./templates/bitmis-hali.js";
+import { bitmisHali, insaatVideosu } from "./templates/bitmis-hali.js";
 import { ffmpeg, type JobContext, type JobResult } from "./templates/common.js";
+import { dosenmisEv } from "./templates/dosenmis-ev.js";
 import { ilanVideosu } from "./templates/ilan-videosu.js";
 
 const QUEUE = "reel";
@@ -26,6 +27,8 @@ const PIPELINES: Record<TemplateId, (ctx: JobContext) => Promise<JobResult>> = {
   "arsa-drone": arsaDrone,
   "ilan-videosu": ilanVideosu,
   "bitmis-hali": bitmisHali,
+  "insaat-videosu": insaatVideosu,
+  "dosenmis-ev": dosenmisEv,
 };
 
 const db = getDb();

@@ -221,7 +221,7 @@ export function ParcelStep({ parcel, onParsed, onNext }: { parcel: Parsed | null
   );
 }
 
-function VoiceStep({ hook, voiceId, onSelect }: { hook: string; voiceId: string | null; onSelect: (id: string) => void }) {
+export function VoiceStep({ hook, voiceId, onSelect }: { hook: string; voiceId: string | null; onSelect: (id: string) => void }) {
   const [voices, setVoices] = useState<VoiceOption[] | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
   const [loading, setLoading] = useState<string | null>(null);

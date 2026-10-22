@@ -13,6 +13,8 @@
     "drone:dev": "pnpm --filter @arsa/drone-studio dev",
     "construction": "pnpm --filter @arsa/orchestrator construction",
     "drone-job": "pnpm --filter @arsa/orchestrator drone-job",
+    "edit-image": "pnpm --filter @arsa/orchestrator edit-image",
+    "insaat": "pnpm --filter @arsa/orchestrator insaat",
     "reel": "pnpm --filter @arsa/drone-studio reel",
     "voices": "pnpm --filter @arsa/drone-studio voices",
     "web": "pnpm --filter @arsa/web dev",

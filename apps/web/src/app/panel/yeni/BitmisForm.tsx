@@ -1,5 +1,5 @@
 "use client";
-import { BUILDING_LABELS, BuildingType } from "@arsa/shared";
+import { BUILDING_LABELS, BuildingType, TEMPLATES } from "@arsa/shared";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ListingFields, listingPayload, type ListingValues } from "./ListingFields";
@@ -13,7 +13,13 @@ const HINTS: Record<BuildingType, string> = {
   ticari: "Cam cepheli ofis, zeminde dükkânlar",
 };
 
-export function BitmisForm() {
+const INTRO = {
+  "bitmis-hali": "Parselin drone çekiminin ardından, aynı kareden seçtiğiniz yapının yükseldiği bir inşaat sahnesi. Görüntü temsilidir; videoda bu yazılır.",
+  "insaat-videosu": "Parselin drone çekiminin son karesinden yapay zekâ inşaatı doğrudan kurar: kazı, kaba inşaat ve bitmiş yapı. Görüntü temsilidir; videoda bu yazılır.",
+};
+
+/** Bitmiş hali ve arsadan inşaat videosu: aynı girdi (parsel + yapı tipi), farklı üretim hattı. */
+export function BitmisForm({ template }: { template: keyof typeof INTRO }) {
   const router = useRouter();
   const [parcel, setParcel] = useState<Parsed | null>(null);
   const [step, setStep] = useState(0);
@@ -32,7 +38,7 @@ export function BitmisForm() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        template: "bitmis-hali",
+        template,
         parcelFileName: parcel.fileName,
         parcelText: parcel.text,
         building,
@@ -50,9 +56,9 @@ export function BitmisForm() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-bold tracking-[-0.025em]">Arsanın bitmiş hali</h1>
+        <h1 className="font-display text-3xl font-bold tracking-[-0.025em]">{TEMPLATES[template].name}</h1>
         <p className="mt-2 text-mute">
-          Parselin drone çekiminin ardından, aynı kareden seçtiğiniz yapının yükseldiği bir inşaat sahnesi. Görüntü temsilidir; videoda bu yazılır.
+          {INTRO[template]}
         </p>
       </div>
 

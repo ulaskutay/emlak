@@ -9,7 +9,9 @@
     "bench": "tsx --env-file-if-exists=../../.env src/bench.ts",
     "listing-video": "tsx --env-file-if-exists=../../.env src/listing-video.ts",
     "construction": "tsx --env-file-if-exists=../../.env src/construction.ts",
-    "drone-job": "tsx --env-file-if-exists=../../.env src/drone-job.ts"
+    "drone-job": "tsx --env-file-if-exists=../../.env src/drone-job.ts",
+    "edit-image": "tsx --env-file-if-exists=../../.env src/edit-image.ts",
+    "insaat": "tsx --env-file-if-exists=../../.env src/insaat.ts"
   },
   "dependencies": {
     "@arsa/providers": "workspace:*",

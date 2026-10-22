@@ -2,6 +2,7 @@ import { TEMPLATES, TemplateId } from "@arsa/shared";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BitmisForm } from "../BitmisForm";
+import { DosemeForm } from "../DosemeForm";
 import { IlanForm } from "../IlanForm";
 import { Wizard } from "../Wizard";
 
@@ -12,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ sablon: s
 
 export default async function Page({ params }: { params: Promise<{ sablon: string }> }) {
   const id = TemplateId.safeParse((await params).sablon);
-  if (!id.success) notFound();
+  if (!id.success || TEMPLATES[id.data].hidden) notFound();
   return (
     <>
       <Link href="/panel" className="mx-auto mb-4 block max-w-3xl text-sm text-mute hover:text-white">
@@ -20,7 +21,8 @@ export default async function Page({ params }: { params: Promise<{ sablon: strin
       </Link>
       {id.data === "arsa-drone" && <Wizard />}
       {id.data === "ilan-videosu" && <IlanForm />}
-      {id.data === "bitmis-hali" && <BitmisForm />}
+      {(id.data === "bitmis-hali" || id.data === "insaat-videosu") && <BitmisForm template={id.data} />}
+      {id.data === "dosenmis-ev" && <DosemeForm />}
     </>
   );
 }

@@ -2,7 +2,7 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Video } from "@arsa/db";
 import { MUSIC_PROMPT } from "@arsa/drone-studio/pipeline";
@@ -122,6 +122,59 @@ export async function backgroundMusic(seconds: number, ctx: JobContext): Promise
     ctx.log(`! müzik üretilemedi: ${String(e).slice(0, 160)}`);
     return null;
   }
+}
+
+/** Seslendirme (ElevenLabs), metne göre önbellekli. Ses dosyası ve süresi; anahtar yoksa null. */
+export async function speakLines(lines: string[], voiceId: string | null, ctx: JobContext): Promise<{ file: string; duration: number }[] | null> {
+  const key = process.env.ELEVENLABS_API_KEY;
+  if (!key) {
+    ctx.log("! ELEVENLABS_API_KEY yok: seslendirmesiz");
+    return null;
+  }
+  const model = process.env.ELEVENLABS_MODEL || "eleven_v3";
+  const el = new ElevenLabsClient({ apiKey: key, voiceId: voiceId || process.env.ELEVENLABS_VOICE_ID, model });
+  const voice = await el.resolveVoice();
+  const out: { file: string; duration: number }[] = [];
+  for (const [i, text] of lines.entries()) {
+    const file = join(ctx.cacheDir, `tts-${createHash("sha1").update(`${voice}|${model}|${text}`).digest("hex").slice(0, 16)}.mp3`);
+    const meta = file.replace(/\.mp3$/, ".json");
+    if (!existsSync(meta)) {
+      const sp = await el.speak(text, { previous: lines[i - 1], next: lines[i + 1] });
+      await writeFile(file, sp.audio);
+      await writeFile(meta, JSON.stringify({ duration: sp.duration }));
+    }
+    out.push({ file, duration: (JSON.parse(await readFile(meta, "utf8")) as { duration: number }).duration });
+  }
+  return out;
+}
+
+/**
+ * Sessiz videoya anlatım ve müzik: anlatımlar verilen saniyelerde başlar, müzik anlatım sırasında kısılır
+ * (ducking), sonda kısılarak biter. Hiç ses yoksa sessiz ses izi eklenir.
+ */
+export async function mixAudio(video: string, cues: { at: number; file: string }[], music: string | null, duration: number, out: string) {
+  if (!cues.length) return addMusic(video, music, duration, out);
+  const inputs = ["-i", video, ...cues.flatMap((c) => ["-i", c.file])];
+  const filters = cues.map((c, k) => {
+    const ms = Math.round(c.at * 1000);
+    return `[${k + 1}:a]adelay=${ms}|${ms},aresample=44100[v${k}]`;
+  });
+  filters.push(`${cues.map((_, k) => `[v${k}]`).join("")}amix=inputs=${cues.length}:normalize=0,volume=1.15,asplit=2[voice][vsc]`);
+  let buses = "[voice]";
+  if (music) {
+    inputs.push("-i", music);
+    filters.push(
+      `[${cues.length + 1}:a]atrim=0:${duration},afade=t=in:d=0.6,afade=t=out:st=${Math.max(0, duration - 1.5)}:d=1.5,volume=0.5[mus]`,
+      "[mus][vsc]sidechaincompress=threshold=0.02:ratio=10:attack=15:release=450:makeup=1[mduck]",
+    );
+    buses += "[mduck]";
+  } else filters.push("[vsc]anullsink");
+  filters.push(`${buses}amix=inputs=${music ? 2 : 1}:normalize=0,alimiter=limit=0.95,apad[aout]`);
+  await ffmpeg([
+    ...inputs, "-filter_complex", filters.join(";"),
+    "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-t", String(duration), "-movflags", "+faststart", out,
+  ]);
+  return out;
 }
 
 /** Sessiz videoya müziği ekler (sonda 1.5 sn kısılarak biter); müzik yoksa sessiz ses izi. */

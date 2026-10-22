@@ -2,26 +2,12 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { ListingFields, listingPayload, type ListingValues } from "./ListingFields";
+import { uploadPhoto } from "./photoUpload";
 
 type Photo = { id: string; key?: string; preview: string; setting: "exterior" | "interior"; title: string; error?: string };
 
 const MIN = 3;
 const MAX = 8;
-const MAX_EDGE = 1600;
-
-/** Fotoğrafı tarayıcıda en uzun kenarı 1600 px JPEG'e küçültür (yükleme hızlı, GPU girdisi için yeterli). */
-async function toJpeg(file: File): Promise<Blob> {
-  const bmp = await createImageBitmap(file).catch(() => {
-    throw new Error("Bu fotoğraf açılamadı; JPEG ya da PNG seçin");
-  });
-  const s = Math.min(1, MAX_EDGE / Math.max(bmp.width, bmp.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bmp.width * s);
-  canvas.height = Math.round(bmp.height * s);
-  canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
-  bmp.close();
-  return new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error("Fotoğraf dönüştürülemedi"))), "image/jpeg", 0.88));
-}
 
 export function IlanForm() {
   const router = useRouter();
@@ -53,12 +39,7 @@ export function IlanForm() {
       list.map(async (f, i) => {
         const id = items[i]!.id;
         try {
-          const fd = new FormData();
-          fd.append("file", await toJpeg(f), "foto.jpg");
-          const res = await fetch("/api/uploads", { method: "POST", body: fd });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error ?? "Yüklenemedi");
-          update(id, { key: data.key });
+          update(id, { key: await uploadPhoto(f) });
         } catch (e) {
           update(id, { error: e instanceof Error ? e.message : "Yüklenemedi" });
         }

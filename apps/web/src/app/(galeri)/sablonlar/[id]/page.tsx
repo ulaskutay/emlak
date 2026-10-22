@@ -1,11 +1,11 @@
-import { TEMPLATE_IDS, TEMPLATES, TemplateId, templateList } from "@arsa/shared";
+import { TEMPLATES, TemplateId, templateList } from "@arsa/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ReelPlayer } from "@/components/site/ReelPlayer";
 import { TemplateCard } from "@/components/templates/TemplateCard";
 
-export const generateStaticParams = () => TEMPLATE_IDS.map((id) => ({ id }));
+export const generateStaticParams = () => templateList.map((t) => ({ id: t.id }));
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const id = TemplateId.safeParse((await params).id);
@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const id = TemplateId.safeParse((await params).id);
-  if (!id.success) notFound();
+  if (!id.success || TEMPLATES[id.data].hidden) notFound();
   const t = TEMPLATES[id.data];
   const others = templateList.filter((o) => o.id !== t.id);
 

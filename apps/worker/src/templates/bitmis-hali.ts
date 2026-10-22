@@ -1,12 +1,14 @@
 /**
- * Arsanın bitmiş hali: parselin drone çekimi (seslendirmesiz) → son kareye AI ile yapı eklenir (Qwen-Image-Edit)
- * → boş arsadan yapıya inşaat timelapse'i (Wan 2.2 ilk/son kare) → drone + inşaat + kapanış kartı + müzik.
+ * İnşaat şablonları: parselin drone çekimi (seslendirmesiz) → son kareden Wan 2.2 inşaat timelapse'i
+ * → drone + inşaat + kapanış kartı + müzik.
+ *   bitmis-hali:    son kareye AI ile yapı eklenir (Qwen-Image-Edit), Wan ilk/son kare arasında geçiş yapar.
+ *   insaat-videosu: bitiş karesi yok; Wan yalnız ilk kare + prompt'la inşaatı kendisi kurar (daha hızlı ve ucuz).
  */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { produceReel } from "@arsa/drone-studio/pipeline";
 import { RunpodClient } from "@arsa/providers";
-import { buildingSpec, FORMAT_SPECS, type BuildingType } from "@arsa/shared";
+import { buildingSpec, constructionPrompt, FORMAT_SPECS, type BuildingType } from "@arsa/shared";
 import {
   addMusic,
   backgroundMusic,
@@ -24,7 +26,10 @@ import {
 const OUT_FPS = 30;
 const OUTRO_SECONDS = 3;
 
-export async function bitmisHali(ctx: JobContext): Promise<JobResult> {
+export const bitmisHali = (ctx: JobContext) => construction(ctx, true);
+export const insaatVideosu = (ctx: JobContext) => construction(ctx, false);
+
+async function construction(ctx: JobContext, endFrame: boolean): Promise<JobResult> {
   const v = ctx.video;
   if (!v.parcelText || !v.parcelSummary) throw new Error("Parsel dosyası eksik");
   const { building, floors } = v.input as { building?: BuildingType; floors?: number };
@@ -34,7 +39,7 @@ export async function bitmisHali(ctx: JobContext): Promise<JobResult> {
   const apiKey = process.env.RUNPOD_API_KEY;
   const qwenId = process.env.RUNPOD_QWEN_ENDPOINT_ID;
   const wanId = process.env.RUNPOD_WAN_ENDPOINT_ID;
-  if (!apiKey || !qwenId || !wanId) throw new Error("RUNPOD_QWEN_ENDPOINT_ID / RUNPOD_WAN_ENDPOINT_ID eksik");
+  if (!apiKey || !wanId || (endFrame && !qwenId)) throw new Error("RUNPOD_QWEN_ENDPOINT_ID / RUNPOD_WAN_ENDPOINT_ID eksik");
   const { width: W, height: H } = FORMAT_SPECS.reels_9x16;
 
   // 1) Drone çekimi: arsa hattı seslendirmesiz; son kare (parsel çizgili) inşaatın başlangıcı.
@@ -56,33 +61,36 @@ export async function bitmisHali(ctx: JobContext): Promise<JobResult> {
   const start = await download(kfUrl, join(ctx.workDir, "baslangic.png"));
   const startData = `data:image/png;base64,${(await readFile(start)).toString("base64")}`;
 
-  // 2) Bitiş karesi: parselin içine yapı
-  await ctx.stage("build");
-  const qwen = await runpodJob(
-    new RunpodClient(apiKey, qwenId),
-    {
-      image_url: startData,
-      width: W,
-      height: H,
-      seed: 7,
-      prompt:
-        `Add ${spec.edit}, built exactly inside the glowing outlined plot. ` +
-        "The building sits on the ground within the outline and matches the aerial camera perspective, scale, shadows and sunlight of the photo. " +
-        "Keep the glowing outline visible. Keep everything outside the outline exactly unchanged: roads, trees, neighboring buildings. Photorealistic aerial drone photo.",
-    },
-    "bitiş karesi",
-    ctx.log,
-  );
-  const end = await saveOutput(qwen, "image", join(ctx.workDir, "bitis.png"));
-  const endData = `data:image/png;base64,${(await readFile(end)).toString("base64")}`;
+  // 2) Bitiş karesi: parselin içine yapı (yalnız bitmiş hali)
+  let endData: string | undefined;
+  if (endFrame) {
+    await ctx.stage("build");
+    const qwen = await runpodJob(
+      new RunpodClient(apiKey, qwenId!),
+      {
+        image_url: startData,
+        width: W,
+        height: H,
+        seed: 7,
+        prompt:
+          `Add ${spec.edit}, built exactly inside the glowing outlined plot. ` +
+          "The building sits on the ground within the outline and matches the aerial camera perspective, scale, shadows and sunlight of the photo. " +
+          "Keep the glowing outline visible. Keep everything outside the outline exactly unchanged: roads, trees, neighboring buildings. Photorealistic aerial drone photo.",
+      },
+      "bitiş karesi",
+      ctx.log,
+    );
+    const end = await saveOutput(qwen, "image", join(ctx.workDir, "bitis.png"));
+    endData = `data:image/png;base64,${(await readFile(end)).toString("base64")}`;
+  }
 
-  // 3) İnşaat timelapse'i
+  // 3) İnşaat timelapse'i. Bitiş karesi yoksa bina tarifi prompt'ta ayrıntılı olmalı: model yapıyı yalnız buradan bilir.
   await ctx.stage("timelapse");
   const wan = await runpodJob(
     new RunpodClient(apiKey, wanId),
     {
       image_url: startData,
-      last_image_url: endData,
+      ...(endData && { last_image_url: endData }),
       width: 480,
       height: 832,
       num_frames: 81, // Wan 16 fps → ~5 sn
@@ -91,11 +99,7 @@ export async function bitmisHali(ctx: JobContext): Promise<JobResult> {
       output_width: W,
       output_height: H,
       seed: 7,
-      prompt:
-        "Aerial construction time-lapse from a static drone camera. Excavators dig the foundation inside the glowing outlined plot, " +
-        "then a reinforced concrete frame rises floor by floor with scaffolding and a tower crane, workers and trucks move quickly, " +
-        `the facade, windows and balconies are completed and the site is cleaned up, revealing ${spec.edit}. ` +
-        "Fast time-lapse, sunlight and shadows shift across the day, the surroundings stay unchanged, photorealistic.",
+      prompt: constructionPrompt(spec.edit, !endData),
     },
     "inşaat",
     ctx.log,

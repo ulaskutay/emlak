@@ -6,13 +6,15 @@
   "scripts": {
     "dev": "vite",
     "record": "tsx scripts/record.ts",
+    "still": "tsx scripts/still.ts",
     "typecheck": "tsc --noEmit",
     "reel": "tsx --env-file-if-exists=../../.env scripts/reel.ts",
     "voices": "tsx --env-file-if-exists=../../.env scripts/voices.ts"
   },
   "dependencies": {
     "@arsa/geo": "workspace:*",
-    "@arsa/providers": "workspace:*"
+    "@arsa/providers": "workspace:*",
+    "@arsa/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/google.maps": "^3.58.0",

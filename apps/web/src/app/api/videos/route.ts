@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { desc, eq, getDb, videos } from "@arsa/db";
-import { TemplateOrder } from "@arsa/shared";
+import { TEMPLATES, TemplateOrder } from "@arsa/shared";
 import { NextResponse } from "next/server";
 import { apiUser, badRequest, unauthorized } from "@/lib/api";
 import { summarizeParcel } from "@/lib/parcel";
@@ -34,6 +34,7 @@ export async function POST(req: Request) {
   const parsed = TemplateOrder.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return badRequest(parsed.error.issues[0]?.message ?? "Geçersiz istek");
   const order = parsed.data;
+  if (TEMPLATES[order.template].hidden) return badRequest("Bu şablon henüz sipariş almıyor");
   const id = randomUUID();
   const base = { id, userId: user.id, template: order.template, listing: order.listing, music: order.music };
 
@@ -41,6 +42,9 @@ export async function POST(req: Request) {
     // Fotoğraflar yalnızca kullanıcının kendi yüklemeleri olabilir.
     if (order.photos.some((p) => !p.key.startsWith(`uploads/${user.id}/`))) return badRequest("Geçersiz fotoğraf");
     await getDb().insert(videos).values({ ...base, input: { photos: order.photos } });
+  } else if (order.template === "dosenmis-ev") {
+    if (order.photos.some((p) => !p.key.startsWith(`uploads/${user.id}/`))) return badRequest("Geçersiz fotoğraf");
+    await getDb().insert(videos).values({ ...base, input: { photos: order.photos, style: order.style, details: order.details, voice: order.voice }, voiceId: order.voiceId ?? null });
   } else {
     let summary;
     try {
@@ -49,7 +53,7 @@ export async function POST(req: Request) {
       return badRequest(e instanceof Error ? e.message : String(e));
     }
     const parcel = { parcelFileName: order.parcelFileName, parcelText: order.parcelText, parcelSummary: summary };
-    if (order.template === "bitmis-hali")
+    if (order.template === "bitmis-hali" || order.template === "insaat-videosu")
       await getDb().insert(videos).values({ ...base, ...parcel, input: { building: order.building, floors: order.floors } });
     else await getDb().insert(videos).values({ ...base, ...parcel, voiceId: order.voiceId ?? null });
   }
