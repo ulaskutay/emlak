@@ -44,15 +44,15 @@ type Agent = { name: string; photo?: Asset; logo?: Asset };
 const tidyPhone = (p: string) => p.replace(/^0\s*\((\d{3})\)\s*/, "0$1 ").replace(/\s+/g, " ").trim();
 const isPayload = (d: unknown): d is IlanPayload =>
   !!d && typeof d === "object" && (d as IlanPayload).type === "arsa-ilan" && typeof (d as IlanPayload).text === "string" && Array.isArray((d as IlanPayload).photos);
-const SAHIBINDEN = /^https:\/\/(www\.)?sahibinden\.com$/;
 
 /**
- * Yer imi butonu: ilan sayfasında (kullanıcının kendi tarayıcısında) metni ve fotoğraf linklerini toplar,
- * paneli yeni sekmede açıp veriyi gönderir; sekmeler arası bağ kesilirse diye veriyi panoya da kopyalar.
+ * Yer imi butonu: ilan sayfasında (kullanıcının kendi tarayıcısında) metni, fotoğraf linklerini ve emlakçıyı toplar,
+ * paneli yeni sekmede veri adresin # kısmında açar (sunucuya gitmez). sahibinden açılan sekmeyle bağı kestiği için
+ * (COOP) sekmeler arası mesaj kullanılmaz. Yedek olarak veri panoya da kopyalanır.
  */
 function bookmarklet(origin: string) {
   // Yalnız bu ilanın (linkteki ilan no) JPEG fotoğrafları, her fotoğraf bir kez (boy öneki ve uzantı atılarak), sayfadaki sırayla.
-  const code = `(()=>{const id=(location.pathname.match(/(\\d{6,})/)||[])[1]||'';const m=new Map();document.querySelectorAll('img,[data-src],[data-source],a[href]').forEach(e=>{for(const v of [e.currentSrc,e.src,e.getAttribute('data-src'),e.getAttribute('data-source'),e.getAttribute('href')]){if(!v||!v.includes('shbdn.com/photos/')||!v.includes(id)||!/\\.jpe?g/i.test(v))continue;const u=new URL(v,location.href).href,k=u.replace(/\\/[a-z0-9]+_/,'/');if(!m.has(k))m.set(k,u)}});const s=[...m.values()];const q=x=>document.querySelector(x),lg=q('.user-info-store-logo img'),ph=q('img.user-info-agent-logo'),tel=((q('.user-info-phones')||document.body).innerText.match(/0\\s?\\(\\d{3}\\)\\s?\\d{3}\\s?\\d{2}\\s?\\d{2}/)||[''])[0];const ag={name:((q('.user-info-agent')||{}).innerText||'').split('\\n')[0].trim(),office:lg?lg.alt:'',photo:ph?ph.src:'',logo:lg?lg.src:'',phone:tel};const d={type:'arsa-ilan',url:location.href,text:document.body.innerText.slice(0,60000),photos:s.slice(0,60),agent:ag};try{navigator.clipboard.writeText(JSON.stringify(d))}catch(e){}const o='${origin}';window.open(o+'/panel/yeni/dosenmis-ev?aktar=1','_blank');const h=e=>{if(e.origin===o&&e.data==='arsa-hazir'){e.source.postMessage(d,o);removeEventListener('message',h)}};addEventListener('message',h)})()`;
+  const code = `(()=>{const id=(location.pathname.match(/(\\d{6,})/)||[])[1]||'';const m=new Map();document.querySelectorAll('img,[data-src],[data-source],a[href]').forEach(e=>{for(const v of [e.currentSrc,e.src,e.getAttribute('data-src'),e.getAttribute('data-source'),e.getAttribute('href')]){if(!v||!v.includes('shbdn.com/photos/')||!v.includes(id)||!/\\.jpe?g/i.test(v))continue;const u=new URL(v,location.href).href,k=u.replace(/\\/[a-z0-9]+_/,'/');if(!m.has(k))m.set(k,u)}});const s=[...m.values()];const q=x=>document.querySelector(x),lg=q('.user-info-store-logo img'),ph=q('img.user-info-agent-logo'),tel=((q('.user-info-phones')||document.body).innerText.match(/0\\s?\\(\\d{3}\\)\\s?\\d{3}\\s?\\d{2}\\s?\\d{2}/)||[''])[0];const ag={name:((q('.user-info-agent')||{}).innerText||'').split('\\n')[0].trim(),office:lg?lg.alt:'',photo:ph?ph.src:'',logo:lg?lg.src:'',phone:tel};const T=document.body.innerText,i=Math.max(0,T.indexOf('İlan No')-600);const d={type:'arsa-ilan',url:location.href,text:T.slice(i,i+12000),photos:s.slice(0,60),agent:ag};const j=JSON.stringify(d);try{navigator.clipboard.writeText(j)}catch(e){}window.open('${origin}/panel/yeni/dosenmis-ev#aktar='+encodeURIComponent(j),'_blank')})()`;
   return `javascript:${encodeURIComponent(code)}`;
 }
 
@@ -79,6 +79,8 @@ export function DosemeForm() {
   const [imported, setImported] = useState<Asset[]>([]);
   const [agent, setAgent] = useState<Agent>({ name: "" });
   const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [link, setLink] = useState("");
+  const linkOk = /^https:\/\/(www\.)?sahibinden\.com\/ilan\//.test(link.trim());
   const bm = useRef<HTMLAnchorElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -137,21 +139,18 @@ export function DosemeForm() {
     bm.current?.setAttribute("href", bookmarklet(window.location.origin));
   }, []);
 
-  // Buton paneli açtıysa ilan sekmesine hazır olduğunu bildirir, veriyi bekler.
+  // Buton paneli veriyle (#aktar=…) açtıysa ilanı içeri al; adres temizlenir ki yenilemede tekrar aktarılmasın.
   useEffect(() => {
-    const onMessage = (e: MessageEvent) => {
-      if (SAHIBINDEN.test(e.origin) && isPayload(e.data)) importListing(e.data);
-    };
-    window.addEventListener("message", onMessage);
-    if (window.opener && new URLSearchParams(window.location.search).has("aktar")) {
-      for (const o of ["https://www.sahibinden.com", "https://sahibinden.com"]) {
-        try {
-          window.opener.postMessage("arsa-hazir", o);
-        } catch {}
-      }
-      setImportMsg("İlan bekleniyor… Gelmezse buraya Ctrl+V ile yapıştırın.");
+    const h = window.location.hash;
+    if (!h.startsWith("#aktar=")) return;
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    try {
+      const d = JSON.parse(decodeURIComponent(h.slice(7)));
+      if (isPayload(d)) importListing(d);
+      else setImportMsg("İlan verisi okunamadı; ilan sayfasında butona yeniden basın.");
+    } catch {
+      setImportMsg("İlan verisi okunamadı; ilan sayfasında butona yeniden basın.");
     }
-    return () => window.removeEventListener("message", onMessage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -238,17 +237,32 @@ export function DosemeForm() {
           if (isPayload(d)) importListing(d);
         } catch {}
       }} tabIndex={-1}>
-        <div className="font-semibold">sahibinden.com ilanından aktar</div>
+        <div>
+          <div className="font-semibold">sahibinden.com ilanından aktar</div>
+          <p className="mt-1 text-sm text-mute">
+            sahibinden ilan sayfalarını sunucumuzun okumasına izin vermiyor (bot doğrulaması). Bu yüzden aktarmayı, ilan sizin tarayıcınızda
+            açıkken yer imindeki buton yapar: fotoğraflar, ilan bilgileri, fiyat ve emlakçı bu sayfaya gelir.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input className="input flex-1" type="url" inputMode="url" placeholder="https://www.sahibinden.com/ilan/…" value={link}
+            aria-label="sahibinden ilan linki" onChange={(e) => setLink(e.target.value)} />
+          <button type="button" className="btn-ghost shrink-0" disabled={!linkOk} onClick={() => window.open(link.trim(), "_blank", "noopener")}>
+            İlanı aç
+          </button>
+        </div>
         <ol className="list-decimal space-y-1 pl-5 text-sm text-mute">
           <li>
-            Bu butonu tarayıcınızın yer imleri çubuğuna sürükleyin (bir kez):{" "}
+            Bu butonu bir kez tarayıcınızın yer imleri çubuğuna sürükleyin:{" "}
             {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
             <a ref={bm} onClick={(e) => e.preventDefault()} className="ml-1 inline-block rounded-lg bg-neon px-3 py-1 font-semibold text-ink">
               Arsa Video&apos;ya aktar
             </a>
+            <span className="block text-xs">Yer imleri çubuğu görünmüyorsa: Ctrl+Shift+B (Mac&apos;te Cmd+Shift+B).</span>
           </li>
-          <li>sahibinden.com&apos;da ilanı açın ve yer imindeki butona basın; bu sayfa ilan bilgileri ve fotoğraflarıyla açılır.</li>
-          <li>Açılmazsa buraya tıklayıp Ctrl+V yapın (buton bilgileri panoya da kopyalar).</li>
+          <li>Linki yukarıya yapıştırıp &quot;İlanı aç&quot;a basın (ya da ilanı sahibinden&apos;de kendiniz açın).</li>
+          <li>İlan sayfasındayken yer imindeki &quot;Arsa Video&apos;ya aktar&quot;a basın; bu panel ilanla birlikte yeni sekmede açılır.</li>
+          <li>Açılmazsa bu sayfada boş bir yere tıklayıp Ctrl+V yapın (buton bilgileri panoya da kopyalar).</li>
         </ol>
         {importMsg && <p className="text-sm text-neon">{importMsg}</p>}
         {imported.length > 0 && (
