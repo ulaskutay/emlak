@@ -31,6 +31,7 @@ import {
   type JobContext,
   type JobResult,
 } from "./common.js";
+import { agentCard } from "./agent-card.js";
 
 const OUT_FPS = 30;
 const TOTAL_SECONDS = 21;
@@ -148,14 +149,21 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
       `${drawText(photos[i]!.title || ROOM_LABELS[photos[i]!.room], titleSize, "h*0.10", "white", 0.3)},` +
       `${drawText("Temsili döşemedir", Math.round(subSize * 0.7), "h*0.93", "white@0.8")}[v${i}]`,
   );
-  const outroFile = await agentCard(ctx, {
+  // Kapanış kartı: arka planı son odanın döşenmiş karesi (kesme yerine aynı odadan bulanık geçiş).
+  const lastFrame = join(ctx.workDir, "son-kare.png");
+  await ffmpeg(["-sseof", "-0.2", "-i", clips[clips.length - 1]!, "-frames:v", "1", lastFrame]);
+  const fetchAsset = (key: string | undefined, name: string) =>
+    key ? ctx.r2.url(key, 600).then((u) => download(u, join(ctx.workDir, name))).catch(() => null) : Promise.resolve(null);
+  const outroFile = await agentCard(ctx.workDir, {
     price: priceText(v.listing.priceTry),
     rent: /kiralık/i.test(details?.kind ?? ""),
     name: agent?.name,
     office: v.listing.officeName,
     phone: v.listing.phone,
-    photoKey: agent?.photoKey,
-    logoKey: agent?.logoKey,
+    photo: await fetchAsset(agent?.photoKey, "emlakci.jpg"),
+    logo: await fetchAsset(agent?.logoKey, "logo.png"),
+    background: lastFrame,
+    seconds: OUTRO_SECONDS,
   });
   const n = clips.length;
   filters.push(`[${n}:v]fps=${OUT_FPS},format=yuv420p,setsar=1[v${n}]`);
@@ -175,22 +183,26 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
   let cues: { at: number; file: string }[] = [];
   if (voices) {
     const spoken = all.map((t, i) => ({ t, at: starts[i]! })).filter((x) => x.t);
+    // İleri: her cümle sahnesinin başında ya da öncekinin ardından. Geri: son cümle videonun sonuna sığacak
+    // kadar öne çekilir, öncekiler de ona göre. İlk cümle baştaki payın önüne düşerse bu hızda sığmıyor demektir.
     const place = (tempo: number) => {
-      let end = 0;
-      const out = spoken.map((x, k) => {
-        const at = Math.max(x.at + VOICE_LEAD, end + (k ? VOICE_GAP : 0));
-        end = at + voices[k]!.duration / tempo;
-        return { at, file: voices[k]!.file };
-      });
-      return { out, end };
+      const len = voices.map((s) => s.duration / tempo);
+      const at: number[] = [];
+      spoken.forEach((x, k) => at.push(Math.max(x.at + VOICE_LEAD, k ? at[k - 1]! + len[k - 1]! + VOICE_GAP : 0)));
+      let limit = duration - 0.3;
+      for (let k = at.length - 1; k >= 0; k--) {
+        at[k] = Math.min(at[k]!, limit - len[k]!);
+        limit = at[k]! - VOICE_GAP;
+      }
+      return { out: at.map((t, k) => ({ at: Math.max(0, t), file: voices[k]!.file })), fits: at[0]! >= VOICE_LEAD - 0.05 };
     };
     let tempo = 1;
     let placed = place(tempo);
-    if (placed.end > duration - 0.3) {
-      tempo = Math.min(MAX_VOICE_TEMPO, voices.reduce((a, s) => a + s.duration, 0) / (duration - 0.3 - VOICE_LEAD - VOICE_GAP * (voices.length - 1)));
-      placed = place(Math.max(1, tempo));
-      ctx.log(`anlatım ${tempo.toFixed(2)}x hızlandırıldı`);
+    while (!placed.fits && tempo < MAX_VOICE_TEMPO) {
+      tempo = Math.min(MAX_VOICE_TEMPO, tempo + 0.05);
+      placed = place(tempo);
     }
+    if (tempo > 1) ctx.log(`anlatım ${tempo.toFixed(2)}x hızlandırıldı${placed.fits ? "" : " (yine de sığmadı, sonu kesilebilir)"}`);
     cues = tempo > 1 ? await Promise.all(placed.out.map(async (c, k) => ({ at: c.at, file: await speedUp(c.file, tempo, join(ctx.workDir, `ses-${k}.m4a`)) }))) : placed.out;
   }
   const music = v.music ? await backgroundMusic(duration, ctx) : null;
@@ -204,59 +216,3 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
 }
 
 const speedUp = async (file: string, tempo: number, out: string) => (await ffmpeg(["-i", file, "-af", `atempo=${tempo.toFixed(3)}`, "-c:a", "aac", out]), out);
-
-/**
- * Kapanış kartı (OUTRO_SECONDS): fiyat, emlakçının yuvarlak fotoğrafı, adı, ofisi, telefonu ve ofis logosu.
- * Olmayan parça atlanır; hiçbiri yoksa yalnız çağrı yazar.
- */
-async function agentCard(
-  ctx: JobContext,
-  a: { price?: string; rent: boolean; name?: string; office?: string; phone?: string; photoKey?: string; logoKey?: string },
-) {
-  const { width: W, height: H } = FORMAT_SPECS.reels_9x16;
-  const big = Math.round(W * 0.085);
-  const mid = Math.round(W * 0.05);
-  const small = Math.round(W * 0.036);
-  const inputs = ["-f", "lavfi", "-i", `color=c=0x121a16:s=${W}x${H}:r=${OUT_FPS}:d=${OUTRO_SECONDS}`];
-  const f: string[] = [];
-  let last = "[0:v]";
-  let k = 1;
-  const D = 380; // fotoğraf çapı
-  const photo = a.photoKey ? await download(await ctx.r2.url(a.photoKey, 600), join(ctx.workDir, "emlakci.jpg")).catch(() => null) : null;
-  const logo = a.logoKey ? await download(await ctx.r2.url(a.logoKey, 600), join(ctx.workDir, "logo.png")).catch(() => null) : null;
-  if (photo) {
-    inputs.push("-i", photo);
-    f.push(
-      `[${k}:v]scale=${D}:${D}:force_original_aspect_ratio=increase,crop=${D}:${D},format=rgba,` +
-        `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='if(lte(hypot(X-${D / 2},Y-${D / 2}),${D / 2 - 2}),255,0)'[ph]`,
-      `${last}[ph]overlay=(W-w)/2:${Math.round(H * 0.25)}[b${k}]`,
-    );
-    last = `[b${k}]`;
-    k++;
-  }
-  if (logo) {
-    inputs.push("-i", logo);
-    // Logo en fazla 480x210, beyaz zeminli kutuda (koyu logolar koyu arka planda kaybolmasın).
-    f.push(
-      `[${k}:v]scale=w='min(480,iw*210/ih)':h=-1,format=rgba,pad=iw+40:ih+30:20:15:color=white@1[lg]`,
-      `${last}[lg]overlay=(W-w)/2:${Math.round(H * 0.74)}[b${k}]`,
-    );
-    last = `[b${k}]`;
-    k++;
-  }
-  const texts: string[] = [];
-  const y = (r: number) => String(Math.round(H * r));
-  if (a.price) {
-    texts.push(drawText(a.price, big, y(0.1), "0xFFC24D", 0));
-    if (a.rent) texts.push(drawText("aylık kira", small, y(0.1 + 0.055), "white@0.85", 0.1));
-  }
-  const top = photo ? 0.25 + D / H + 0.025 : 0.3;
-  if (a.name) texts.push(drawText(a.name, mid, y(top), "white", 0.2));
-  if (a.office) texts.push(drawText(a.office, small, y(top + 0.04), "white@0.8", 0.25));
-  if (a.phone) texts.push(drawText(a.phone, big, y(top + 0.09), "white", 0.3));
-  if (!texts.length) texts.push(drawText("Detaylar için arayın", big, y(0.45), "white", 0));
-  f.push(`${last}${texts.join(",")},format=yuv420p[out]`);
-  const out = join(ctx.workDir, "kapanis.mp4");
-  await ffmpeg([...inputs, "-filter_complex", f.join(";"), "-map", "[out]", "-t", String(OUTRO_SECONDS), "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", out]);
-  return out;
-}

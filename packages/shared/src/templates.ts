@@ -325,12 +325,12 @@ export function constructionStagePrompts(building: string): [string, string] {
 
 /** Oda tipine göre eklenecek eşyalar (Qwen-Image-Edit talimatı). */
 const ROOM_FURNITURE: Record<RoomType, string> = {
-  salon: "living room furniture: a sofa, two armchairs, a coffee table, a TV unit, a rug, a floor lamp, cushions and plants",
-  yatak_odasi: "bedroom furniture: a double bed with bedding and pillows, two nightstands with lamps, a rug and a plant",
-  cocuk_odasi: "child's room furniture: a single bed with colorful bedding, a small desk and chair, a toy shelf, a playful rug and wall decor",
+  salon: "living room furniture: a sofa, two armchairs, a coffee table, a TV unit, a rug, a floor lamp, cushions, plants and an elegant chandelier hanging from the ceiling",
+  yatak_odasi: "bedroom furniture: a double bed with bedding and pillows, two nightstands with lamps, a rug, a plant and a stylish pendant chandelier hanging from the ceiling",
+  cocuk_odasi: "child's room furniture: a single bed with colorful bedding, a small desk and chair, a toy shelf, a playful rug, wall decor and a playful pendant lamp hanging from the ceiling",
   mutfak: "a dining table with chairs, bar stools at the counter, pendant lights, a fruit bowl and plants",
   yemek_odasi: "dining room furniture: a dining table for six with chairs, a pendant chandelier, a sideboard, a rug and a centerpiece",
-  calisma_odasi: "home office furniture: a desk, an office chair, a bookshelf with books, a desk lamp, a rug and plants",
+  calisma_odasi: "home office furniture: a desk, an office chair, a bookshelf with books, a desk lamp, a rug, plants and a modern pendant lamp hanging from the ceiling",
   banyo: "towels, a bath mat, toiletries, a small plant and decor accessories",
   balkon: "balcony furniture: outdoor lounge chairs, a small table, potted plants, an outdoor rug and string lights",
 };
@@ -353,7 +353,7 @@ export function stagingEditPrompt(room: RoomType, style: StagingStyle) {
   const keep = room === "mutfak" ? "the kitchen cabinets and counters, " : "";
   return (
     `Add ${ROOM_FURNITURE[room]} to the open floor space of this room, ${STYLE_DETAILS[style]}. ` +
-    `Keep the walls, floor, ceiling and lights, windows, doors, ${keep}and everything else in the photo exactly the same. ` +
+    `Keep the walls, floor, ceiling and its built-in lighting, windows, doors, ${keep}and everything else in the photo exactly the same. ` +
     "Do not cover or change any window or door, and do not add walls, openings, cabinets or curtains."
   );
 }
@@ -375,7 +375,7 @@ const ROOM_LABELS_EN: Record<RoomType, string> = {
 export function stagingVideoPrompt(room: RoomType) {
   return (
     "Interior design reveal, locked-off static camera, no camera movement. " +
-    `In the empty room, furniture and decor for ${ROOM_LABELS_EN[room]} gradually fade in one piece at a time and settle in place on the floor. ` +
+    `In the empty room, furniture and decor for ${ROOM_LABELS_EN[room]} gradually fade in one piece at a time and settle in place, ceiling lights and lamps switch on softly. ` +
     "Calm and smooth, nothing flies or falls. Windows, doors, walls, floor and ceiling stay exactly unchanged and windows stay clear. " +
     "No people. Natural daylight, photorealistic, sharp, high detail."
   );
