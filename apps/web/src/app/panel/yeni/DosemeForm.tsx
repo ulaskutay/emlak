@@ -1,21 +1,25 @@
 "use client";
-import { parseListingText, presenterList, presenterNarration, type PresenterId, ROOM_LABELS, RoomType, stagingNarration, STYLE_LABELS, StagingStyle } from "@arsa/shared";
+import { parseListingText, presenterList, type PresenterId, ROOM_LABELS, RoomType, stagingNarration, STYLE_LABELS, StagingStyle, TOUR_MAX_WORDS, tourScript, type TourNearby } from "@arsa/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ListingFields, listingPayload, type ListingValues } from "./ListingFields";
 import { uploadPhotoWithFocus } from "./photoUpload";
 import { VoiceStep } from "./Wizard";
 
-type Photo = { id: string; key?: string; preview: string; room?: RoomType; title: string; focusX: number; error?: string };
+/** text: sunuculu turda kullanıcının düzenlediği sahne metni (boşsa otomatik senaryo). */
+type Photo = { id: string; key?: string; preview: string; room?: RoomType; title: string; focusX: number; text?: string; error?: string };
 
 const MIN = 2;
 const MAX = 4;
-/** Sunuculu turda oda başına ~10 sn klip: 3 oda + kapanış ~35 sn. */
-const MAX_SUNUCU = 3;
+/** Sunuculu turda sahne başına ~10 sn klip: 4 sahne + kapanış ~40 sn. */
+const MAX_SUNUCU = 4;
+/** Binanın dışı yalnız sunuculu turda (döşenmez). */
 const ROOMS = RoomType.options;
+const STAGING_ROOMS = ROOMS.filter((r) => r !== "dis_cephe");
+const words = (t: string) => t.split(/\s+/).filter(Boolean).length;
 const STYLES = StagingStyle.options;
 
-type Details = { kind: string; rooms: string; netM2: string; location: string; highlights: string };
+type Details = { kind: string; rooms: string; netM2: string; location: string; highlights: string; province?: string; title?: string };
 const NO_DETAILS: Details = { kind: "", rooms: "", netM2: "", location: "", highlights: "" };
 
 /** Formdaki ilan bilgisi → sipariş/anlatım alanları (boşlar atlanır). */
@@ -27,6 +31,8 @@ function detailsPayload(d: Details) {
     ...(/^\d{1,2}\+\d{1,2}$/.test(rooms) && { rooms }),
     ...(net >= 10 && { netM2: net }),
     ...(d.location.trim() && { location: d.location.trim() }),
+    ...(d.province && { province: d.province }),
+    ...(d.title && { title: d.title.slice(0, 120) }),
     highlights: d.highlights.split("\n").map((l) => l.trim()).filter((l) => l.length >= 2).slice(0, 5),
   };
 }
@@ -38,6 +44,10 @@ type IlanPayload = {
   text: string;
   photos: string[];
   agent?: { name?: string; office?: string; photo?: string; logo?: string; phone?: string };
+  /** İlan başlığı ve harita koordinatı (sayfada varsa). */
+  title?: string;
+  lat?: number;
+  lng?: number;
 };
 type Asset = { key: string; url: string };
 type ImportedPhoto = Asset & { focusX: number };
@@ -88,9 +98,9 @@ const isPayload = (d: unknown): d is IlanPayload =>
  * paneli yeni sekmede veri adresin # kısmında açar (sunucuya gitmez). sahibinden açılan sekmeyle bağı kestiği için
  * (COOP) sekmeler arası mesaj kullanılmaz. Yedek olarak veri panoya da kopyalanır.
  */
-function bookmarklet(origin: string) {
+function bookmarklet(origin: string, template: string) {
   // Yalnız bu ilanın (linkteki ilan no) JPEG fotoğrafları, her fotoğraf bir kez (boy öneki ve uzantı atılarak), sayfadaki sırayla.
-  const code = `(()=>{const id=(location.pathname.match(/(\\d{6,})/)||[])[1]||'';const m=new Map();document.querySelectorAll('img,[data-src],[data-source],a[href]').forEach(e=>{for(const v of [e.currentSrc,e.src,e.getAttribute('data-src'),e.getAttribute('data-source'),e.getAttribute('href')]){if(!v||!v.includes('shbdn.com/photos/')||!v.includes(id)||!/\\.jpe?g/i.test(v))continue;const u=new URL(v,location.href).href,k=u.replace(/\\/[a-z0-9]+_/,'/');if(!m.has(k))m.set(k,u)}});const s=[...m.values()];const q=x=>document.querySelector(x),lg=q('.user-info-store-logo img'),ph=q('img.user-info-agent-logo'),tel=((q('.user-info-phones')||document.body).innerText.match(/0\\s?\\(\\d{3}\\)\\s?\\d{3}\\s?\\d{2}\\s?\\d{2}/)||[''])[0];const ag={name:((q('.user-info-agent')||{}).innerText||'').split('\\n')[0].trim(),office:lg?lg.alt:'',photo:ph?ph.src:'',logo:lg?lg.src:'',phone:tel};const T=document.body.innerText,i=Math.max(0,T.indexOf('İlan No')-600);const d={type:'arsa-ilan',url:location.href,text:T.slice(i,i+12000),photos:s.slice(0,60),agent:ag};const j=JSON.stringify(d);try{navigator.clipboard.writeText(j)}catch(e){}window.open('${origin}/panel/yeni/dosenmis-ev#aktar='+encodeURIComponent(j),'_blank')})()`;
+  const code = `(()=>{const id=(location.pathname.match(/(\\d{6,})/)||[])[1]||'';const m=new Map();document.querySelectorAll('img,[data-src],[data-source],a[href]').forEach(e=>{for(const v of [e.currentSrc,e.src,e.getAttribute('data-src'),e.getAttribute('data-source'),e.getAttribute('href')]){if(!v||!v.includes('shbdn.com/photos/')||!v.includes(id)||!/\\.jpe?g/i.test(v))continue;const u=new URL(v,location.href).href,k=u.replace(/\\/[a-z0-9]+_/,'/');if(!m.has(k))m.set(k,u)}});const s=[...m.values()];const q=x=>document.querySelector(x),lg=q('.user-info-store-logo img'),ph=q('img.user-info-agent-logo'),tel=((q('.user-info-phones')||document.body).innerText.match(/0\\s?\\(\\d{3}\\)\\s?\\d{3}\\s?\\d{2}\\s?\\d{2}/)||[''])[0];const ag={name:((q('.user-info-agent')||{}).innerText||'').split('\\n')[0].trim(),office:lg?lg.alt:'',photo:ph?ph.src:'',logo:lg?lg.src:'',phone:tel};const T=document.body.innerText,i=Math.max(0,T.indexOf('İlan No')-600);const tt=((q('.classifiedDetailTitle h1')||q('h1')||{}).innerText||'').trim(),g=q('[data-lat][data-lon]')||q('[data-lat][data-lng]'),la=g?parseFloat(g.getAttribute('data-lat')):NaN,lo=g?parseFloat(g.getAttribute('data-lon')||g.getAttribute('data-lng')):NaN;const d={type:'arsa-ilan',url:location.href,text:T.slice(i,i+12000),photos:s.slice(0,60),agent:ag,title:tt.slice(0,120),...(isFinite(la)&&isFinite(lo)?{lat:la,lng:lo}:{})};const j=JSON.stringify(d);try{navigator.clipboard.writeText(j)}catch(e){}window.open('${origin}/panel/yeni/${template}#aktar='+encodeURIComponent(j),'_blank')})()`;
   return `javascript:${encodeURIComponent(code)}`;
 }
 
@@ -111,6 +121,8 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [style, setStyle] = useState<StagingStyle | null>(sunucu ? null : "modern");
   const [presenter, setPresenter] = useState<PresenterId>("defne");
+  const [nearby, setNearby] = useState<TourNearby[]>([]);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [listing, setListing] = useState<ListingValues>({ price: "", officeName: "", phone: "" });
   const [music, setMusic] = useState(true);
   const [paste, setPaste] = useState("");
@@ -135,10 +147,28 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
   const untyped = ready.filter((p) => !p.room).length;
 
   const priceTry = Number(listing.price.replace(/\D/g, "")) || undefined;
-  const typedRooms = ready.flatMap((p) => (p.room ? [p.room] : []));
-  const narration = sunucu
-    ? { rooms: presenterNarration(typedRooms, detailsPayload(details), priceTry), outro: "" }
-    : stagingNarration(typedRooms, detailsPayload(details), priceTry);
+  const typed = ready.filter((p) => p.room);
+  const typedRooms = typed.map((p) => p.room!);
+  const narration = stagingNarration(typedRooms.filter((r) => r !== "dis_cephe"), detailsPayload(details), priceTry);
+  // Sunuculu tur: sahne başına otomatik senaryo; kullanıcı bir sahnenin metnini değiştirdiyse o kullanılır.
+  const script = sunucu ? tourScript(typedRooms, detailsPayload(details), nearby, priceTry) : [];
+  const sceneText = (p: Photo) => p.text ?? script[typed.indexOf(p)] ?? "";
+  const tooLong = sunucu ? typed.filter((p) => words(sceneText(p)) > TOUR_MAX_WORDS).length : 0;
+
+  // Konum (ya da ilan koordinatı) değişince yakın yerler; senaryonun konum cümlesi bundan.
+  useEffect(() => {
+    if (!sunucu || (!details.location.trim() && !coords)) return setNearby([]);
+    const t = setTimeout(async () => {
+      const res = await fetch("/api/listing/nearby", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ location: details.location, province: details.province, ...coords }),
+      }).catch(() => null);
+      const data = res?.ok ? await res.json().catch(() => null) : null;
+      setNearby(data?.nearby ?? []);
+    }, 800);
+    return () => clearTimeout(t);
+  }, [sunucu, details.location, details.province, coords]);
 
   function readListing(text = paste) {
     const r = parseListingText(text);
@@ -151,6 +181,8 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
       netM2: d.netM2 ? String(d.netM2) : details.netM2,
       location: d.location ?? details.location,
       highlights: d.highlights.length ? d.highlights.join("\n") : details.highlights,
+      province: d.province ?? details.province,
+      title: details.title,
     });
     if (r.priceTry) setListing((l) => (l.price ? l : { ...l, price: r.priceTry!.toLocaleString("tr-TR") }));
     setParsed(`${found} bilgi bulundu. Kontrol edip düzeltebilirsiniz.`);
@@ -159,6 +191,8 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
   async function importListing(d: IlanPayload) {
     setPaste(d.text);
     readListing(d.text);
+    if (d.title) setDetails((x) => ({ ...x, title: d.title }));
+    if (typeof d.lat === "number" && typeof d.lng === "number") setCoords({ lat: d.lat, lng: d.lng });
     setImportMsg(`İlan aktarıldı, ${d.photos.length} fotoğraf indiriliyor…`);
     const a = d.agent ?? {};
     // Kapanış kartı ilandaki emlakçıyla: ofis adı ve telefon da ondan.
@@ -177,8 +211,8 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
 
   // React javascript: linkini engeller; yer imi butonunun adresi elle verilir.
   useEffect(() => {
-    bm.current?.setAttribute("href", bookmarklet(window.location.origin));
-  }, []);
+    bm.current?.setAttribute("href", bookmarklet(window.location.origin, template));
+  }, [template]);
 
   // Sayfanın herhangi bir yerinde Ctrl+V: ilan sayfasından kopyalanan içerik (ya da butonun panoya koyduğu veri) aktarılır.
   useEffect(() => {
@@ -265,7 +299,13 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         template,
-        photos: ready.map((p) => ({ key: p.key, room: p.room, focusX: p.focusX, ...(p.title.trim() ? { title: p.title.trim() } : {}) })),
+        photos: ready.map((p) => ({
+          key: p.key,
+          room: p.room,
+          focusX: p.focusX,
+          ...(p.title.trim() ? { title: p.title.trim() } : {}),
+          ...(sunucu ? { text: sceneText(p).trim() } : {}),
+        })),
         ...(style ? { style } : {}),
         ...(sunucu ? { presenter } : {}),
         details: detailsPayload(details),
@@ -368,7 +408,7 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
         <input ref={input} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files && (add(e.target.files), (e.target.value = ""))} />
         <div className="font-semibold">Oda fotoğraflarını sürükleyin ya da seçin</div>
         <div className="mt-1 text-sm text-mute">
-          {photos.length}/{max} fotoğraf · video {sunucu ? "oda başına 5–10 saniye" : "21 saniye"} · yalnız iç mekân; odayı geniş açıdan gören fotoğraflar en iyi sonucu verir
+          {photos.length}/{max} fotoğraf · video {sunucu ? "sahne başına ~10 saniye, 4 sahneyle ~40 saniye · odalar ve binanın dışı" : "21 saniye · yalnız iç mekân"}; odayı geniş açıdan gören fotoğraflar en iyi sonucu verir
         </div>
       </div>
 
@@ -399,12 +439,26 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
                 </div>
                 <select className={`input py-2 ${p.room ? "" : "border-neon/60"}`} value={p.room ?? ""} aria-label={`${i + 1}. oda tipi`} onChange={(e) => update(p.id, { room: e.target.value as RoomType })}>
                   <option value="" disabled>Oda tipini seçin</option>
-                  {ROOMS.map((r) => (
+                  {(sunucu ? ROOMS : STAGING_ROOMS).map((r) => (
                     <option key={r} value={r}>{ROOM_LABELS[r]}</option>
                   ))}
                 </select>
                 <input className="input py-2" maxLength={40} placeholder={p.room ? `Başlık (boşsa "${ROOM_LABELS[p.room]}")` : "Başlık (isteğe bağlı)"} value={p.title}
                   aria-label={`${i + 1}. oda başlığı`} onChange={(e) => update(p.id, { title: e.target.value })} />
+                {sunucu && p.room && (
+                  <div>
+                    <textarea className="input min-h-20 py-2 text-sm" maxLength={220} value={sceneText(p)} aria-label={`${i + 1}. sahnede sunucunun söyleyeceği`}
+                      onChange={(e) => update(p.id, { text: e.target.value })} />
+                    <div className="mt-1 flex items-center justify-between text-xs text-mute">
+                      <span className={words(sceneText(p)) > TOUR_MAX_WORDS ? "text-red-300" : ""}>
+                        {words(sceneText(p))}/{TOUR_MAX_WORDS} kelime
+                      </span>
+                      {p.text !== undefined && (
+                        <button type="button" className="hover:text-white" onClick={() => update(p.id, { text: undefined })}>Otomatik metne dön</button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </li>
           ))}
@@ -498,15 +552,18 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
       {sunucu ? (
         <div className="card space-y-3 p-6">
           <div>
-            <div className="font-semibold">Sunucunun söyleyecekleri</div>
-            <p className="mt-1 text-sm text-mute">Her odada bir sahne. Metin ilan bilgilerinden kurulur; bilgileri düzelttikçe değişir.</p>
+            <div className="font-semibold">Anlatım ve altyazı</div>
+            <p className="mt-1 text-sm text-mute">
+              Sunucu her sahnede o sahnenin kutusundaki metni söyler; metin ilan bilgilerinden ve yakın yerlerden kurulur, kutuda değiştirebilirsiniz.
+              Konuşma videoya kelime kelime altyazı olarak da yazılır. Sahne başına en fazla {TOUR_MAX_WORDS} kelime (10 saniye).
+            </p>
           </div>
-          <ol className="list-decimal space-y-1 rounded-lg border border-line p-3 pl-8 text-sm">
-            {narration.rooms.map((l, i) => (
-              <li key={i}>{l}</li>
-            ))}
-          </ol>
-          {ready.some((p) => !p.room) && <p className="text-xs text-mute">Oda tipi seçilmeyen fotoğraflar eklenmedi.</p>}
+          {nearby.length > 0 && (
+            <p className="text-sm text-mute">
+              Yakın yerler: {nearby.map((n) => `${n.name ?? n.category} (${n.distanceM < 1000 ? `${n.distanceM} m` : `${(n.distanceM / 1000).toFixed(1)} km`})`).join(" · ")}
+            </p>
+          )}
+          {ready.some((p) => !p.room) && <p className="text-xs text-mute">Tipi seçilmeyen fotoğraflar videoya girmez.</p>}
         </div>
       ) : (
       <>
@@ -578,9 +635,10 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
         {ready.length < MIN ? (
           <span className="text-sm text-mute">En az {MIN} fotoğraf gerekli</span>
         ) : (
-          untyped > 0 && <span className="text-sm text-mute">{untyped} fotoğrafın oda tipini seçin</span>
+          (untyped > 0 && <span className="text-sm text-mute">{untyped} fotoğrafın oda tipini seçin</span>) ||
+          (tooLong > 0 && <span className="text-sm text-mute">{tooLong} sahnenin metni çok uzun</span>)
         )}
-        <button className="btn-primary" disabled={busy || uploading || ready.length < MIN || untyped > 0} onClick={submit}>
+        <button className="btn-primary" disabled={busy || uploading || ready.length < MIN || untyped > 0 || tooLong > 0} onClick={submit}>
           {busy ? "Gönderiliyor…" : uploading ? "Fotoğraflar yükleniyor…" : "Videoyu oluştur"}
         </button>
       </div>

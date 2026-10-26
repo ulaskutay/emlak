@@ -99,3 +99,16 @@ export async function googleSettlements(
   );
   return found.filter((p): p is Poi => !!p);
 }
+
+/** Yer adından konum (Google metin araması): "Acıbadem, Üsküdar, İstanbul" → mahalle merkezi. Bulunamazsa null. */
+export async function geocodePlace(query: string, key: string): Promise<LatLng | null> {
+  const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Goog-Api-Key": key, "X-Goog-FieldMask": "places.location" },
+    body: JSON.stringify({ textQuery: query, languageCode: "tr", regionCode: "TR", pageSize: 1 }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) throw new Error(`Google Places metin araması ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const loc = ((await res.json()) as { places?: GooglePlace[] }).places?.[0]?.location;
+  return loc ? { lat: loc.latitude, lng: loc.longitude } : null;
+}

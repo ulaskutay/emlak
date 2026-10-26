@@ -14,6 +14,10 @@ export const ListingDetails = z.object({
   netM2: z.coerce.number().int().min(10).max(5000).optional(),
   /** "Etimesgut Bağlıca" */
   location: z.string().trim().max(60).optional(),
+  /** İl ("Ankara"): yakın yerler için konumu aramada kullanılır. */
+  province: z.string().trim().max(30).optional(),
+  /** İlan başlığı (sayfadan, olduğu gibi). */
+  title: z.string().trim().max(120).optional(),
   /** Anlatımda geçecek kısa cümleler ("Site içinde.", "Krediye uygun."). */
   highlights: z.array(z.string().trim().min(2).max(80)).max(5).default([]),
 });
@@ -51,6 +55,20 @@ function descriptionBullets(text: string) {
     .map(sentence);
 }
 
+/** Açıklamada ilanı öne çıkaran kısa düz cümleler (madde işaretsiz yazılmış ilanlar için): anahtar kelimeli olanlar. */
+const SELLING = /manzara|metro|marmaray|metrobüs|havuz|otopark|site|güvenlik|sıfır|yeni|aydınlık|ferah|cephe|bahçe|asansör|krediye|deniz|park|okul|avm|merkez|lüks|geniş|teras|ebeveyn|giyinme|ankastre|doğalgaz|yerden ısıtma/i;
+function descriptionSentences(text: string) {
+  const at = text.search(/\nAçıklama\s*\n/);
+  if (at < 0) return [];
+  return text
+    .slice(at + 10, at + 3000)
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((l) => l.replace(/^\s*[-•*–]\s*/, "").trim())
+    .filter((l) => l.split(/\s+/).length >= 3 && l.split(/\s+/).length <= 12 && SELLING.test(l))
+    .filter((l) => !/\b(the|and|with|rooms?|bedrooms?)\b/i.test(l) && !/metrekare|m²|m2\b|\d\s*\+\s*\d|tel|whatsapp|arayın|ofis|emlak/i.test(l))
+    .map(sentence);
+}
+
 export function parseListingText(text: string): { details: ListingDetails; priceTry?: number } {
   const t = text.replace(/\r/g, "").replace(/ /g, " ");
   const rooms = field(t, "Oda Sayısı")?.match(/(\d{1,2}(?:[.,]5)?)\s*\+\s*(\d{1,2})/);
@@ -79,7 +97,7 @@ export function parseListingText(text: string): { details: ListingDetails; price
 
   // Tablodan en fazla 2 özellik, kalanı emlakçının açıklamadaki maddeleri.
   const picked = [...highlights.slice(0, 2)];
-  for (const b of descriptionBullets(t)) if (picked.length < 5 && !picked.includes(b)) picked.push(b);
+  for (const b of [...descriptionBullets(t), ...descriptionSentences(t)]) if (picked.length < 5 && !picked.includes(b)) picked.push(b);
 
   return {
     details: {
@@ -87,6 +105,7 @@ export function parseListingText(text: string): { details: ListingDetails; price
       rooms: rooms ? `${rooms[1]!.replace(",", ".")}+${rooms[2]}` : undefined,
       netM2: net && /^\d+/.test(net) ? Number(net.match(/^\d+/)![0]) : undefined,
       location: loc ? `${loc[2]} ${strip(loc[3]!)}` : undefined,
+      province: loc?.[1]?.trim(),
       highlights: picked,
     },
     priceTry: price ? Number(price[1]!.replace(/\./g, "")) : undefined,
@@ -110,6 +129,7 @@ export const ROOM_LINES = {
   calisma_odasi: "Evden çalışmak için sessiz, verimli bir köşe.",
   banyo: "Ferah ve bakımlı bir banyo.",
   balkon: "Sabah kahvenizi içeceğiniz huzurlu bir balkon.",
+  dis_cephe: "Bakımlı ve şık bir binada.",
 } as const;
 
 /** Anlatımın kelime bütçesi: seslendirme ~2,2 kelime/sn, 21 sn'lik videoda boşluklarla birlikte ~40 kelime sığar. */
@@ -146,50 +166,94 @@ export function stagingNarration(rooms: (keyof typeof ROOM_LINES)[], d: Partial<
   return { rooms: lines, outro };
 }
 
-/** Sunucunun bir sahnede (en fazla 10 sn'lik klip) söyleyebileceği kelime: ~2,2 kelime/sn, baş ve sonda pay. */
-export const PRESENTER_WORDS = 18;
+/**
+ * Sunuculu tur: bir sahnede (Gemini Omni klibi en fazla 10 sn) söylenebilecek kelime, ~2,2 kelime/sn ve pay.
+ * Kullanıcı metni düzenlerse sınır sipariş şemasında da denetlenir (TOUR_MAX_WORDS).
+ */
+export const TOUR_WORDS = 19;
+export const TOUR_MAX_WORDS = 24;
 
-/** Sunucunun odaya girerken söylediği kısa giriş. */
-const PRESENTER_ROOM_LINES: Record<keyof typeof ROOM_LINES, string> = {
-  salon: "Şimdi salondayız, geniş ve gün boyu aydınlık.",
-  yatak_odasi: "Yatak odası ferah ve sakin.",
-  cocuk_odasi: "Çocuk odası aydınlık ve kullanışlı.",
-  mutfak: "Mutfak geniş ve kullanışlı.",
-  yemek_odasi: "Yemek odası kalabalık sofralara uygun.",
-  calisma_odasi: "Çalışma odası sessiz ve verimli.",
-  banyo: "Banyo ferah ve bakımlı.",
-  balkon: "Balkon sabah kahvesi için birebir.",
+/** Sahne türleri: odalar + binanın dışı / site alanı (RoomType ile aynı). */
+export type TourSceneType = keyof typeof ROOM_LINES;
+
+/** Sunucunun sahneye girerken söylediği canlı cümle. */
+const TOUR_LINES: Record<TourSceneType, string> = {
+  salon: "İşte salon! Geniş, ferah ve gün boyu ışık alıyor.",
+  yatak_odasi: "Yatak odasına geçelim, huzurlu ve aydınlık!",
+  cocuk_odasi: "Çocuk odası rengârenk hayallere hazır!",
+  mutfak: "Mutfağa bakın, geniş ve çok kullanışlı!",
+  yemek_odasi: "Yemek odası kalabalık sofralar için birebir!",
+  calisma_odasi: "Çalışma odası sessiz ve verimli bir köşe!",
+  banyo: "Banyo ferah, modern ve tertemiz!",
+  balkon: "Balkona çıkalım, sabah kahvesi için harika!",
+  dis_cephe: "Binanın dışına bakın, bakımlı ve şık bir yapı!",
 };
 
+/** Formun yakın yer önerisi: en yakın anlamlı nokta (metro, okul, AVM…). */
+export interface TourNearby {
+  category: string;
+  name?: string;
+  distanceM: number;
+}
+
+const NEAR_NOUN: Record<string, string> = {
+  metro: "Metroya",
+  school: "Okula",
+  mall: "Alışveriş merkezine",
+  hospital: "Hastaneye",
+  park: "Parka",
+  beach: "Denize",
+  sea: "Denize",
+  supermarket: "Markete",
+  university: "Üniversiteye",
+};
+
+/** "Metroya yürüyerek beş dakika!" / "Alışveriş merkezine arabayla on dakika!" (yürüme ~80 m/dk, şehir içi araç ~500 m/dk). */
+export function nearbyLine(n: TourNearby) {
+  const noun = NEAR_NOUN[n.category];
+  if (!noun) return "";
+  const walk = Math.max(1, Math.round(n.distanceM / 80));
+  if (walk <= 15) return `${noun} yürüyerek sadece ${numberWords(walk)} dakika!`;
+  const drive = Math.max(2, Math.round(n.distanceM / 500));
+  return drive <= 20 ? `${noun} arabayla ${numberWords(drive)} dakika!` : "";
+}
+
 /**
- * Sunuculu ev turu: oda başına sunucunun kameraya söylediği cümle(ler). Her sahne PRESENTER_WORDS kelimeyi aşmaz.
- * İlk oda: selam + ilanın kimliği. Aradakiler: oda + öne çıkan özellikler. Son oda: fiyat ve çağrı.
- * Video modeli metni kendisi seslendirdiği için sayılar yazıyla verilir.
+ * Sunuculu ev turunun senaryosu: sahne başına sunucunun kameraya söylediği canlı cümleler (TOUR_WORDS kelimeyi aşmaz).
+ * İlk sahne: selam + ilanın kimliği. Ara sahneler: sahnenin cümlesi + öne çıkan özellik. Konum cümlesi (yakın yer)
+ * binanın dışı sahnesinde, yoksa sondan bir önceki sahnede. Son sahne: fiyat ve çağrı. Sayılar yazıyla (model okur).
+ * Kullanıcı her sahnenin metnini panelde değiştirebilir.
  */
-export function presenterNarration(rooms: (keyof typeof ROOM_LINES)[], d: Partial<ListingDetails> = {}, priceTry?: number) {
+export function tourScript(scenes: TourSceneType[], d: Partial<ListingDetails> = {}, nearby: TourNearby[] = [], priceTry?: number) {
   const [deal, ...noun] = (d.kind ?? "").toLocaleLowerCase("tr").split(/\s+/).filter(Boolean);
   const isDeal = deal === "satılık" || deal === "kiralık";
-  const attrs = [isDeal && deal, d.rooms && spokenRooms(d.rooms), d.netM2 && `${numberWords(d.netM2)} metrekare`].filter(Boolean).join(", ");
-  const name = (isDeal ? noun.join(" ") : [deal, ...noun].join(" ")) || "daire";
+  const attrs = [d.rooms && spokenRooms(d.rooms), d.netM2 && `${numberWords(d.netM2)} metrekare`].filter(Boolean).join(", ");
+  const name = [isDeal && deal, (isDeal ? noun.join(" ") : [deal, ...noun].join(" ")) || "daire"].filter(Boolean).join(" ");
   const where = d.location ? `${locative(d.location)} ` : "";
-  const hello = d.location || d.rooms || d.netM2 ? `Merhaba! Bugün ${where}${attrs} bir ${name} geziyoruz.` : "Merhaba! Bu evi birlikte geziyoruz.";
-  const price = priceTry ? `${deal === "kiralık" ? "Aylık kirası" : "Fiyatı"} ${spokenPrice(priceTry)} lira.` : "";
-  const outro = price ? `${price} Hemen arayın!` : "Detaylar için hemen arayın!";
+  const hello = d.location || attrs ? `Merhaba! ${where}${attrs ? `${attrs} ` : ""}${name} sizi bekliyor, hadi gezelim!` : "Merhaba! Bu harika evi birlikte gezelim!";
+  const price = priceTry ? `${deal === "kiralık" ? "Aylık kirası" : "Fiyatı"} sadece ${spokenPrice(priceTry)} lira!` : "";
+  const outro = price ? `${price} Kaçırmayın, hemen arayın!` : "Kaçırmayın, hemen arayın!";
+  const near = nearby.map(nearbyLine).find(Boolean) ?? "";
+  // İlk sahnede selam, son sahnede fiyat ve çağrı yer kaplıyor: dış cephe bunlardan biriyse konum sondan bir öncekine.
+  const ext = scenes.indexOf("dis_cephe");
+  const nearAt = !near ? -1 : ext > 0 && ext < scenes.length - 1 ? ext : Math.max(0, scenes.length - 2);
 
   const highlights = [...(d.highlights ?? [])];
-  return rooms.map((r, i) => {
-    const last = i === rooms.length - 1;
-    const said: string[] = [];
-    let left = PRESENTER_WORDS - (i === 0 ? words(hello) : 0) - (last ? words(outro) : 0);
-    // Önce ilanın öne çıkanları (son odada sığdığı kadar, diğerlerinde birer tane), sonra sığarsa odanın cümlesi.
-    while (highlights.length && words(highlights[0]!) <= left) {
-      left -= words(highlights[0]!);
-      said.push(highlights.shift()!);
-      if (!last) break;
-    }
-    const room = PRESENTER_ROOM_LINES[r];
-    // Ara odada hiçbir şey söylenmeyecekse oda cümlesi sınırı aşsa da söylenir (sessiz sahne olmasın).
-    const withRoom = words(room) <= left || (i > 0 && !said.length);
-    return [i === 0 ? hello : "", withRoom ? room : "", ...said, last ? outro : ""].filter(Boolean).join(" ");
+  return scenes.map((r, i) => {
+    const last = i === scenes.length - 1;
+    const parts: string[] = [];
+    let left = TOUR_WORDS - (i === 0 ? words(hello) : 0) - (last ? words(outro) : 0);
+    const add = (t: string) => {
+      if (!t || words(t) > left) return false;
+      parts.push(t);
+      left -= words(t);
+      return true;
+    };
+    // İlk sahnede selam uzun: sahnenin cümlesi ancak sığarsa. Diğerlerinde önce sahnenin cümlesi, sonra konum ya da özellik.
+    const line = add(TOUR_LINES[r]);
+    if (i === nearAt) add(near);
+    while (highlights.length && add(highlights[0]!)) if ((highlights.shift(), !last)) break;
+    if (!line && !parts.length && i > 0) parts.push(TOUR_LINES[r]);
+    return [i === 0 ? hello : "", ...parts, last ? outro : ""].filter(Boolean).join(" ");
   });
 }

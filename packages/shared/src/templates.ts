@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ListingDetails } from "./listing-text.js";
+import { ListingDetails, TOUR_MAX_WORDS } from "./listing-text.js";
 import { PresenterId, type PresenterInfo } from "./presenters.js";
 import { REEL_STAGES, ReelListing, ReelOrder } from "./reel.js";
 
@@ -147,14 +147,13 @@ export const TEMPLATES: Record<TemplateId, TemplateInfo> = {
     name: "Sunuculu ev turu",
     tagline: "Sanal emlak sunucusu evi oda oda gezdirip kameraya anlatır",
     description:
-      "Seçtiğiniz sanal sunucu ilan fotoğraflarındaki her odada durur ve odayı kameraya Türkçe anlatır: ilk odada ilanın kimliği, aradakilerde öne çıkanlar, sonda fiyat ve çağrı. İsterseniz boş odalar önce döşenir. Oda başlıkları ve emlakçı kartıyla. Sunucu ve döşeme temsilidir; videoda bu yazılır.",
+      "İlanı aktarın, fotoğrafları salon, oda ya da binanın dışı diye işaretleyin. Seçtiğiniz sanal sunucu her sahnede birkaç adım atarak alanı kameraya Türkçe anlatır: ilk sahnede ilanın kimliği, aradakilerde öne çıkanlar ve yakın yerler, sonda fiyat ve çağrı. Metni düzenleyebilirsiniz; konuşma kelime kelime altyazıyla yazılır. İsterseniz boş odalar önce döşenir. Sunucu ve döşeme temsilidir; videoda bu yazılır.",
     category: "Konut",
-    needs: ["2–3 oda fotoğrafı (sahibinden.com ilanındaki fotoğraflar olur)", "Her fotoğraf için oda tipi", "İlan sayfasının metni (anlatım için, isteğe bağlı)"],
-    includes: ["Oda başına konuşan sunucu sahnesi", "İlan bilgisinden Türkçe anlatım", "İsteğe bağlı döşeme (temsili)", "Oda başlıkları, fiyat ve iletişim kartı", "Müzik"],
-    duration: "20–35 sn",
-    preview: { poster: "/media/sablon-dosenmis-poster.jpg" },
+    needs: ["2–4 fotoğraf: odalar ve isterseniz binanın dışı (sahibinden.com ilanından aktarılır)", "Her fotoğraf için oda tipi", "İlan linki ya da sayfa metni (anlatım için)"],
+    includes: ["Sahne başına odada yürüyerek anlatan sunucu", "İlandan ve yakın yerlerden canlı Türkçe anlatım", "Kelime kelime altyazı", "İsteğe bağlı döşeme (temsili)", "Oda başlıkları, fiyat ve iletişim kartı", "Müzik"],
+    duration: "~40 sn",
+    preview: { video: "/media/sablon-sunucu.mp4", poster: "/media/sablon-sunucu-poster.jpg" },
     badge: "Yeni",
-    hidden: true,
     stages: [
       { id: "photos", label: "Fotoğraflar" },
       { id: "staging", label: "Döşeme" },
@@ -225,7 +224,8 @@ export const BitmisOrder = z.object({
 export type BitmisOrder = z.infer<typeof BitmisOrder>;
 
 
-export const RoomType = z.enum(["salon", "yatak_odasi", "cocuk_odasi", "mutfak", "yemek_odasi", "calisma_odasi", "banyo", "balkon"]);
+/** Oda tipleri; "dis_cephe" (binanın dışı / site alanı) yalnız sunuculu turda seçilir (döşenmez). */
+export const RoomType = z.enum(["salon", "yatak_odasi", "cocuk_odasi", "mutfak", "yemek_odasi", "calisma_odasi", "banyo", "balkon", "dis_cephe"]);
 export type RoomType = z.infer<typeof RoomType>;
 
 export const ROOM_LABELS: Record<RoomType, string> = {
@@ -237,6 +237,7 @@ export const ROOM_LABELS: Record<RoomType, string> = {
   calisma_odasi: "Çalışma odası",
   banyo: "Banyo",
   balkon: "Balkon",
+  dis_cephe: "Binanın dışı",
 };
 
 export const StagingStyle = z.enum(["modern", "iskandinav", "klasik", "luks", "dogal"]);
@@ -261,7 +262,11 @@ const AgentAsset = z.string().regex(/^uploads\/[\w-]+\/[\w-]+\.(jpg|png)$/, "Ge�
 
 export const DosemeOrder = z.object({
   template: z.literal("dosenmis-ev"),
-  photos: z.array(RoomPhoto).min(2, "En az 2 fotoğraf seçin").max(4, "En fazla 4 fotoğraf"),
+  photos: z
+    .array(RoomPhoto)
+    .min(2, "En az 2 fotoğraf seçin")
+    .max(4, "En fazla 4 fotoğraf")
+    .refine((ps) => ps.every((p) => p.room !== "dis_cephe"), "Binanın dışı döşenemez; yalnız oda fotoğrafları seçin"),
   style: StagingStyle,
   /** Kapanış kartındaki emlakçı (ilan aktarmadan): profil fotoğrafı ve ofis logosu kullanıcının yüklemeleri. */
   agent: z
@@ -280,9 +285,20 @@ export const DosemeOrder = z.object({
 export type DosemeOrder = z.infer<typeof DosemeOrder>;
 
 /** Sunuculu ev turu: döşeme formunun alanları; tarz yoksa odalar olduğu gibi kalır. Ses video modelinden gelir (voiceId yok). */
-export const SunucuOrder = DosemeOrder.omit({ template: true, style: true, voice: true, voiceId: true }).extend({
+/** Sunuculu turun sahnesi: fotoğraf + sunucunun söyleyeceği metin (panelde düzenlenir; boşsa tourScript). */
+export const TourScene = RoomPhoto.extend({
+  text: z
+    .string()
+    .trim()
+    .max(220)
+    .refine((t) => t.split(/\s+/).filter(Boolean).length <= TOUR_MAX_WORDS, `Bir sahnede en fazla ${TOUR_MAX_WORDS} kelime (10 saniyeye sığsın)`)
+    .optional(),
+});
+export type TourScene = z.infer<typeof TourScene>;
+
+export const SunucuOrder = DosemeOrder.omit({ template: true, photos: true, style: true, voice: true, voiceId: true }).extend({
   template: z.literal("sunucu-ev"),
-  photos: z.array(RoomPhoto).min(2, "En az 2 fotoğraf seçin").max(3, "En fazla 3 fotoğraf"),
+  photos: z.array(TourScene).min(2, "En az 2 sahne seçin").max(4, "En fazla 4 sahne"),
   style: StagingStyle.optional(),
   presenter: PresenterId.default("defne"),
 });
@@ -324,7 +340,7 @@ export type TemplateOrder = z.infer<typeof TemplateOrder>;
 export type TemplateInput =
   | { photos: IlanPhoto[] }
   | { photos: RoomPhoto[]; style: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; voice?: boolean }
-  | { photos: RoomPhoto[]; style?: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; presenter?: PresenterId }
+  | { photos: TourScene[]; style?: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; presenter?: PresenterId }
   | { building: BuildingType; floors: number }
   | { building: BuildingType; floors: number; zoning: Zoning; agent?: DosemeOrder["agent"] }
   | Record<string, never>;
@@ -405,6 +421,7 @@ const ROOM_FURNITURE: Record<RoomType, string> = {
   calisma_odasi: "home office furniture: a desk, an office chair, a bookshelf with books, a desk lamp, a rug, plants and a modern pendant lamp hanging from the ceiling",
   banyo: "towels, a bath mat, toiletries, a small plant and decor accessories",
   balkon: "balcony furniture: outdoor lounge chairs, a small table, potted plants, an outdoor rug and string lights",
+  dis_cephe: "outdoor seating, potted plants and neat landscaping",
 };
 
 const STYLE_DETAILS: Record<StagingStyle, string> = {
@@ -439,6 +456,7 @@ const ROOM_LABELS_EN: Record<RoomType, string> = {
   calisma_odasi: "a home office",
   banyo: "a bathroom",
   balkon: "a balcony",
+  dis_cephe: "the outside of the building and its grounds",
 };
 
 /**
@@ -455,33 +473,46 @@ export function stagingVideoPrompt(room: RoomType) {
 
 
 /**
- * Sunucuyu oda fotoğrafına yerleştiren talimat (Seedream 5.0 Pro; 1. referans oda, 2. ve 3. referans sunucu).
- * 2026-10-25 denemesi: oda birebir kaldı, sunucu ön planda ayakta ve kameraya dönük.
+ * Sunucuyu sahne fotoğrafına yerleştiren talimat (Seedream 5.0 Pro; 1. referans sahne, 2. ve 3. referans sunucu).
+ * Oda ön planda kalsın diye geniş açı ve sunucu kadrajın yarısından kısa, yanda (2026-10-26: tam boy ön plan
+ * odayı kapatıyordu). Dış cephede sunucu binanın/sitenin önünde.
  */
 export function presenterPlacePrompt(room: RoomType, p: PresenterInfo) {
   const person = p.gender === "female" ? "woman" : "man";
   const pr = p.gender === "female" ? "She" : "He";
+  const where =
+    room === "dis_cephe"
+      ? "in front of the building from the first reference image, on the walkway or garden, with the building facade clearly visible behind"
+      : `inside ${ROOM_LABELS_EN[room]} from the first reference image, standing a few steps into the room near one side`;
   return (
-    `Place the ${person} from the second and third reference images into ${ROOM_LABELS_EN[room]} from the first reference image. ` +
-    "Keep the room exactly as it is: same walls, floor, ceiling, windows, doors, furniture and camera angle; do not add or remove anything. " +
-    `${pr} stands in the open floor area in the foreground, full body visible from head to knees, facing the camera with a warm confident smile, one hand gently open toward the room. ` +
-    `Same face and age, ${p.look}. ` +
-    "Realistic lighting and shadows matching the room, photorealistic, no text."
+    `Place the ${person} from the second and third reference images ${where}. ` +
+    "Wide-angle shot that keeps the whole space visible: the room or building stays the main subject and fills most of the frame. " +
+    `${pr} appears at medium distance, full body visible, taking up less than half of the frame height, slightly off-center, ` +
+    "turned toward the camera with a warm excited smile and one hand open toward the space. " +
+    "Keep the space exactly as it is: same walls, floor, ceiling, windows, doors, furniture, facade and camera angle; do not add or remove anything. " +
+    `Same face and age, ${p.look}. Realistic lighting and shadows matching the scene, photorealistic, no text.`
   );
 }
 
 /**
- * Konuşan sunucu klibi (ilk kare + modelin kendi Türkçe sesi). Kamera neredeyse sabit: hareket arttıkça model
- * odaya olmayan parçalar ekliyordu (Wan 3.0 denemesi). "ışık" gibi noktasız ı'lı kelimeler yanlış okunabiliyor.
+ * Sunucu klibi (ilk kare + modelin kendi Türkçe sesi). Kamera yavaşça birkaç küçük adım ilerler, sunucu bir iki adım
+ * atıp alanı gösterir; geniş hareket modeli odaya olmayan parçalar eklemeye itiyordu (Wan 3.0 denemesi), bu yüzden
+ * adımlar küçük. "ışık" gibi noktasız ı'lı kelimeler yanlış okunabiliyor.
  */
 export function presenterVideoPrompt(room: RoomType, line: string, p: PresenterInfo) {
   const pr = p.gender === "female" ? "She" : "He";
   const pos = p.gender === "female" ? "Her" : "His";
+  const subject = `${p.who.charAt(0).toUpperCase()}${p.who.slice(1)}`;
+  const action =
+    room === "dis_cephe"
+      ? `${subject} is a Turkish real estate agent presenting the building from outside. ${pr} takes a couple of small steps along the walkway and points up at the facade with an open palm. The camera slowly moves a few small steps toward the building, keeping the whole facade in view.`
+      : `${subject} is a Turkish real estate agent giving a tour of ${ROOM_LABELS_EN[room]}. ${pr} takes a couple of small steps into the room and points around the space with open palms. The camera smoothly moves forward a few small steps into the room, keeping the room wide and fully visible; ${pos.toLowerCase()} figure stays medium-sized.`;
   return (
-    `${p.who.charAt(0).toUpperCase()}${p.who.slice(1)} is a Turkish real estate agent presenting ${ROOM_LABELS_EN[room]}. ` +
-    `${pr} stays in the same spot, talks directly to the camera with natural facial expressions and lips synchronized to the speech, and once gestures with an open palm toward the room. ` +
-    `The camera is almost static, only a very slow gentle push-in. Keep the room exactly as in the first frame; do not add or change anything in the room. ${pos} hands are empty. ` +
+    `${action} ${pr} talks to the camera with natural, cheerful facial expressions and lips synchronized to the speech. ` +
+    `Keep the space exactly as in the first frame; do not add, remove or change anything. ${pos} hands are empty. ` +
+    // Konuşma tarifi 2026-10-25'teki sorunsuz sürümle aynı: "slowly and clearly" çıkarılıp "upbeat and excited"
+    // eklenince model hızlandı ve kelime uydurdu ("dairegilde", "yür yüz"). Canlılık metnin kendisinden gelir.
     `Audio: ${pr.toLowerCase()} speaks slowly and clearly in natural standard Turkish (İstanbul accent), ${p.voice}, studio-quality clean voice recording, ` +
-    `saying exactly: "${line}" Pronounce every Turkish letter correctly, including the dotless ı. Quiet room ambience only, no music, no other voices.`
+    `saying exactly: "${line}" Pronounce every Turkish letter correctly, including the dotless ı. Quiet ambience only, no music, no other voices.`
   );
 }

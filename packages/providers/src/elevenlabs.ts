@@ -138,13 +138,21 @@ export class ElevenLabsClient {
 
   /** Konuşmayı yazıya çevirir (Scribe): seslendirmenin metni doğru okuyup okumadığını denetlemek için. */
   async transcribe(audio: Buffer, languageCode = "tr"): Promise<string> {
+    return (await this.transcribeWords(audio, languageCode)).text;
+  }
+
+  /** Konuşmayı kelime zamanlarıyla yazıya çevirir (Scribe): hazır videonun sesine altyazı için. */
+  async transcribeWords(audio: Buffer, languageCode = "tr"): Promise<{ text: string; words: Word[] }> {
     const fd = new FormData();
     fd.append("model_id", "scribe_v1");
     fd.append("language_code", languageCode);
+    fd.append("timestamps_granularity", "word");
     fd.append("file", new Blob([new Uint8Array(audio)]), "speech.mp3");
     const res = await fetch(`${API}/v1/speech-to-text`, { method: "POST", headers: { "xi-api-key": this.o.apiKey }, body: fd });
     if (!res.ok) throw new Error(`ElevenLabs speech-to-text ${res.status}: ${(await res.text()).slice(0, 300)}`);
-    return ((await res.json()) as { text: string }).text;
+    const data = (await res.json()) as { text: string; words?: { text: string; start: number; end: number; type?: string }[] };
+    const words = (data.words ?? []).filter((w) => (w.type ?? "word") === "word").map((w) => ({ word: w.text.trim(), start: w.start, end: w.end }));
+    return { text: data.text, words };
   }
 
   /** Enstrümantal fon müziği (Eleven Music). */
