@@ -1,5 +1,5 @@
 "use client";
-import { parseListingText, presenterList, type PresenterId, ROOM_LABELS, RoomType, stagingNarration, STYLE_LABELS, StagingStyle, TOUR_MAX_WORDS, tourScript, type TourNearby } from "@arsa/shared";
+import { parseListingText, presenterList, type PresenterId, ROOM_LABELS, RoomType, stagingNarration, STYLE_LABELS, StagingStyle, TOUR_MAX_WORDS, TOUR_QUALITY, TourQuality, tourScript, type TourNearby } from "@arsa/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ListingFields, listingPayload, type ListingValues } from "./ListingFields";
@@ -121,6 +121,7 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [style, setStyle] = useState<StagingStyle | null>(sunucu ? null : "modern");
   const [presenter, setPresenter] = useState<PresenterId>("defne");
+  const [quality, setQuality] = useState<TourQuality>("orta");
   const [nearby, setNearby] = useState<TourNearby[]>([]);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [listing, setListing] = useState<ListingValues>({ price: "", officeName: "", phone: "" });
@@ -320,7 +321,7 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
           ...(sunucu ? { text: sceneText(p).trim() } : {}),
         })),
         ...(style ? { style } : {}),
-        ...(sunucu ? { presenter } : {}),
+        ...(sunucu ? { presenter, quality } : {}),
         details: detailsPayload(details),
         agent: { ...(agent.name.trim() && { name: agent.name.trim() }), ...(agent.photo && { photoKey: agent.photo.key }), ...(agent.logo && { logoKey: agent.logo.key }) },
         listing: listingPayload(listing),
@@ -565,6 +566,29 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
             value={details.highlights} onChange={(e) => setDetails({ ...details, highlights: e.target.value })} />
         </div>
       </div>
+
+      {sunucu && (
+        <fieldset className="card p-6">
+          <legend className="sr-only">Kalite</legend>
+          <div className="mb-4 font-semibold">Video kalitesi</div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {TourQuality.options.map((q) => (
+              <label key={q}
+                className={`flex cursor-pointer flex-col rounded-xl border p-4 transition ${quality === q ? "border-neon bg-neon/10" : "border-line hover:border-neon/50"}`}>
+                <input type="radio" name="quality" value={q} className="sr-only" checked={quality === q} onChange={() => setQuality(q)} />
+                <span className="flex items-baseline justify-between gap-2">
+                  <span className="font-semibold">{TOUR_QUALITY[q].label}</span>
+                  <span className="text-sm text-neon">sahne başına {TOUR_QUALITY[q].credits} kredi</span>
+                </span>
+                <span className="mt-1 text-sm text-mute">{TOUR_QUALITY[q].hint}</span>
+              </label>
+            ))}
+          </div>
+          <p className="mt-3 text-sm text-mute">
+            {typed.length ? `${typed.length} sahne · toplam ${typed.length * TOUR_QUALITY[quality].credits} kredi` : "Sahne seçince toplam kredi burada görünür"} · video 1080p 60 FPS teslim edilir.
+          </p>
+        </fieldset>
+      )}
 
       {sunucu && (
         <fieldset className="card p-6">

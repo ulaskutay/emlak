@@ -296,11 +296,25 @@ export const TourScene = RoomPhoto.extend({
 });
 export type TourScene = z.infer<typeof TourScene>;
 
+/** Sunuculu turun kalitesi: video modelinin çözünürlüğü (ikisinde de sonuç 1080p 60 FPS'e büyütülür). */
+export const TourQuality = z.enum(["orta", "yuksek"]);
+export type TourQuality = z.infer<typeof TourQuality>;
+
+/**
+ * Kalite seçenekleri. `credits`: panelde gösterilen sahne başına kullanıcı kredisi (bakiye sistemi henüz yok, etiket).
+ * Higgsfield maliyeti (2026-10-26, 10 sn'lik sahne): orta ~16,5 kredi (Gemini 360p 10), yüksek ~36,5 (720p 30).
+ */
+export const TOUR_QUALITY: Record<TourQuality, { label: string; hint: string; resolution: "360p" | "720p"; credits: number }> = {
+  orta: { label: "Orta kalite", hint: "Hızlı ve ekonomik; sosyal medya için yeterli", resolution: "360p", credits: 1 },
+  yuksek: { label: "Yüksek kalite", hint: "Daha net yüz ve detay, daha az bozulma", resolution: "720p", credits: 2 },
+};
+
 export const SunucuOrder = DosemeOrder.omit({ template: true, photos: true, style: true, voice: true, voiceId: true }).extend({
   template: z.literal("sunucu-ev"),
   photos: z.array(TourScene).min(2, "En az 2 sahne seçin").max(4, "En fazla 4 sahne"),
   style: StagingStyle.optional(),
   presenter: PresenterId.default("defne"),
+  quality: TourQuality.default("orta"),
 });
 export type SunucuOrder = z.infer<typeof SunucuOrder>;
 
@@ -340,7 +354,7 @@ export type TemplateOrder = z.infer<typeof TemplateOrder>;
 export type TemplateInput =
   | { photos: IlanPhoto[] }
   | { photos: RoomPhoto[]; style: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; voice?: boolean }
-  | { photos: TourScene[]; style?: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; presenter?: PresenterId }
+  | { photos: TourScene[]; style?: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; presenter?: PresenterId; quality?: TourQuality }
   | { building: BuildingType; floors: number }
   | { building: BuildingType; floors: number; zoning: Zoning; agent?: DosemeOrder["agent"] }
   | Record<string, never>;

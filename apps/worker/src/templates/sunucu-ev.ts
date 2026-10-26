@@ -6,7 +6,8 @@
  * Metin panelden gelir (kullanıcı düzenler), yoksa tourScript. Klipler kendi sesleriyle dizilir; sahne başlıkları,
  * kelime kelime altyazı (zamanlar ElevenLabs Scribe'dan, altyazi.ts), emlakçı kartı ve konuşmada kısılan müzik eklenir.
  *
- * Maliyet (2026-10-25, plan kredisi): 10 sn'lik sahne ~16,5 kredi (kare 2,5 + klip 10 + büyütme 4); 4 sahne ~66.
+ * Maliyet (2026-10-26, plan kredisi), 10 sn'lik sahne: orta ~16,5 kredi (kare 2,5 + 360p klip 10 + büyütme 4),
+ * yüksek ~36,5 (720p klip 30); 4 sahne orta ~66, yüksek ~146.
  */
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -16,6 +17,7 @@ import {
   FORMAT_SPECS,
   PRESENTERS,
   ROOM_LABELS,
+  TOUR_QUALITY,
   presenterPlacePrompt,
   presenterVideoPrompt,
   stagingEditPrompt,
@@ -24,6 +26,7 @@ import {
   type PresenterId,
   type RoomType,
   type StagingStyle,
+  type TourQuality,
   type TourScene,
 } from "@arsa/shared";
 import { agentCard } from "./agent-card.js";
@@ -65,6 +68,8 @@ export interface TourRoom {
 
 export interface TourOptions {
   presenter: PresenterId;
+  /** Orta: Gemini 360p, yüksek: 720p; ikisi de 1080p 60 FPS'e büyütülür. */
+  quality: TourQuality;
   details?: ListingDetails;
   priceTry?: number;
   style?: StagingStyle;
@@ -74,10 +79,11 @@ export interface TourOptions {
 
 export async function sunucuEv(ctx: JobContext): Promise<JobResult> {
   const v = ctx.video;
-  const { photos, style, details, agent, presenter } = v.input as {
+  const { photos, style, details, agent, presenter, quality } = v.input as {
     photos?: TourScene[];
     style?: StagingStyle;
     presenter?: PresenterId;
+    quality?: TourQuality;
     details?: ListingDetails;
     agent?: { name?: string; photoKey?: string; logoKey?: string };
   };
@@ -99,6 +105,7 @@ export async function sunucuEv(ctx: JobContext): Promise<JobResult> {
     key ? ctx.r2.url(key, 600).then((u) => download(u, join(ctx.workDir, name))).catch(() => null) : Promise.resolve(null);
   return presenterTour(ctx, rooms, {
     presenter: presenter ?? "defne",
+    quality: quality ?? "orta",
     details,
     priceTry: v.listing.priceTry,
     style,
@@ -160,11 +167,11 @@ export async function presenterTour(ctx: Pick<JobContext, "workDir" | "cacheDir"
       );
       const stillFile = await download(still.url, join(ctx.workDir, `sunucu-${i + 1}.jpg`));
       await ctx.stage("presenter", ++placed / rooms.length);
-      // 360p üretilip büyütülür: 720p'nin üçte biri fiyatına, büyütmeyle daha net (2026-10-25 denemesi).
+      // Orta kalite 360p üretilip büyütülür (720p'nin üçte biri fiyatına, 2026-10-25 denemesi); yüksek kalite 720p'den.
       const raw = await hf.generate(
         VIDEO_MODEL,
         {
-          params: { prompt: presenterVideoPrompt(r.room, lines[i]!, who), mode: "image-to-video", duration: clipSeconds(lines[i]!), resolution: "360p", aspect_ratio: "9:16" },
+          params: { prompt: presenterVideoPrompt(r.room, lines[i]!, who), mode: "image-to-video", duration: clipSeconds(lines[i]!), resolution: TOUR_QUALITY[o.quality].resolution, aspect_ratio: "9:16" },
           media: [["start-image", still.id]],
         },
         { label: `sahne ${i + 1}`, log: ctx.log },
@@ -245,6 +252,6 @@ export async function presenterTour(ctx: Pick<JobContext, "workDir" | "cacheDir"
     videoPath: final,
     durationSec: duration,
     posterAt: Math.min(1.5, durs[0]! / 2),
-    stats: { presenter: o.presenter, rooms: rooms.length, style: o.style ?? null, narration: lines, clipSeconds: durs, subtitles: words.length },
+    stats: { presenter: o.presenter, quality: o.quality, rooms: rooms.length, style: o.style ?? null, narration: lines, clipSeconds: durs, subtitles: words.length },
   };
 }

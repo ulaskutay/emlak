@@ -1,14 +1,14 @@
 /**
  * Sunuculu ev turunu kuyruk/veritabanı olmadan, yerel fotoğraflarla dener (Higgsfield CLI oturumu açık olmalı).
  *
- *   pnpm --filter @arsa/worker sunucu-dene -- --out <klasör> --room salon=<foto.jpg> --room yatak_odasi=<foto.jpg> [--presenter murat] [--style modern]
+ *   pnpm --filter @arsa/worker sunucu-dene -- --out <klasör> --room salon=<foto.jpg> --room yatak_odasi=<foto.jpg> [--presenter murat] [--quality yuksek] [--style modern]
  *     [--kind "Kiralık Daire"] [--rooms 2+1] [--m2 89] [--location "Üsküdar Acıbadem"] [--highlight "..."] [--price 109000]
  *     [--agent-name ".."] [--agent-photo foto.jpg] [--logo logo.png] [--office ".."] [--phone ".."] [--no-music]
  */
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { PresenterId, RoomType, StagingStyle } from "@arsa/shared";
+import { PresenterId, RoomType, StagingStyle, TourQuality } from "@arsa/shared";
 import { ffmpeg } from "../src/templates/common.js";
 import { presenterTour, type TourRoom } from "../src/templates/sunucu-ev.js";
 
@@ -19,6 +19,7 @@ const { values: a } = parseArgs({
     room: { type: "string", multiple: true },
     style: { type: "string" },
     presenter: { type: "string", default: "defne" },
+    quality: { type: "string", default: "orta" },
     kind: { type: "string" },
     rooms: { type: "string" },
     m2: { type: "string" },
@@ -53,6 +54,7 @@ const r = await presenterTour(
   rooms,
   {
     presenter: PresenterId.parse(a.presenter),
+    quality: TourQuality.parse(a.quality),
     style: a.style ? StagingStyle.parse(a.style) : undefined,
     details: {
       kind: a.kind,
