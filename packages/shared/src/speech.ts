@@ -67,3 +67,26 @@ export function halves(x: number) {
   if (r - whole === 0) return numberWords(whole);
   return whole === 0 ? "yarım" : `${numberWords(whole)} buçuk`;
 }
+
+/** Sıra sayısının okunuşu: 1 → "birinci", 4 → "dördüncü", 20 → "yirminci". */
+export function ordinalWords(n: number) {
+  const w = numberWords(n).replace(/dört$/, "dörd");
+  const vowels = w.match(/[aeıioöuü]/g);
+  const last = vowels?.[vowels.length - 1] ?? "i";
+  const v = "aı".includes(last) ? "ı" : "ei".includes(last) ? "i" : "ou".includes(last) ? "u" : "ü";
+  return /[aeıioöuü]$/.test(w) ? `${w}nc${v}` : `${w}${v}nc${v}`;
+}
+
+/**
+ * Video modelinin kendisi seslendirdiği metinde rakam bırakılmaz (model rakamları bozuk ya da İngilizce okuyabiliyor):
+ * "20. kat" → "yirminci kat", "2+1" → "iki artı bir", "89 m²" → "seksen dokuz metrekare", diğer tam sayılar yazıyla.
+ */
+export function speakable(text: string) {
+  return text
+    .replace(/(\d+)(?:[.,](5))?\s*\+\s*(\d+)/g, (_, a: string, half: string | undefined, b: string) =>
+      `${numberWords(Number(a))}${half ? " buçuk" : ""} artı ${numberWords(Number(b))}`)
+    .replace(/(\d+)\.(?=\s*\p{L})/gu, (_, n: string) => ordinalWords(Number(n)))
+    .replace(/\s*m²|\s*m2\b/gi, " metrekare")
+    .replace(/\s*(?:TL|₺)(?=$|[\s.,!?])/g, " lira")
+    .replace(/\d{1,3}(?:\.\d{3})+|\d+/g, (n) => numberWords(Number(n.replace(/\./g, ""))));
+}

@@ -4,7 +4,7 @@
  * (bot koruması, 403) metni kullanıcı kopyalar.
  */
 import { z } from "zod";
-import { locative, numberWords, spokenPrice } from "./speech.js";
+import { locative, numberWords, speakable, spokenPrice } from "./speech.js";
 
 export const ListingDetails = z.object({
   /** "Satılık Daire", "Kiralık Villa"… */
@@ -89,11 +89,11 @@ export function parseListingText(text: string): { details: ListingDetails; price
   const site = field(t, "Site Adı");
   if (yes(field(t, "Site İçerisinde"))) highlights.push(site && site.length <= 40 ? `${site} içinde.` : "Site içinde, güvenli bir yaşam.");
   const heat = field(t, "Isıtma") ?? "";
-  if (/yerden/i.test(heat)) highlights.push("Yerden ısıtmalı.");
-  else if (/kombi/i.test(heat)) highlights.push("Doğalgaz kombili.");
-  if (yes(field(t, "Asansör"))) highlights.push("Asansörlü bina.");
-  if (/kapalı/i.test(field(t, "Otopark") ?? "")) highlights.push("Kapalı otoparklı.");
-  if (yes(field(t, "Krediye Uygun"))) highlights.push("Krediye uygun.");
+  if (/yerden/i.test(heat)) highlights.push("Ev yerden ısıtmalı.");
+  else if (/kombi/i.test(heat)) highlights.push("Doğalgaz kombiyle ısınıyor.");
+  if (yes(field(t, "Asansör"))) highlights.push("Binada asansör de var.");
+  if (/kapalı/i.test(field(t, "Otopark") ?? "")) highlights.push("Kapalı otoparkı da var.");
+  if (yes(field(t, "Krediye Uygun"))) highlights.push("Üstelik krediye uygun.");
 
   // Tablodan en fazla 2 özellik, kalanı emlakçının açıklamadaki maddeleri.
   const picked = [...highlights.slice(0, 2)];
@@ -254,6 +254,6 @@ export function tourScript(scenes: TourSceneType[], d: Partial<ListingDetails> =
     if (i === nearAt) add(near);
     while (highlights.length && add(highlights[0]!)) if ((highlights.shift(), !last)) break;
     if (!line && !parts.length && i > 0) parts.push(TOUR_LINES[r]);
-    return [i === 0 ? hello : "", ...parts, last ? outro : ""].filter(Boolean).join(" ");
+    return speakable([i === 0 ? hello : "", ...parts, last ? outro : ""].filter(Boolean).join(" "));
   });
 }

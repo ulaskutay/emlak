@@ -21,6 +21,7 @@ import {
   presenterPlacePrompt,
   presenterVideoPrompt,
   stagingEditPrompt,
+  speakable,
   tourScript,
   type ListingDetails,
   type PresenterId,
@@ -127,7 +128,8 @@ export async function presenterTour(ctx: Pick<JobContext, "workDir" | "cacheDir"
   const refs = presenterRefs(o.presenter);
   const { width: W, height: H } = FORMAT_SPECS.reels_9x16;
   const script = tourScript(rooms.map((r) => r.room), o.details, [], o.priceTry);
-  const lines = rooms.map((r, i) => r.text?.trim() || script[i]!);
+  // Panelde düzenlenen metinde de rakam kalmasın ("20. kat" → "yirminci kat"): model rakamları bozuk okuyabiliyor.
+  const lines = rooms.map((r, i) => speakable(r.text?.trim() || script[i]!));
   lines.forEach((l, i) => ctx.log(`metin ${i + 1}: ${l}`));
 
   // 1) İsteğe bağlı döşeme (Qwen, RunPod); binanın dışı döşenmez.
