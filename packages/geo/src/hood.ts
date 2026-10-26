@@ -13,6 +13,11 @@ export interface Neighbourhood {
   /** Dış sınır (kapalı değil: ilk nokta sonda tekrarlanmaz), sadeleştirilmiş. */
   ring: LatLng[];
   source: "tkgm" | "osm";
+  /**
+   * Adın başka kaynaklardaki yazımları (TKGM parsel kaydı, OpenStreetMap köy / mahalle / ilçe). TKGM adlarında "ı" bazen "i" yazılıyor
+   * ("Sirapinar"); seslendirme metni doğru yazımı buradan alır.
+   */
+  spellings?: string[];
 }
 
 const TKGM = "https://cbsapi.tkgm.gov.tr/megsiswebapi.v3/api";
@@ -47,7 +52,8 @@ async function fromTkgm(p: LatLng): Promise<Neighbourhood | null> {
   );
   const f = list.features.find((x) => x.properties.id === mahalleId);
   if (!f) return null;
-  return { name: f.properties.text || mahalleAd || "", ring: outerRing(f.geometry), source: "tkgm" };
+  // Liste adı ile parsel adı farklı yerlerde "ı"yı kaybediyor ("Balikli Köyü" / "Kızılköy"): ikisi de yazım kaynağı.
+  return { name: f.properties.text || mahalleAd || "", ring: outerRing(f.geometry), source: "tkgm", spellings: mahalleAd ? [mahalleAd] : [] };
 }
 
 /** OSM ilişkisinin dış yollarını uç uca ekleyip halka kurar. */
@@ -111,8 +117,18 @@ export function simplifyRing(ring: LatLng[], toleranceM: number): LatLng[] {
   return ring.filter((_, i) => keep[i]);
 }
 
+/** Nominatim ters kodlaması: noktanın köy / mahalle / ilçe / il adları (Türkçe yazımıyla). */
+async function osmPlaceNames(p: LatLng): Promise<string[]> {
+  const url = `https://nominatim.openstreetmap.org/reverse?lat=${p.lat}&lon=${p.lng}&zoom=14&format=json&accept-language=tr`;
+  const j = await getJson<{ address?: Record<string, string> }>(url, 10000);
+  return Object.entries(j.address ?? {})
+    .filter(([k]) => !/^(ISO|postcode|country|region)/.test(k))
+    .map(([, v]) => v);
+}
+
 export async function neighbourhoodBoundary(p: LatLng): Promise<Neighbourhood | null> {
   let hood: Neighbourhood | null = null;
+  const spellings = osmPlaceNames(p).catch(() => [] as string[]);
   try {
     hood = await fromTkgm(p);
   } catch {
@@ -123,5 +139,5 @@ export async function neighbourhoodBoundary(p: LatLng): Promise<Neighbourhood | 
   // Uzunluğa göre tolerans: büyük köy sınırında 8 m, küçük mahallede 3 m.
   let ring = simplifyRing(hood.ring, 3);
   for (let tol = 6; ring.length > 300; tol *= 1.6) ring = simplifyRing(hood.ring, tol);
-  return { ...hood, ring };
+  return { ...hood, ring, spellings: [...(hood.spellings ?? []), ...(await spellings)] };
 }

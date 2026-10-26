@@ -92,8 +92,9 @@ export async function prepareParcel(
     cached && (opts.pois || cached.pois.length)
       ? { ...cached, pois: opts.pois ?? cached.pois }
       : await buildContext(geo.centroid, { googleKey: opts.googleKey, placesKey: opts.placesKey, district: parsed.properties.Ilce, province: parsed.properties.Il, neighbourhood: parsed.properties.Mahalle, pois: opts.pois });
-  // Mahalle sınırı eklenmeden önceki önbellek: yalnızca sınır sorgulanır.
-  if (context.hood === undefined) context.hood = await neighbourhoodBoundary(geo.centroid).catch(() => null);
+  // Mahalle sınırı (ya da ad yazımları, "Sirapinar") eklenmeden önceki önbellek: yalnızca sınır yeniden sorgulanır.
+  if (context.hood === undefined || (context.hood && !context.hood.spellings))
+    context.hood = (await neighbourhoodBoundary(geo.centroid).catch(() => null)) ?? context.hood;
   return {
     name: parsed.name,
     properties: parsed.properties,

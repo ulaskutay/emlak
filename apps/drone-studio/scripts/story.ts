@@ -10,7 +10,7 @@
  *
  * Seslendirme (voice) eklenince kurgu ona göre uzar ve altyazı kelime kelime vurgulanır.
  */
-import { halves, locative, numberWords, spokenPrice } from "@arsa/shared";
+import { fixDotlessI, halves, locative, numberWords, spokenPrice } from "@arsa/shared";
 import type { ParcelInfo } from "../src/types.js";
 
 export { locative, numberWords, spokenPrice };
@@ -57,7 +57,8 @@ export const formatPrice = (tl: number) => `${Math.round(tl).toLocaleString("tr-
 
 /** Arsa dilinde alan: 2.000 m² üstü dönümle ("on bir dönüm"), altı metrekareyle. */
 export function spokenArea(m2: number) {
-  if (m2 < 2000) return `${numberWords(Math.round(m2 / 10) * 10)} metrekare`;
+  // Ekrandaki m² ile aynı sayı (744,61 → "yedi yüz kırk beş"; 10'a yuvarlanınca "kırk" okunup karttaki 745 ile çelişiyordu).
+  if (m2 < 2000) return `${numberWords(Math.round(m2))} metrekare`;
   return `${halves(m2 / 1000)} dönüm`;
 }
 
@@ -125,9 +126,12 @@ const speakable = (x?: string) => (x && /^[\p{L} ,.-]+$/u.test(x) ? x.trim().rep
 
 export function buildStory(p: ParcelInfo, listing: StoryListing = {}): Story {
   const prop = p.properties;
-  const district = prop.Ilce ?? p.address.district;
+  // TKGM adlarında "ı" bazen "i" ("Sirapinar"): doğru yazım OSM / Google adlarından ve çevre noktalarından alınır.
+  const spellings = [p.hood?.name, prop.Mahalle, ...(p.hood?.spellings ?? []), p.address.neighbourhood, p.address.district, ...p.pois.map((x) => x.name)];
+  const fix = (x?: string) => x && fixDotlessI(x, spellings);
+  const district = fix(prop.Ilce ?? p.address.district);
   const province = prop.Il ?? p.address.province;
-  const hoodRaw = p.hood?.name || prop.Mahalle || p.address.neighbourhood;
+  const hoodRaw = fix(p.hood?.name || prop.Mahalle || p.address.neighbourhood);
   const hoodShort = hoodRaw?.replace(/ (Mahallesi|Mah\.?|Köyü)$/i, "");
   const place = [district, hoodShort].filter(Boolean).join(" ");
   const kind = (prop.Nitelik ?? "arsa").toLocaleLowerCase("tr");
@@ -165,7 +169,7 @@ export function buildStory(p: ParcelInfo, listing: StoryListing = {}): Story {
   if (sea) features.push({ icon: "🌊", label: "Denize", value: sea.distanceM < 150 ? "Sıfır" : fmtKm(sea.distanceM) });
   for (const x of near.slice(0, 2)) features.push({ icon: x.emoji, label: x.name ?? x.label, value: fmtKm(x.distanceM) });
   if (p.elevation !== null && p.elevation !== undefined) features.push({ icon: "⛰️", label: "Rakım", value: `${Math.round(p.elevation)} m` });
-  if (prop.Mevkii) features.push({ icon: "📍", label: "Mevkii", value: prop.Mevkii });
+  if (prop.Mevkii) features.push({ icon: "📍", label: "Mevkii", value: fix(prop.Mevkii)! });
 
   const endcard =
     listing.officeName || listing.phone || listing.priceTry

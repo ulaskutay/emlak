@@ -12,7 +12,7 @@ export interface ParcelInfo {
   /** category: @arsa/geo PoiCategory (sea, town, village, hospital, custom...). */
   pois: { category?: string; label: string; emoji: string; name?: string; position: { lat: number; lng: number }; distanceM: number }[];
   /** Mahalle / köy sınırı (TKGM ya da OSM); yoksa bölge sahnesi yalnızca pinle. */
-  hood?: { name: string; ring: { lat: number; lng: number }[]; source?: string } | null;
+  hood?: { name: string; ring: { lat: number; lng: number }[]; source?: string; spellings?: string[] } | null;
 }
 
 export interface Camera {

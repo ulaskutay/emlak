@@ -15,6 +15,26 @@ export function locative(word: string) {
   return `${word}'${hard ? "t" : "d"}${back ? "a" : "e"}`;
 }
 
+/**
+ * TKGM yer adlarında "ı" zaman zaman "i" yazılıyor ("Sırapınar" → "Sirapinar", "Balıklı" → "Balikli"; "İ" → "I"),
+ * seslendirme de adı öyle okuyor. Bozulma tek yönlü: adın her kelimesi, diğer kaynaklarda (Google adresi, yer adları)
+ * harf harf aynı olan bir yazım varsa ı/İ'leri ondan alır. Kaynaklarda doğru yazım yoksa ad olduğu gibi kalır.
+ */
+export function fixDotlessI(name: string, sources: (string | null | undefined)[]) {
+  const fold = (w: string) => w.toLocaleLowerCase("tr").replace(/ı/g, "i");
+  const words = sources.flatMap((s) => s?.match(/\p{L}+/gu) ?? []);
+  return name.replace(/\p{L}+/gu, (w) => {
+    const same = words.filter((c) => c.length === w.length && fold(c) === fold(w));
+    return [...w]
+      .map((o, i) => {
+        if (o === "i" && same.some((c) => c[i]!.toLocaleLowerCase("tr") === "ı")) return "ı";
+        if (o === "I" && same.some((c) => c[i] === "İ")) return "İ";
+        return o;
+      })
+      .join("");
+  });
+}
+
 const ONES = ["", "bir", "iki", "üç", "dört", "beş", "altı", "yedi", "sekiz", "dokuz"];
 const TENS = ["", "on", "yirmi", "otuz", "kırk", "elli", "altmış", "yetmiş", "seksen", "doksan"];
 

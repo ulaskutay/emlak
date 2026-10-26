@@ -88,7 +88,9 @@ function bounds(ring: { lat: number; lng: number }[]) {
 export function buildTimeline(p: ParcelInfo, story?: Story) {
   const dur = (id: string) => story?.scenes.find((s) => s.id === id)?.voice?.duration ?? 0;
   const has = (id: string) => !!story?.scenes.some((s) => s.id === id);
-  const r = Math.max(25, p.radiusM);
+  // Kamera menzilleri yarıçapla ölçeklenir. Küçük parselde (745 m², ~22 m) kamera ~120 m'ye iner, kadraj yerde ~50 m kalır:
+  // Google karo dokusu o yakınlıkta yetmez, görüntü büyütülmüş / bulanık çıkar. 50 m tabanla kuşbakışı kadraj ~100 m (~10 cm/piksel).
+  const r = Math.max(50, p.radiusM);
   const P = p.centroid;
   const h0 = p.longestEdgeHeading;
   const hood = p.hood && p.hood.ring.length > 2 ? p.hood : null;
