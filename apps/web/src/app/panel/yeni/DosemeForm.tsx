@@ -376,7 +376,10 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
           <p className="mt-2">
             Bu butonu tarayıcınızın yer imleri çubuğuna sürükleyin; ilan sayfasındayken basınca bu panel ilanla birlikte yeni sekmede açılır:{" "}
             {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
-            <a ref={bm} onClick={(e) => e.preventDefault()} className="ml-1 inline-block rounded-lg bg-neon px-3 py-1 font-semibold text-ink">
+            {/* Panelde tıklanınca bir şey yapamaz (ilan sayfasında çalışır): sessiz kalmasın, ne yapılacağı yazılır. */}
+            <a ref={bm}
+              onClick={(e) => (e.preventDefault(), setImportMsg("Bu buton burada çalışmaz: önce yer imleri çubuğuna sürükleyin, sonra ilan sayfasındayken yer imlerinden basın. Ya da ilan sayfasında Cmd+A, Cmd+C yapıp burada Cmd+V yapın."))}
+              className="ml-1 inline-block rounded-lg bg-neon px-3 py-1 font-semibold text-ink">
               Arsa Video&apos;ya aktar
             </a>
             <span className="block text-xs">Yer imleri çubuğu görünmüyorsa: Ctrl+Shift+B (Mac&apos;te Cmd+Shift+B).</span>
