@@ -148,7 +148,13 @@ export class ElevenLabsClient {
     fd.append("language_code", languageCode);
     fd.append("timestamps_granularity", "word");
     fd.append("file", new Blob([new Uint8Array(audio)]), "speech.mp3");
-    const res = await fetch(`${API}/v1/speech-to-text`, { method: "POST", headers: { "xi-api-key": this.o.apiKey }, body: fd });
+    // Aynı anda birkaç klip gönderilince "system_busy" (429) dönebiliyor: kısa beklemeyle yeniden denenir.
+    let res: Response;
+    for (let attempt = 1; ; attempt++) {
+      res = await fetch(`${API}/v1/speech-to-text`, { method: "POST", headers: { "xi-api-key": this.o.apiKey }, body: fd });
+      if (res.ok || attempt >= 5 || (res.status !== 429 && res.status < 500)) break;
+      await new Promise((r) => setTimeout(r, attempt * 3000));
+    }
     if (!res.ok) throw new Error(`ElevenLabs speech-to-text ${res.status}: ${(await res.text()).slice(0, 300)}`);
     const data = (await res.json()) as { text: string; words?: { text: string; start: number; end: number; type?: string }[] };
     const words = (data.words ?? []).filter((w) => (w.type ?? "word") === "word").map((w) => ({ word: w.text.trim(), start: w.start, end: w.end }));
