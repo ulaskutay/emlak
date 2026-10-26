@@ -250,9 +250,17 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
   }, []);
 
   // Buton paneli veriyle (#aktar=…) açtıysa ilanı içeri al; adres temizlenir ki yenilemede tekrar aktarılmasın.
+  // Yer imindeki buton kurulduğu formun adresini taşır (eski butonlar hep "Boş evi döşe"yi açar): ilan, kullanıcının en
+  // son açtığı aktarmalı forma yönlendirilir; sunuculu turu açıp eski butona basan kullanıcı döşeme formuna düşmesin.
   useEffect(() => {
     const h = window.location.hash;
+    let last: string | null = null;
+    try {
+      last = localStorage.getItem("aktar-sablon");
+      if (!h.startsWith("#aktar=")) localStorage.setItem("aktar-sablon", template);
+    } catch {}
     if (!h.startsWith("#aktar=")) return;
+    if ((last === "sunucu-ev" || last === "dosenmis-ev") && last !== template) return window.location.replace(`/panel/yeni/${last}${h}`);
     history.replaceState(null, "", window.location.pathname + window.location.search);
     try {
       const d = JSON.parse(decodeURIComponent(h.slice(7)));
