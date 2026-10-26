@@ -19,6 +19,7 @@ import { ffmpeg, type JobContext, type JobResult } from "./templates/common.js";
 import { dosenmisEv } from "./templates/dosenmis-ev.js";
 import { ilanVideosu } from "./templates/ilan-videosu.js";
 import { insaatVideosu } from "./templates/insaat-videosu.js";
+import { sunucuEv } from "./templates/sunucu-ev.js";
 
 const QUEUE = "reel";
 const CONCURRENCY = Number(process.env.REEL_CONCURRENCY ?? 2);
@@ -30,6 +31,7 @@ const PIPELINES: Record<TemplateId, (ctx: JobContext) => Promise<JobResult>> = {
   "bitmis-hali": bitmisHali,
   "insaat-videosu": insaatVideosu,
   "dosenmis-ev": dosenmisEv,
+  "sunucu-ev": sunucuEv,
 };
 
 const db = getDb();

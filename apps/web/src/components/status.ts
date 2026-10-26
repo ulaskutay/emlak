@@ -23,6 +23,7 @@ const WEIGHTS: Partial<Record<TemplateId, Record<string, [number, number]>>> = {
   "bitmis-hali": { parcel: [0, 0.05], render: [0.05, 0.5], build: [0.5, 0.6], timelapse: [0.6, 0.93], compose: [0.93, 0.99], done: [1, 1] },
   "insaat-videosu": { parcel: [0, 0.02], side: [0.02, 0.12], build: [0.12, 0.3], timelapse: [0.3, 0.85], compose: [0.85, 0.93], sound: [0.93, 0.99], done: [1, 1] },
   "dosenmis-ev": { photos: [0, 0.03], staging: [0.03, 0.3], clips: [0.3, 0.93], compose: [0.93, 0.99], done: [1, 1] },
+  "sunucu-ev": { photos: [0, 0.02], staging: [0.02, 0.15], presenter: [0.15, 0.3], clips: [0.3, 0.93], compose: [0.93, 0.99], done: [1, 1] },
 };
 
 /** Genel ilerleme (0..1): aşama sırası + aşama içi ilerleme. */
@@ -48,6 +49,10 @@ export function videoTitle(v: {
   if (v.template === "dosenmis-ev") {
     const n = (v.input as { photos?: unknown[] }).photos?.length ?? 0;
     return `Boş evi döşe · ${n} oda`;
+  }
+  if (v.template === "sunucu-ev") {
+    const n = (v.input as { photos?: unknown[] }).photos?.length ?? 0;
+    return `Sunuculu ev turu · ${n} oda`;
   }
   const s = v.parcelSummary;
   const parcel = s?.ada && s.parsel ? `${s.ada} ada ${s.parsel} parsel` : "Parsel";

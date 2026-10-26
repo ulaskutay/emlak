@@ -145,3 +145,51 @@ export function stagingNarration(rooms: (keyof typeof ROOM_LINES)[], d: Partial<
   });
   return { rooms: lines, outro };
 }
+
+/** Sunucunun bir sahnede (en fazla 10 sn'lik klip) söyleyebileceği kelime: ~2,2 kelime/sn, baş ve sonda pay. */
+export const PRESENTER_WORDS = 18;
+
+/** Sunucunun odaya girerken söylediği kısa giriş. */
+const PRESENTER_ROOM_LINES: Record<keyof typeof ROOM_LINES, string> = {
+  salon: "Şimdi salondayız, geniş ve gün boyu aydınlık.",
+  yatak_odasi: "Yatak odası ferah ve sakin.",
+  cocuk_odasi: "Çocuk odası aydınlık ve kullanışlı.",
+  mutfak: "Mutfak geniş ve kullanışlı.",
+  yemek_odasi: "Yemek odası kalabalık sofralara uygun.",
+  calisma_odasi: "Çalışma odası sessiz ve verimli.",
+  banyo: "Banyo ferah ve bakımlı.",
+  balkon: "Balkon sabah kahvesi için birebir.",
+};
+
+/**
+ * Sunuculu ev turu: oda başına sunucunun kameraya söylediği cümle(ler). Her sahne PRESENTER_WORDS kelimeyi aşmaz.
+ * İlk oda: selam + ilanın kimliği. Aradakiler: oda + öne çıkan özellikler. Son oda: fiyat ve çağrı.
+ * Video modeli metni kendisi seslendirdiği için sayılar yazıyla verilir.
+ */
+export function presenterNarration(rooms: (keyof typeof ROOM_LINES)[], d: Partial<ListingDetails> = {}, priceTry?: number) {
+  const [deal, ...noun] = (d.kind ?? "").toLocaleLowerCase("tr").split(/\s+/).filter(Boolean);
+  const isDeal = deal === "satılık" || deal === "kiralık";
+  const attrs = [isDeal && deal, d.rooms && spokenRooms(d.rooms), d.netM2 && `${numberWords(d.netM2)} metrekare`].filter(Boolean).join(", ");
+  const name = (isDeal ? noun.join(" ") : [deal, ...noun].join(" ")) || "daire";
+  const where = d.location ? `${locative(d.location)} ` : "";
+  const hello = d.location || d.rooms || d.netM2 ? `Merhaba! Bugün ${where}${attrs} bir ${name} geziyoruz.` : "Merhaba! Bu evi birlikte geziyoruz.";
+  const price = priceTry ? `${deal === "kiralık" ? "Aylık kirası" : "Fiyatı"} ${spokenPrice(priceTry)} lira.` : "";
+  const outro = price ? `${price} Hemen arayın!` : "Detaylar için hemen arayın!";
+
+  const highlights = [...(d.highlights ?? [])];
+  return rooms.map((r, i) => {
+    const last = i === rooms.length - 1;
+    const said: string[] = [];
+    let left = PRESENTER_WORDS - (i === 0 ? words(hello) : 0) - (last ? words(outro) : 0);
+    // Önce ilanın öne çıkanları (son odada sığdığı kadar, diğerlerinde birer tane), sonra sığarsa odanın cümlesi.
+    while (highlights.length && words(highlights[0]!) <= left) {
+      left -= words(highlights[0]!);
+      said.push(highlights.shift()!);
+      if (!last) break;
+    }
+    const room = PRESENTER_ROOM_LINES[r];
+    // Ara odada hiçbir şey söylenmeyecekse oda cümlesi sınırı aşsa da söylenir (sessiz sahne olmasın).
+    const withRoom = words(room) <= left || (i > 0 && !said.length);
+    return [i === 0 ? hello : "", withRoom ? room : "", ...said, last ? outro : ""].filter(Boolean).join(" ");
+  });
+}

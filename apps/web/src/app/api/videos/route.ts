@@ -46,6 +46,10 @@ export async function POST(req: Request) {
     const own = (k?: string) => !k || k.startsWith(`uploads/${user.id}/`);
     if (order.photos.some((p) => !own(p.key)) || !own(order.agent.photoKey) || !own(order.agent.logoKey)) return badRequest("Geçersiz fotoğraf");
     await getDb().insert(videos).values({ ...base, input: { photos: order.photos, style: order.style, details: order.details, agent: order.agent, voice: order.voice }, voiceId: order.voiceId ?? null });
+  } else if (order.template === "sunucu-ev") {
+    const own = (k?: string) => !k || k.startsWith(`uploads/${user.id}/`);
+    if (order.photos.some((p) => !own(p.key)) || !own(order.agent.photoKey) || !own(order.agent.logoKey)) return badRequest("Geçersiz fotoğraf");
+    await getDb().insert(videos).values({ ...base, input: { photos: order.photos, style: order.style, details: order.details, agent: order.agent, presenter: order.presenter } });
   } else {
     let summary;
     try {

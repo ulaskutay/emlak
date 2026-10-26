@@ -1,5 +1,5 @@
 "use client";
-import { parseListingText, ROOM_LABELS, RoomType, stagingNarration, STYLE_LABELS, StagingStyle } from "@arsa/shared";
+import { parseListingText, presenterList, presenterNarration, type PresenterId, ROOM_LABELS, RoomType, stagingNarration, STYLE_LABELS, StagingStyle } from "@arsa/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ListingFields, listingPayload, type ListingValues } from "./ListingFields";
@@ -10,6 +10,8 @@ type Photo = { id: string; key?: string; preview: string; room?: RoomType; title
 
 const MIN = 2;
 const MAX = 4;
+/** Sunuculu turda oda başına ~10 sn klip: 3 oda + kapanış ~35 sn. */
+const MAX_SUNUCU = 3;
 const ROOMS = RoomType.options;
 const STYLES = StagingStyle.options;
 
@@ -100,11 +102,15 @@ const STYLE_HINTS: Record<StagingStyle, string> = {
   dogal: "Hasır, keten, bol bitki",
 };
 
-export function DosemeForm() {
+/** Boş evi döşe formu; "sunucu-ev" aynı formla sunuculu ev turunu sipariş eder (tarz isteğe bağlı, ses sunucudan). */
+export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-ev" | "sunucu-ev" }) {
+  const sunucu = template === "sunucu-ev";
+  const max = sunucu ? MAX_SUNUCU : MAX;
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [style, setStyle] = useState<StagingStyle>("modern");
+  const [style, setStyle] = useState<StagingStyle | null>(sunucu ? null : "modern");
+  const [presenter, setPresenter] = useState<PresenterId>("defne");
   const [listing, setListing] = useState<ListingValues>({ price: "", officeName: "", phone: "" });
   const [music, setMusic] = useState(true);
   const [paste, setPaste] = useState("");
@@ -129,11 +135,10 @@ export function DosemeForm() {
   const untyped = ready.filter((p) => !p.room).length;
 
   const priceTry = Number(listing.price.replace(/\D/g, "")) || undefined;
-  const narration = stagingNarration(
-    ready.flatMap((p) => (p.room ? [p.room] : [])),
-    detailsPayload(details),
-    priceTry,
-  );
+  const typedRooms = ready.flatMap((p) => (p.room ? [p.room] : []));
+  const narration = sunucu
+    ? { rooms: presenterNarration(typedRooms, detailsPayload(details), priceTry), outro: "" }
+    : stagingNarration(typedRooms, detailsPayload(details), priceTry);
 
   function readListing(text = paste) {
     const r = parseListingText(text);
@@ -167,7 +172,7 @@ export function DosemeForm() {
     if (!res.ok) return setImportMsg(data.error ?? "Fotoğraflar aktarılamadı");
     setImported(data.photos);
     setAgent({ name: a.name?.slice(0, 60) ?? "", photo: data.agent?.photo, logo: data.agent?.logo });
-    setImportMsg(`İlandan ${data.photos.length} fotoğraf geldi. Kullanmak istediğiniz boş odalara tıklayın (en fazla ${MAX}).`);
+    setImportMsg(`İlandan ${data.photos.length} fotoğraf geldi. Kullanmak istediğiniz boş odalara tıklayın (en fazla ${max}).`);
   }
 
   // React javascript: linkini engeller; yer imi butonunun adresi elle verilir.
@@ -214,14 +219,14 @@ export function DosemeForm() {
   function togglePick(img: ImportedPhoto) {
     setError(null);
     if (photos.some((p) => p.key === img.key)) return setPhotos((ps) => ps.filter((p) => p.key !== img.key));
-    if (photos.length >= MAX) return setError(`En fazla ${MAX} fotoğraf`);
+    if (photos.length >= max) return setError(`En fazla ${max} fotoğraf`);
     setPhotos((ps) => [...ps, { id: img.key, key: img.key, preview: img.url, title: "", focusX: img.focusX }]);
   }
 
   async function add(files: FileList | File[]) {
     setError(null);
-    const list = [...files].filter((f) => f.type.startsWith("image/")).slice(0, MAX - photos.length);
-    if (!list.length) return setError(photos.length >= MAX ? `En fazla ${MAX} fotoğraf` : "Fotoğraf dosyası seçin");
+    const list = [...files].filter((f) => f.type.startsWith("image/")).slice(0, max - photos.length);
+    if (!list.length) return setError(photos.length >= max ? `En fazla ${max} fotoğraf` : "Fotoğraf dosyası seçin");
     const items: Photo[] = list.map((f, i) => ({
       id: `${Date.now()}-${i}-${f.name}`,
       preview: URL.createObjectURL(f),
@@ -259,14 +264,14 @@ export function DosemeForm() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        template: "dosenmis-ev",
+        template,
         photos: ready.map((p) => ({ key: p.key, room: p.room, focusX: p.focusX, ...(p.title.trim() ? { title: p.title.trim() } : {}) })),
-        style,
+        ...(style ? { style } : {}),
+        ...(sunucu ? { presenter } : {}),
         details: detailsPayload(details),
         agent: { ...(agent.name.trim() && { name: agent.name.trim() }), ...(agent.photo && { photoKey: agent.photo.key }), ...(agent.logo && { logoKey: agent.logo.key }) },
         listing: listingPayload(listing),
-        voice,
-        ...(voice && voiceId ? { voiceId } : {}),
+        ...(sunucu ? {} : { voice, ...(voice && voiceId ? { voiceId } : {}) }),
         music,
       }),
     });
@@ -279,11 +284,18 @@ export function DosemeForm() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-bold tracking-[-0.025em]">Boş evi döşe</h1>
-        <p className="mt-2 text-mute">
-          İlandaki boş odaların fotoğraflarını yükleyin ({MIN}–{MAX} oda). Yapay zekâ her odayı seçtiğiniz tarzda döşer; videoda oda gözünüzün önünde
-          eşyalanır. Duvar, pencere ve zemin aynı kalır. Görüntü temsilidir; videoda bu yazılır.
-        </p>
+        <h1 className="font-display text-3xl font-bold tracking-[-0.025em]">{sunucu ? "Sunuculu ev turu" : "Boş evi döşe"}</h1>
+        {sunucu ? (
+          <p className="mt-2 text-mute">
+            İlandaki odaların fotoğraflarını yükleyin ({MIN}–{max} oda). Seçtiğiniz sanal sunucu her odada durup odayı kameraya Türkçe anlatır.
+            Boş odaları isterseniz önce döşeriz. Sunucu ve döşeme temsilidir; videoda bu yazılır.
+          </p>
+        ) : (
+          <p className="mt-2 text-mute">
+            İlandaki boş odaların fotoğraflarını yükleyin ({MIN}–{max} oda). Yapay zekâ her odayı seçtiğiniz tarzda döşer; videoda oda gözünüzün önünde
+            eşyalanır. Duvar, pencere ve zemin aynı kalır. Görüntü temsilidir; videoda bu yazılır.
+          </p>
+        )}
       </div>
 
       <div className="card space-y-3 p-6">
@@ -356,7 +368,7 @@ export function DosemeForm() {
         <input ref={input} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files && (add(e.target.files), (e.target.value = ""))} />
         <div className="font-semibold">Oda fotoğraflarını sürükleyin ya da seçin</div>
         <div className="mt-1 text-sm text-mute">
-          {photos.length}/{MAX} fotoğraf · video 21 saniye · yalnız iç mekân; odayı geniş açıdan gören fotoğraflar en iyi sonucu verir
+          {photos.length}/{max} fotoğraf · video {sunucu ? "oda başına 5–10 saniye" : "21 saniye"} · yalnız iç mekân; odayı geniş açıdan gören fotoğraflar en iyi sonucu verir
         </div>
       </div>
 
@@ -401,8 +413,16 @@ export function DosemeForm() {
 
       <fieldset className="card p-6">
         <legend className="sr-only">Döşeme tarzı</legend>
-        <div className="mb-4 font-semibold">Hangi tarzda döşensin?</div>
+        <div className="mb-4 font-semibold">{sunucu ? "Odalar döşensin mi?" : "Hangi tarzda döşensin?"}</div>
         <div className="grid gap-3 sm:grid-cols-3">
+          {sunucu && (
+            <label
+              className={`flex cursor-pointer flex-col rounded-xl border p-4 transition ${style === null ? "border-neon bg-neon/10" : "border-line hover:border-neon/50"}`}>
+              <input type="radio" name="style" value="" className="sr-only" checked={style === null} onChange={() => setStyle(null)} />
+              <span className="font-semibold">Olduğu gibi</span>
+              <span className="mt-1 text-sm text-mute">Fotoğraftaki oda, döşemeden</span>
+            </label>
+          )}
           {STYLES.map((s) => (
             <label key={s}
               className={`flex cursor-pointer flex-col rounded-xl border p-4 transition ${style === s ? "border-neon bg-neon/10" : "border-line hover:border-neon/50"}`}>
@@ -456,6 +476,40 @@ export function DosemeForm() {
         </div>
       </div>
 
+      {sunucu && (
+        <fieldset className="card p-6">
+          <legend className="sr-only">Sunucu</legend>
+          <div className="mb-4 font-semibold">Evi kim anlatsın?</div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            {presenterList.map((pr) => (
+              <label key={pr.id}
+                className={`flex cursor-pointer flex-col overflow-hidden rounded-xl border transition ${presenter === pr.id ? "border-neon bg-neon/10" : "border-line hover:border-neon/50"}`}>
+                <input type="radio" name="presenter" value={pr.id} className="sr-only" checked={presenter === pr.id} onChange={() => setPresenter(pr.id)} />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`/media/sunucular/${pr.id}.jpg`} alt={pr.name} className="aspect-[3/4] w-full object-cover object-top" />
+                <span className="px-3 pt-2 font-semibold">{pr.name}</span>
+                <span className="px-3 pb-3 text-xs text-mute">{pr.blurb}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+
+      {sunucu ? (
+        <div className="card space-y-3 p-6">
+          <div>
+            <div className="font-semibold">Sunucunun söyleyecekleri</div>
+            <p className="mt-1 text-sm text-mute">Her odada bir sahne. Metin ilan bilgilerinden kurulur; bilgileri düzelttikçe değişir.</p>
+          </div>
+          <ol className="list-decimal space-y-1 rounded-lg border border-line p-3 pl-8 text-sm">
+            {narration.rooms.map((l, i) => (
+              <li key={i}>{l}</li>
+            ))}
+          </ol>
+          {ready.some((p) => !p.room) && <p className="text-xs text-mute">Oda tipi seçilmeyen fotoğraflar eklenmedi.</p>}
+        </div>
+      ) : (
+      <>
       <div className="card space-y-4 p-6">
         <label className="flex cursor-pointer items-center justify-between">
           <span>
@@ -476,6 +530,8 @@ export function DosemeForm() {
         )}
       </div>
       {voice && <VoiceStep hook={narration.rooms[0] ?? "Bu evi bir de eşyalı hayal edin."} voiceId={voiceId} onSelect={setVoiceId} />}
+      </>
+      )}
 
       <div className="card space-y-4 p-6">
         <div>

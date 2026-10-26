@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "tsx --env-file-if-exists=../../.env src/index.ts",
     "start": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "sunucu-dene": "tsx --env-file-if-exists=../../.env scripts/sunucu-dene.ts",
+    "sunucu-portre": "tsx --env-file-if-exists=../../.env scripts/sunucu-portre.ts"
   },
   "dependencies": {
     "@arsa/db": "workspace:*",

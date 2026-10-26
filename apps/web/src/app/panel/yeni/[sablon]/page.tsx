@@ -25,6 +25,7 @@ export default async function Page({ params }: { params: Promise<{ sablon: strin
       {id.data === "bitmis-hali" && <BitmisForm template={id.data} />}
       {id.data === "insaat-videosu" && <InsaatForm />}
       {id.data === "dosenmis-ev" && <DosemeForm />}
+      {id.data === "sunucu-ev" && <DosemeForm template="sunucu-ev" />}
     </>
   );
 }

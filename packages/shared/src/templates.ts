@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { ListingDetails } from "./listing-text.js";
+import { PresenterId, type PresenterInfo } from "./presenters.js";
 import { REEL_STAGES, ReelListing, ReelOrder } from "./reel.js";
 
 /**
  * Video şablonları: galeri, sipariş formu, API ve worker aynı tanımı kullanır.
  * Yeni şablon = buraya tanım + sipariş şeması + apps/worker/src/templates altında üretim hattı.
  */
-export const TEMPLATE_IDS = ["arsa-drone", "ilan-videosu", "bitmis-hali", "insaat-videosu", "dosenmis-ev"] as const;
+export const TEMPLATE_IDS = ["arsa-drone", "ilan-videosu", "bitmis-hali", "insaat-videosu", "dosenmis-ev", "sunucu-ev"] as const;
 export const TemplateId = z.enum(TEMPLATE_IDS);
 export type TemplateId = z.infer<typeof TemplateId>;
 
@@ -141,6 +142,28 @@ export const TEMPLATES: Record<TemplateId, TemplateInfo> = {
       { id: "done", label: "Hazır" },
     ],
   },
+  "sunucu-ev": {
+    id: "sunucu-ev",
+    name: "Sunuculu ev turu",
+    tagline: "Sanal emlak sunucusu evi oda oda gezdirip kameraya anlatır",
+    description:
+      "Seçtiğiniz sanal sunucu ilan fotoğraflarındaki her odada durur ve odayı kameraya Türkçe anlatır: ilk odada ilanın kimliği, aradakilerde öne çıkanlar, sonda fiyat ve çağrı. İsterseniz boş odalar önce döşenir. Oda başlıkları ve emlakçı kartıyla. Sunucu ve döşeme temsilidir; videoda bu yazılır.",
+    category: "Konut",
+    needs: ["2–3 oda fotoğrafı (sahibinden.com ilanındaki fotoğraflar olur)", "Her fotoğraf için oda tipi", "İlan sayfasının metni (anlatım için, isteğe bağlı)"],
+    includes: ["Oda başına konuşan sunucu sahnesi", "İlan bilgisinden Türkçe anlatım", "İsteğe bağlı döşeme (temsili)", "Oda başlıkları, fiyat ve iletişim kartı", "Müzik"],
+    duration: "20–35 sn",
+    preview: { poster: "/media/sablon-dosenmis-poster.jpg" },
+    badge: "Yeni",
+    hidden: true,
+    stages: [
+      { id: "photos", label: "Fotoğraflar" },
+      { id: "staging", label: "Döşeme" },
+      { id: "presenter", label: "Sunucu" },
+      { id: "clips", label: "Sahneler" },
+      { id: "compose", label: "Kurgu" },
+      { id: "done", label: "Hazır" },
+    ],
+  },
 };
 
 /** Sitede görünen şablonlar (gizliler hariç). */
@@ -256,6 +279,15 @@ export const DosemeOrder = z.object({
 });
 export type DosemeOrder = z.infer<typeof DosemeOrder>;
 
+/** Sunuculu ev turu: döşeme formunun alanları; tarz yoksa odalar olduğu gibi kalır. Ses video modelinden gelir (voiceId yok). */
+export const SunucuOrder = DosemeOrder.omit({ template: true, style: true, voice: true, voiceId: true }).extend({
+  template: z.literal("sunucu-ev"),
+  photos: z.array(RoomPhoto).min(2, "En az 2 fotoğraf seçin").max(3, "En fazla 3 fotoğraf"),
+  style: StagingStyle.optional(),
+  presenter: PresenterId.default("defne"),
+});
+export type SunucuOrder = z.infer<typeof SunucuOrder>;
+
 /** İmar durumu (imar durumu belgesinden): seslendirilir ve ekranda kartla yazar. */
 export const Zoning = z.object({
   /** İmar türü, ör. "Konut", "Ticari", "Turizm". */
@@ -284,7 +316,7 @@ export type InsaatOrder = z.infer<typeof InsaatOrder>;
 /** API'nin kabul ettiği sipariş. Şablonsuz eski istek arsa drone turu sayılır. */
 export const TemplateOrder = z.preprocess(
   (v) => (v && typeof v === "object" && !("template" in v) ? { ...v, template: "arsa-drone" } : v),
-  z.discriminatedUnion("template", [ArsaDroneOrder, IlanOrder, BitmisOrder, InsaatOrder, DosemeOrder]),
+  z.discriminatedUnion("template", [ArsaDroneOrder, IlanOrder, BitmisOrder, InsaatOrder, DosemeOrder, SunucuOrder]),
 );
 export type TemplateOrder = z.infer<typeof TemplateOrder>;
 
@@ -292,6 +324,7 @@ export type TemplateOrder = z.infer<typeof TemplateOrder>;
 export type TemplateInput =
   | { photos: IlanPhoto[] }
   | { photos: RoomPhoto[]; style: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; voice?: boolean }
+  | { photos: RoomPhoto[]; style?: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; presenter?: PresenterId }
   | { building: BuildingType; floors: number }
   | { building: BuildingType; floors: number; zoning: Zoning; agent?: DosemeOrder["agent"] }
   | Record<string, never>;
@@ -420,3 +453,35 @@ export function stagingVideoPrompt(room: RoomType) {
   );
 }
 
+
+/**
+ * Sunucuyu oda fotoğrafına yerleştiren talimat (Seedream 5.0 Pro; 1. referans oda, 2. ve 3. referans sunucu).
+ * 2026-10-25 denemesi: oda birebir kaldı, sunucu ön planda ayakta ve kameraya dönük.
+ */
+export function presenterPlacePrompt(room: RoomType, p: PresenterInfo) {
+  const person = p.gender === "female" ? "woman" : "man";
+  const pr = p.gender === "female" ? "She" : "He";
+  return (
+    `Place the ${person} from the second and third reference images into ${ROOM_LABELS_EN[room]} from the first reference image. ` +
+    "Keep the room exactly as it is: same walls, floor, ceiling, windows, doors, furniture and camera angle; do not add or remove anything. " +
+    `${pr} stands in the open floor area in the foreground, full body visible from head to knees, facing the camera with a warm confident smile, one hand gently open toward the room. ` +
+    `Same face and age, ${p.look}. ` +
+    "Realistic lighting and shadows matching the room, photorealistic, no text."
+  );
+}
+
+/**
+ * Konuşan sunucu klibi (ilk kare + modelin kendi Türkçe sesi). Kamera neredeyse sabit: hareket arttıkça model
+ * odaya olmayan parçalar ekliyordu (Wan 3.0 denemesi). "ışık" gibi noktasız ı'lı kelimeler yanlış okunabiliyor.
+ */
+export function presenterVideoPrompt(room: RoomType, line: string, p: PresenterInfo) {
+  const pr = p.gender === "female" ? "She" : "He";
+  const pos = p.gender === "female" ? "Her" : "His";
+  return (
+    `${p.who.charAt(0).toUpperCase()}${p.who.slice(1)} is a Turkish real estate agent presenting ${ROOM_LABELS_EN[room]}. ` +
+    `${pr} stays in the same spot, talks directly to the camera with natural facial expressions and lips synchronized to the speech, and once gestures with an open palm toward the room. ` +
+    `The camera is almost static, only a very slow gentle push-in. Keep the room exactly as in the first frame; do not add or change anything in the room. ${pos} hands are empty. ` +
+    `Audio: ${pr.toLowerCase()} speaks slowly and clearly in natural standard Turkish (İstanbul accent), ${p.voice}, studio-quality clean voice recording, ` +
+    `saying exactly: "${line}" Pronounce every Turkish letter correctly, including the dotless ı. Quiet room ambience only, no music, no other voices.`
+  );
+}
