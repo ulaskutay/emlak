@@ -136,6 +136,19 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
   const [link, setLink] = useState("");
   const linkOk = /^https:\/\/(www\.)?sahibinden\.com\/ilan\//.test(link.trim());
   const bm = useRef<HTMLAnchorElement>(null);
+  // Aktarma butonu kurulumu tarayıcıda hatırlanır (yer imini algılayamayız; kullanıcı "Kurdum" der).
+  const [setupDone, setSetupDone] = useState(false);
+  useEffect(() => {
+    try {
+      setSetupDone(localStorage.getItem("aktar-butonu") === "1");
+    } catch {}
+  }, []);
+  const markSetup = (v: boolean) => {
+    setSetupDone(v);
+    try {
+      localStorage.setItem("aktar-butonu", v ? "1" : "0");
+    } catch {}
+  };
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
@@ -212,7 +225,7 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
   // React javascript: linkini engeller; yer imi butonunun adresi elle verilir.
   useEffect(() => {
     bm.current?.setAttribute("href", bookmarklet(window.location.origin, template));
-  }, [template]);
+  }, [template, setupDone]);
 
   // Sayfanın herhangi bir yerinde Ctrl+V: ilan sayfasından kopyalanan içerik (ya da butonun panoya koyduğu veri) aktarılır.
   useEffect(() => {
@@ -338,40 +351,63 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
         )}
       </div>
 
-      <div className="card space-y-3 p-6">
+      <div className="card space-y-5 p-6">
         <div>
           <div className="font-semibold">sahibinden.com ilanından aktar</div>
           <p className="mt-1 text-sm text-mute">
-            sahibinden ilan sayfalarını sunucumuzun okumasına izin vermiyor (bot doğrulaması); ilanı sizin tarayıcınızdan kopyalarız.
-            Fotoğraflar, ilan bilgileri, fiyat ve emlakçı bu sayfaya gelir.
+            Fiyat, oda sayısı, m², konum, açıklama, fotoğraflar ve emlakçı tek tıkla bu sayfaya gelir. sahibinden ilanları sunucuların okumasına
+            izin vermediği için aktarma sizin tarayıcınızdaki butonla yapılır (bilgisayarda).
           </p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input className="input flex-1" type="url" inputMode="url" placeholder="https://www.sahibinden.com/ilan/…" value={link}
-            aria-label="sahibinden ilan linki" onChange={(e) => setLink(e.target.value)} />
-          <button type="button" className="btn-ghost shrink-0" disabled={!linkOk} onClick={() => window.open(link.trim(), "_blank", "noopener")}>
-            İlanı aç
-          </button>
+
+        {setupDone ? (
+          <p className="flex flex-wrap items-center gap-2 text-sm text-mute">
+            <span className="text-neon">✓</span> Aktarma butonu yer imlerinizde.
+            <button type="button" className="underline hover:text-white" onClick={() => markSetup(false)}>Kurulumu tekrar göster</button>
+          </p>
+        ) : (
+          <div className="rounded-xl border border-neon/40 bg-neon/5 p-4">
+            <div className="text-sm font-semibold">1. Bir kez kurun: butonu yer imleri çubuğuna sürükleyin</div>
+            <div className="mt-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+              {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
+              <a ref={bm} onClick={(e) => e.preventDefault()} draggable
+                className="inline-flex shrink-0 cursor-grab items-center gap-2 whitespace-nowrap rounded-lg bg-neon px-4 py-2 font-semibold text-ink shadow active:cursor-grabbing">
+                ⤓ Arsa Video&apos;ya aktar
+              </a>
+              <span className="text-sm text-mute">← Bu sarı butonu fareyle tutup tarayıcının üstündeki yer imleri çubuğuna bırakın.</span>
+            </div>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-mute">
+              <li>
+                Yer imleri çubuğu görünmüyorsa önce açın: <b className="text-white">Ctrl+Shift+B</b> (Mac&apos;te <b className="text-white">Cmd+Shift+B</b>).
+              </li>
+              <li>Butona bu sayfada tıklamayın; ilan sayfasındayken yer imlerinden basılınca çalışır.</li>
+            </ul>
+            <button type="button" className="btn-ghost mt-3 py-1.5 text-sm" onClick={() => markSetup(true)}>Kurdum</button>
+          </div>
+        )}
+
+        <div>
+          <div className="text-sm font-semibold">{setupDone ? "Her ilanda" : "2. Her ilanda"}: ilanı açıp yer imlerindeki &quot;Arsa Video&apos;ya aktar&quot;a basın</div>
+          <p className="mt-1 text-sm text-mute">Panel ilanla birlikte yeni sekmede açılır; bilgiler ve fotoğraflar kendiliğinden dolar.</p>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <input className="input flex-1" type="url" inputMode="url" placeholder="İlan linkini yapıştırın: https://www.sahibinden.com/ilan/…" value={link}
+              aria-label="sahibinden ilan linki" onChange={(e) => setLink(e.target.value)} />
+            <button type="button" className="btn-ghost shrink-0" disabled={!linkOk} onClick={() => window.open(link.trim(), "_blank", "noopener")}>
+              İlanı aç
+            </button>
+          </div>
         </div>
-        <ol className="list-decimal space-y-1 pl-5 text-sm text-mute">
-          <li>Linki yukarıya yapıştırıp &quot;İlanı aç&quot;a basın (ya da ilanı sahibinden&apos;de kendiniz açın).</li>
-          <li>
-            İlan sayfasında <b className="text-white">Ctrl+A</b>, ardından <b className="text-white">Ctrl+C</b> yapın (Mac&apos;te Cmd+A, Cmd+C).
-          </li>
-          <li>
-            Bu sayfaya dönüp <b className="text-white">Ctrl+V</b> yapın (Mac&apos;te Cmd+V). Bir kutuya tıklamanız gerekmez.
-          </li>
-        </ol>
+
         <details className="text-sm text-mute">
-          <summary className="cursor-pointer">Tek tıkla aktarma butonu (isteğe bağlı)</summary>
-          <p className="mt-2">
-            Bu butonu tarayıcınızın yer imleri çubuğuna sürükleyin; ilan sayfasındayken basınca bu panel ilanla birlikte yeni sekmede açılır:{" "}
-            {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
-            <a ref={bm} onClick={(e) => e.preventDefault()} className="ml-1 inline-block rounded-lg bg-neon px-3 py-1 font-semibold text-ink">
-              Arsa Video&apos;ya aktar
-            </a>
-            <span className="block text-xs">Yer imleri çubuğu görünmüyorsa: Ctrl+Shift+B (Mac&apos;te Cmd+Shift+B).</span>
-          </p>
+          <summary className="cursor-pointer">Buton çalışmazsa: kopyala-yapıştır</summary>
+          <ol className="mt-2 list-decimal space-y-1 pl-5">
+            <li>
+              İlan sayfasında <b className="text-white">Ctrl+A</b>, ardından <b className="text-white">Ctrl+C</b> yapın (Mac&apos;te Cmd+A, Cmd+C).
+            </li>
+            <li>
+              Bu sayfaya dönüp <b className="text-white">Ctrl+V</b> yapın (Mac&apos;te Cmd+V). Bir kutuya tıklamanız gerekmez.
+            </li>
+          </ol>
         </details>
         {importMsg && <p className="text-sm text-neon">{importMsg}</p>}
         {imported.length > 0 && (
