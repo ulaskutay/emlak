@@ -113,7 +113,7 @@ const STYLE_HINTS: Record<StagingStyle, string> = {
 };
 
 /** Boş evi döşe formu; "sunucu-ev" aynı formla sunuculu ev turunu sipariş eder (tarz isteğe bağlı, ses sunucudan). */
-export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-ev" | "sunucu-ev" }) {
+export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template?: "dosenmis-ev" | "sunucu-ev"; tourCredits?: Record<TourQuality, number> }) {
   const sunucu = template === "sunucu-ev";
   const max = sunucu ? MAX_SUNUCU : MAX;
   const router = useRouter();
@@ -553,14 +553,14 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
                 <input type="radio" name="quality" value={q} className="sr-only" checked={quality === q} onChange={() => setQuality(q)} />
                 <span className="flex items-baseline justify-between gap-2">
                   <span className="font-semibold">{TOUR_QUALITY[q].label}</span>
-                  <span className="text-sm text-gok">sahne başına {TOUR_QUALITY[q].credits} kredi</span>
+                  <span className="text-sm text-gok">sahne başına {tourCredits?.[q]} kredi</span>
                 </span>
                 <span className="mt-1 text-sm text-gri">{TOUR_QUALITY[q].hint}</span>
               </label>
             ))}
           </div>
           <p className="mt-3 text-sm text-gri">
-            {typed.length ? `${typed.length} sahne · toplam ${typed.length * TOUR_QUALITY[quality].credits} kredi` : "Sahne seçince toplam kredi burada görünür"} · video 1080p 60 FPS teslim edilir.
+            {typed.length ? `${typed.length} sahne · toplam ${typed.length * (tourCredits?.[quality] ?? 0)} kredi` : "Sahne seçince toplam kredi burada görünür"} · video 1080p 60 FPS teslim edilir.
           </p>
         </fieldset>
       )}

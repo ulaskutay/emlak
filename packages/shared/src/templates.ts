@@ -301,12 +301,12 @@ export const TourQuality = z.enum(["orta", "yuksek"]);
 export type TourQuality = z.infer<typeof TourQuality>;
 
 /**
- * Kalite seçenekleri. `credits`: panelde gösterilen sahne başına kullanıcı kredisi (bakiye sistemi henüz yok, etiket).
+ * Kalite seçenekleri. Sahne başına kullanıcı kredisi fiyat ayarlarında (PricingSettings.tourCredits).
  * Higgsfield maliyeti (2026-10-26, 10 sn'lik sahne): orta ~16,5 kredi (Gemini 360p 10), yüksek ~36,5 (720p 30).
  */
-export const TOUR_QUALITY: Record<TourQuality, { label: string; hint: string; resolution: "360p" | "720p"; credits: number }> = {
-  orta: { label: "Orta kalite", hint: "Hızlı ve ekonomik; sosyal medya için yeterli", resolution: "360p", credits: 1 },
-  yuksek: { label: "Yüksek kalite", hint: "Daha net yüz ve detay, daha az bozulma", resolution: "720p", credits: 2 },
+export const TOUR_QUALITY: Record<TourQuality, { label: string; hint: string; resolution: "360p" | "720p" }> = {
+  orta: { label: "Orta kalite", hint: "Hızlı ve ekonomik; sosyal medya için yeterli", resolution: "360p" },
+  yuksek: { label: "Yüksek kalite", hint: "Daha net yüz ve detay, daha az bozulma", resolution: "720p" },
 };
 
 export const SunucuOrder = DosemeOrder.omit({ template: true, photos: true, style: true, voice: true, voiceId: true }).extend({

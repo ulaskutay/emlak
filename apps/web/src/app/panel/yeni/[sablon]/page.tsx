@@ -5,6 +5,7 @@ import { BitmisForm } from "../BitmisForm";
 import { DosemeForm } from "../DosemeForm";
 import { IlanForm } from "../IlanForm";
 import { InsaatForm } from "../InsaatForm";
+import { getPricing } from "@/lib/credits";
 import { Wizard } from "../Wizard";
 
 export async function generateMetadata({ params }: { params: Promise<{ sablon: string }> }) {
@@ -28,7 +29,7 @@ export default async function Page({ params }: { params: Promise<{ sablon: strin
       {id.data === "bitmis-hali" && <BitmisForm template={id.data} />}
       {id.data === "insaat-videosu" && <InsaatForm />}
       {id.data === "dosenmis-ev" && <DosemeForm />}
-      {id.data === "sunucu-ev" && <DosemeForm template="sunucu-ev" />}
+      {id.data === "sunucu-ev" && <DosemeForm template="sunucu-ev" tourCredits={(await getPricing()).tourCredits} />}
     </>
   );
 }

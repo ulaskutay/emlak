@@ -1,4 +1,4 @@
-import { TOUR_QUALITY, type TemplateId, type TemplateInput, type TourQuality } from "./templates.js";
+import { type TemplateId, type TemplateInput, type TourQuality } from "./templates.js";
 
 /**
  * Kredi ve maliyet: siparişte düşülen kullanıcı kredisi ve yönetici panelindeki tahmini maliyet.
@@ -11,8 +11,10 @@ export interface PricingSettings {
   usdTry: number;
   /** Higgsfield plan kredisinin dolar değeri (plan ücreti / plan kredisi). */
   higgsfieldCreditUsd: number;
-  /** Şablon başına kullanıcı kredisi (sunucuda sahne başına, kaliteye göre TOUR_QUALITY). */
+  /** Şablon başına kullanıcı kredisi (sunuculu turda sahne başına, tourCredits). */
   credits: Record<Exclude<TemplateId, "sunucu-ev">, number>;
+  /** Sunuculu turda sahne başına kullanıcı kredisi, kaliteye göre. */
+  tourCredits: Record<TourQuality, number>;
   /** Şablon başına tahmini maliyet ($): RunPod GPU, ElevenLabs, Google; sahne/oda başına olanlar ayrıca. */
   costUsd: {
     "arsa-drone": number;
@@ -31,13 +33,15 @@ export interface PricingSettings {
  *   (model yükleme) ~120 sn, tek tük siparişte her videoda ödenir. Qwen düzenleme ~40 sn, Wan 81 kare 4 adım ~90 sn.
  * - ElevenLabs eleven_v3 ~$0,00022/karakter (Creator); müzik uzunluğa göre önbellekte. Google Places aylık ücretsiz kotada.
  * - Higgsfield (hesap hareketleri): Seedream 5.0 Pro 2,5 kredi/kare, Gemini Omni Flash 1.1 360p 1, 720p 3 kredi/sn,
- *   ByteDance büyütme 1080p 60 FPS ~0,4 kredi/sn. Plus aylık $49/1000 kredi; ek paketler biraz pahalı → $0,05.
+ *   ByteDance büyütme 1080p 60 FPS ~0,4 kredi/sn. Plus aylık $49/1000 kredi; ek paketlerle $0,06 (canlı ayar).
  */
 export const DEFAULT_PRICING: PricingSettings = {
-  creditPriceTry: 100,
+  creditPriceTry: 2,
   usdTry: 49.79,
-  higgsfieldCreditUsd: 0.05,
-  credits: { "arsa-drone": 1, "ilan-videosu": 1, "bitmis-hali": 2, "insaat-videosu": 2, "dosenmis-ev": 1 },
+  higgsfieldCreditUsd: 0.06,
+  credits: { "arsa-drone": 150, "ilan-videosu": 100, "bitmis-hali": 250, "insaat-videosu": 250, "dosenmis-ev": 200 },
+  // Sahne maliyeti orta ~51 ₺, yüksek ~111 ₺ (kredi $0,06); ~3 katı: 150 ₺ ve 300 ₺.
+  tourCredits: { orta: 75, yuksek: 150 },
   costUsd: {
     // Drone render ~265 sn $0,08 + seslendirme ~450 karakter $0,10 + Google.
     "arsa-drone": 0.2,
@@ -62,6 +66,7 @@ export function mergePricing(saved: unknown): PricingSettings {
     ...d,
     ...s,
     credits: { ...d.credits, ...s.credits },
+    tourCredits: { ...d.tourCredits, ...s.tourCredits },
     costUsd: {
       ...d.costUsd,
       ...s.costUsd,
@@ -81,7 +86,7 @@ const tourQuality = (input: TemplateInput): TourQuality => ("quality" in input &
 
 /** Siparişte düşülecek kredi. */
 export function videoCredits(template: TemplateId, input: TemplateInput, p: PricingSettings = DEFAULT_PRICING): number {
-  if (template === "sunucu-ev") return photoCount(input) * TOUR_QUALITY[tourQuality(input)].credits;
+  if (template === "sunucu-ev") return photoCount(input) * p.tourCredits[tourQuality(input)];
   return p.credits[template];
 }
 

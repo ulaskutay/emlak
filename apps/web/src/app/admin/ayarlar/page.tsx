@@ -1,4 +1,4 @@
-import { estimateCostTry, TEMPLATES, TOUR_QUALITY, videoCredits, type PricingSettings, type TemplateId, type TemplateInput } from "@arsa/shared";
+import { estimateCostTry, TEMPLATES, TOUR_QUALITY, TourQuality, videoCredits, type PricingSettings, type TemplateId, type TemplateInput } from "@arsa/shared";
 import { savePricing } from "@/app/admin/actions";
 import { PageTitle } from "@/components/admin/ui";
 import { getPricing } from "@/lib/credits";
@@ -64,9 +64,9 @@ export default async function SettingsPage() {
           {(Object.keys(p.credits) as (keyof typeof p.credits)[]).map((id) => (
             <Field key={id} name={`credits.${id}`} label={n(id)} value={p.credits[id]} unit="kredi" />
           ))}
-          <p className="text-sm text-gri sm:col-span-3">
-            {n("sunucu-ev")}: sahne başına {TOUR_QUALITY.orta.credits} (orta) / {TOUR_QUALITY.yuksek.credits} (yüksek) kredi; kodda sabit (packages/shared/src/templates.ts).
-          </p>
+          {TourQuality.options.map((q) => (
+            <Field key={q} name={`tourCredits.${q}`} label={`${n("sunucu-ev")} · ${TOUR_QUALITY[q].label.toLowerCase()}, sahne başına`} value={p.tourCredits[q]} unit="kredi" />
+          ))}
         </section>
 
         <section className="adm-kart grid gap-4 p-5 sm:grid-cols-3">
