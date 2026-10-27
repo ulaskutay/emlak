@@ -23,10 +23,15 @@ export async function getSession() {
   return auth.api.getSession({ headers: await headers() });
 }
 
-/** Yönetici: rolü admin olan ya da ADMIN_EMAILS (virgülle) listesindeki e-posta. */
-export function isAdmin(u: { email: string; role?: string | null }) {
+/** Süper yönetici: ADMIN_EMAILS (virgülle) listesindeki e-posta. */
+export function isSuperAdmin(u: { email: string }) {
   const list = (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
-  return u.role === "admin" || list.includes(u.email.toLowerCase());
+  return list.includes(u.email.toLowerCase());
+}
+
+/** Yönetici: süper yönetici ya da rolü admin olan. */
+export function isAdmin(u: { email: string; role?: string | null }) {
+  return u.role === "admin" || isSuperAdmin(u);
 }
 
 /** Sayfalar için: oturum yoksa girişe yönlendirir. */
