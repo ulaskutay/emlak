@@ -6,6 +6,7 @@ import { HeroVizor } from "@/components/site/HeroVizor";
 import { SablonKatalogu } from "@/components/site/SablonKatalogu";
 import { SonCagri } from "@/components/site/SonCagri";
 import { VideoTile } from "@/components/site/VideoTile";
+import { VizorCercevesi } from "@/components/site/VizorCercevesi";
 import { ornekAdi, sablonOrnekleri, digerOrnekler } from "@/lib/ornekler";
 import { site } from "@/lib/site";
 
@@ -26,6 +27,13 @@ const ADIMLAR = [
   { ikon: "🧩", baslik: "Şablonu seçin", text: "Arsa, konut ya da proje: ilanınıza uyan video türünü seçin, örneğini önceden izleyin." },
   { ikon: "✍️", baslik: "Bilgileri girin", text: "Parsel dosyası ya da fotoğraflar, fiyat ve telefon. Formu şablonun kendisi adım adım sorar." },
   { ikon: "🎬", baslik: "Videoyu paylaşın", text: "Birkaç dakikada panelinizde. Reels, TikTok, Shorts ve ilan sitelerine hazır dikey video." },
+];
+
+const KARSILASTIRMA = [
+  { konu: "Hazırlık", ekip: "Çekim günü ve drone izni ayarlanır", biz: "Şablonu seçip bilgileri girersiniz" },
+  { konu: "Hava", ekip: "Uçuş için uygun hava beklenir", biz: "Uydu görüntüsü ve fotoğraflarla çalışır, hava beklenmez" },
+  { konu: "Kurgu ve ses", ekip: "Ayrı bir iş olarak yaptırılır", biz: "Kamera hareketi, yazılar, seslendirme ve müzik hazır gelir" },
+  { konu: "Teslim", ekip: "Bir ilan için günler geçer", biz: "Video birkaç dakikada panelinizde olur" },
 ];
 
 export default function Home() {
@@ -100,39 +108,36 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Çekim ekibi ile karşılaştırma */}
+      {/* Çekim ekibi ile karşılaştırma: iki künye yan yana, Arsa Video tarafı vizörde */}
       <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-6">
-        <div className="grid gap-5 md:grid-cols-2">
-          <div className="rounded-3xl border border-ayrac bg-white/60 p-7 sm:p-9">
+        <h2 className="max-w-2xl text-[clamp(2rem,4vw,3rem)] leading-[1.08] font-extrabold tracking-[-0.035em] text-balance">
+          Aynı ilan, iki yol
+        </h2>
+        <div className="mt-10 grid items-start gap-6 md:grid-cols-2 md:gap-8">
+          <div className="px-2.5 pt-2.5">
             <h3 className="text-xl font-extrabold text-gri">Çekim ekibiyle</h3>
-            <ul className="mt-6 space-y-4 text-[1.0625rem] text-gri">
-              {["Çekim gününü ve drone iznini ayarlarsınız", "Havanın uygun olmasını beklersiniz", "Kurgu ve seslendirme ayrı bir iş olur", "Bir ilan için günler geçer"].map(
-                (x) => (
-                  <li key={x} className="flex gap-3">
-                    <span aria-hidden className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ayrac text-sm">
-                      ✕
-                    </span>
-                    {x}
-                  </li>
-                ),
-              )}
-            </ul>
+            <dl className="mt-5 border-b border-ayrac">
+              {KARSILASTIRMA.map((k) => (
+                <div key={k.konu} className="border-t border-ayrac py-4">
+                  <dt className="text-sm text-gri/80">{k.konu}</dt>
+                  <dd className="mt-0.5 text-[1.0625rem] text-gri">{k.ekip}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
-          <div className="rounded-3xl bg-gok p-7 text-white shadow-[0_30px_60px_-30px_rgba(43,108,255,.9)] sm:p-9">
-            <h3 className="text-xl font-extrabold">Arsa Video ile</h3>
-            <ul className="mt-6 space-y-4 text-[1.0625rem]">
-              {["Şablonu seçip bilgileri girersiniz", "Kamera hareketi, yazılar ve müzik hazır gelir", "Ofis adınız ve telefonunuz videoda yer alır", "Video birkaç dakikada panelinizde olur"].map(
-                (x) => (
-                  <li key={x} className="flex gap-3">
-                    <span aria-hidden className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gunes text-sm font-bold text-lacivert">
-                      ✓
-                    </span>
-                    {x}
-                  </li>
-                ),
-              )}
-            </ul>
-          </div>
+          <VizorCercevesi>
+            <div className="rounded-xl bg-white p-5 shadow-[0_30px_60px_-34px_rgba(13,27,62,.45)] sm:p-6">
+              <h3 className="text-xl font-extrabold">Arsa Video ile</h3>
+              <dl className="mt-5">
+                {KARSILASTIRMA.map((k) => (
+                  <div key={k.konu} className="border-t border-ayrac py-4 last:pb-0">
+                    <dt className="text-sm text-gri">{k.konu}</dt>
+                    <dd className="mt-0.5 text-[1.0625rem] font-semibold">{k.biz}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </VizorCercevesi>
         </div>
       </section>
 

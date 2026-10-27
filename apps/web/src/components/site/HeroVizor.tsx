@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { TEMPLATES, type TemplateId } from "@arsa/shared";
 import { createHref } from "@/lib/tutorials";
+import { VizorCercevesi } from "./VizorCercevesi";
 
 type Kunye = { etiket: string; deger: string };
 
@@ -136,11 +137,7 @@ export function HeroVizor() {
 
           <div className="mt-5 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 sm:gap-6">
             {/* Vizör: köşe işaretleri, süre sayacı */}
-            <div className="relative p-2.5">
-              <span aria-hidden className="absolute top-0 left-0 h-7 w-7 rounded-tl-xl border-t-2 border-l-2 border-gunes" />
-              <span aria-hidden className="absolute top-0 right-0 h-7 w-7 rounded-tr-xl border-t-2 border-r-2 border-gunes" />
-              <span aria-hidden className="absolute bottom-0 left-0 h-7 w-7 rounded-bl-xl border-b-2 border-l-2 border-gunes" />
-              <span aria-hidden className="absolute right-0 bottom-0 h-7 w-7 rounded-br-xl border-r-2 border-b-2 border-gunes" />
+            <VizorCercevesi>
               <div className="relative overflow-hidden rounded-xl bg-black shadow-[0_40px_80px_-30px_rgba(0,0,0,.8)]">
                 <video
                   key={t.id}
@@ -160,7 +157,7 @@ export function HeroVizor() {
                   {sure(an)}
                 </span>
               </div>
-            </div>
+            </VizorCercevesi>
 
             {/* Künye: videodaki bilgiler */}
             <dl className="w-[9.5rem] space-y-4 pb-3 sm:w-44">

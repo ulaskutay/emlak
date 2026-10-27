@@ -6,11 +6,7 @@ import { createHref } from "@/lib/tutorials";
 export function DroneAnlatim() {
   return (
     <AnlatimBolumu
-      etiket={
-        <>
-          <span aria-hidden>🚁</span> Arsa drone turu
-        </>
-      }
+      etiket="Arsa drone turu"
       baslik="Drone kiralamadan arsanız havadan tanıtılsın"
       text="Arsaya gitmenize gerek yok. Parseli uydu görüntüsünde bulup sınırlarını çiziyoruz; kamera üstünde drone gibi süzülürken arsanın yeri, alanı ve fiyatı anlatılıyor."
       adimlar={[
@@ -20,7 +16,6 @@ export function DroneAnlatim() {
       ]}
       birincil={{ href: createHref("arsa-drone"), label: "Arsa videosu oluşturun" }}
       ikincil={{ href: "/sablonlar/arsa-drone", label: "Örneği izleyin" }}
-      parilti="bg-gradient-to-br from-gok/20 via-gunes/25 to-cimen/15"
       cizim={<DroneCizim className="w-full" />}
     />
   );

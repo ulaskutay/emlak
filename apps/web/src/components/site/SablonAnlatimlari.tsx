@@ -8,11 +8,7 @@ export function KonutAnlatim() {
   return (
     <AnlatimBolumu
       ters
-      etiket={
-        <>
-          <span aria-hidden>🏡</span> Konut videoları
-        </>
-      }
+      etiket="Konut videoları"
       baslik="İlan fotoğrafları gezilen bir eve dönüşsün"
       text="Elinizdeki fotoğraflar yeter. Her kare sinematik bir kamera hareketine dönüşür, boş odalara istediğiniz tarzda sanal eşya döşenir, isterseniz bir sunucu evi odası odası anlatır."
       adimlar={[
@@ -22,7 +18,6 @@ export function KonutAnlatim() {
       ]}
       birincil={{ href: createHref("ilan-videosu"), label: "Konut videosu oluşturun" }}
       ikincil={{ href: "/sablonlar/sunucu-ev", label: "Örneği izleyin" }}
-      parilti="bg-gradient-to-br from-mercan/25 via-gunes/20 to-gok/15"
       cizim={<KonutCizim className="w-full" />}
     />
   );
@@ -31,11 +26,7 @@ export function KonutAnlatim() {
 export function ProjeAnlatim() {
   return (
     <AnlatimBolumu
-      etiket={
-        <>
-          <span aria-hidden>🏗️</span> Proje videoları
-        </>
-      }
+      etiket="Proje videoları"
       baslik="Boş arsada yükselecek binayı bugünden gösterin"
       text="Daha temel atılmadan alıcı projeyi görsün. Parselin drone çekimi üstüne binanın bitmiş hali yerleştirilir; inşaat hızlandırılmış sahneyle kat kat yükselir."
       adimlar={[
@@ -45,7 +36,6 @@ export function ProjeAnlatim() {
       ]}
       birincil={{ href: createHref("bitmis-hali"), label: "Proje videosu oluşturun" }}
       ikincil={{ href: "/sablonlar/insaat-videosu", label: "Örneği izleyin" }}
-      parilti="bg-gradient-to-br from-gunes/30 via-gok/15 to-cimen/15"
       cizim={<ProjeCizim className="w-full" />}
     />
   );
