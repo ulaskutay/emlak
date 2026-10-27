@@ -1,5 +1,5 @@
 /**
- * Çizim konut: boş bir salon sırayla döşenir (halı, koltuk, sehpa, lamba, bitki, tablo), köşede sunucu anlatır.
+ * Çizim konut: boş bir salon sırayla döşenir (halı, koltuk, sehpa, lamba, bitki, tablo); sağ önde gerçek sunucu karesi anlatır.
  * Eşyalar `konut-esya` ile sırayla belirir, döngü başında kaybolup yeniden döşenir.
  */
 const ESYA_GECIKME = [0, 0.7, 1.4, 2.1, 2.8, 3.5];
@@ -92,11 +92,10 @@ export function KonutCizim({ className = "" }: { className?: string }) {
       </Esya>
       <Esya i={3}>
         {/* Lambader */}
-        <circle cx="470" cy="236" r="70" fill="url(#kn-lamba-isik)" />
-        <path d="M470 248 L470 360" stroke="#1b2a52" strokeWidth="5" strokeLinecap="round" />
-        <ellipse cx="470" cy="364" rx="24" ry="6" fill="#1b2a52" />
-        <path d="M440 250 L500 250 L488 206 L452 206 Z" fill="#ffffff" stroke="#c3c9d6" strokeWidth="2" />
-        <path d="M444 250 L496 250" stroke="#ffd166" strokeWidth="4" />
+        <circle cx="325" cy="236" r="70" fill="url(#kn-lamba-isik)" />
+        <path d="M325 248 L325 300" stroke="#1b2a52" strokeWidth="5" strokeLinecap="round" />
+        <path d="M295 250 L355 250 L343 206 L307 206 Z" fill="#ffffff" stroke="#c3c9d6" strokeWidth="2" />
+        <path d="M299 250 L351 250" stroke="#ffd166" strokeWidth="4" />
       </Esya>
       <Esya i={4}>
         {/* Bitki */}
@@ -118,26 +117,18 @@ export function KonutCizim({ className = "" }: { className?: string }) {
         <circle cx="254" cy="140" r="9" fill="#ffd166" />
       </Esya>
 
-      {/* Sunucu: sağ önde, konuşurken ses dalgası */}
-      <g>
-        <path d="M520 500 C520 440 560 420 580 420 C600 420 640 440 640 500 Z" fill="url(#kn-ceket)" />
-        <path d="M566 430 L580 468 L594 430 Z" fill="#ffffff" />
-        <path d="M576 420 L584 420 L580 440 Z" fill="#ff6b4a" />
-        <circle cx="580" cy="390" r="30" fill="#f1c9a5" />
-        <path d="M550 384 C552 352 608 352 610 384 L610 376 C606 346 554 346 550 376 Z" fill="#3a2a1f" />
-        <circle cx="570" cy="392" r="2.5" fill="#1b2a52" />
-        <circle cx="590" cy="392" r="2.5" fill="#1b2a52" />
-        <path d="M572 404 Q580 410 588 404" stroke="#b6563c" strokeWidth="2" strokeLinecap="round" fill="none" />
-        <g fill="#2b6cff">
-          {[0, 1, 2, 3].map((i) => (
-            <rect key={i} className="konut-ses" x={500 + i * 9} y="370" width="5" height="26" rx="2.5" style={{ animationDelay: `${i * 0.12}s` }} />
-          ))}
-        </g>
+      {/* Sunucu: Higgsfield'da ürettiğimiz sunucu görselinden kesilmiş kare (public/media/sunucu-kare.webp), konuşurken ses dalgası */}
+      <ellipse cx="548" cy="496" rx="88" ry="9" fill="#0d1b3e" opacity="0.18" />
+      <image href="/media/sunucu-kare.webp" x="452" y="150" width="178" height="350" preserveAspectRatio="xMidYMax meet" />
+      <g fill="#2b6cff">
+        {[0, 1, 2, 3].map((i) => (
+          <rect key={i} className="konut-ses" x={478 + i * 9} y="174" width="5" height="26" rx="2.5" style={{ animationDelay: `${i * 0.12}s` }} />
+        ))}
       </g>
 
       {/* Altyazı */}
-      <rect x="150" y="466" width="300" height="34" rx="17" fill="#0d1b3e" opacity="0.9" />
-      <text x="300" y="489" textAnchor="middle" fill="#ffffff" fontSize="16" fontWeight="700" fontFamily="inherit">
+      <rect x="80" y="466" width="300" height="34" rx="17" fill="#0d1b3e" opacity="0.9" />
+      <text x="230" y="489" textAnchor="middle" fill="#ffffff" fontSize="16" fontWeight="700" fontFamily="inherit">
         Salon, güney cephe, 32 m²
       </text>
     </svg>
