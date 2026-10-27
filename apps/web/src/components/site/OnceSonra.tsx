@@ -1,13 +1,13 @@
 "use client";
 import { useState } from "react";
 
-/** Boş oda ile döşenmiş hali: sürgü kullanıcının elinde, hareket yalnız onun eylemine yanıt verir. */
+/** Boş oda ile döşenmiş hali ("Boş evi döşe" videosunun çocuk odası kareleri): sürgü kullanıcının elinde, hareket yalnız onun eylemine yanıt verir. */
 export function OnceSonra({ once, sonra, className = "" }: { once: string; sonra: string; className?: string }) {
   const [p, setP] = useState(50);
   return (
     <div className={`relative overflow-hidden rounded-2xl bg-black select-none ${className}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={once} alt="Boş oda" className="block aspect-[480/649] w-full object-cover" draggable={false} />
+      <img src={once} alt="Boş oda" className="block aspect-[4/5] w-full object-cover" draggable={false} />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={sonra}

@@ -144,9 +144,10 @@ export default function Home() {
           olustur={createHref("arsa-drone")}
           ornek="/sablonlar/arsa-drone"
           gorsel={
-            <div className="relative mx-auto max-w-[520px] overflow-hidden rounded-2xl bg-black">
+            <div className="relative mx-auto max-w-[440px] overflow-hidden rounded-2xl bg-black">
+              {/* 1080p drone render'ından kartsız kare; sayılar altta künyede */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/media/kare-15.jpg" alt="Parsel sınırı ve kenar uzunlukları uydu görüntüsünde" className="block aspect-[4/5] w-full object-cover object-center" />
+              <img src="/media/arsa-parsel.webp" alt="Parsel sınırı uydu görüntüsünde" className="block aspect-[4/5] w-full object-cover object-center" />
               <dl className="absolute right-3 bottom-3 left-3 grid grid-cols-3 gap-2 rounded-xl bg-lacivert/80 p-3 text-xs backdrop-blur sm:text-sm">
                 {[
                   ["Ada / parsel", "230 / 3"],
@@ -174,7 +175,7 @@ export default function Home() {
           adimlar={KONUT}
           olustur={createHref("ilan-videosu")}
           ornek="/sablonlar/sunucu-ev"
-          gorsel={<OnceSonra once="/media/oda-bos.webp" sonra="/media/oda-doseli.webp" className="mx-auto max-w-[460px]" />}
+          gorsel={<OnceSonra once="/media/oda-cocuk-bos.webp" sonra="/media/oda-cocuk-doseli.webp" className="mx-auto max-w-[400px]" />}
         />
       </section>
 
