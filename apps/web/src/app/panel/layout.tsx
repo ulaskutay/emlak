@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { SignOut } from "@/components/SignOut";
 import { SiteLogo } from "@/components/site/SiteLogo";
-import { requireUser } from "@/lib/auth";
+import { isAdmin, requireUser } from "@/lib/auth";
 
 export default async function PanelLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
@@ -19,6 +19,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
             </nav>
           </div>
           <div className="flex items-center gap-4">
+            {isAdmin(user) ? <Link href="/admin" className="text-sm font-semibold text-neon hover:brightness-110">Yönetim</Link> : null}
             <span className="hidden text-sm text-mute md:inline">{user.name || user.email}</span>
             <SignOut />
           </div>

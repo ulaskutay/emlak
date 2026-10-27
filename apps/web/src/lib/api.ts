@@ -5,7 +5,7 @@ import { getSession } from "./auth";
 /** API rotaları için: oturum yoksa 401. */
 export async function apiUser() {
   const s = await getSession();
-  return s?.user ?? null;
+  return s && !s.user.banned ? s.user : null;
 }
 
 export const unauthorized = () => NextResponse.json({ error: "Giriş yapmalısınız" }, { status: 401 });

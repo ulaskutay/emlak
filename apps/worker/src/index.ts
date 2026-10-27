@@ -9,7 +9,7 @@
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { eq, getDb, videos } from "@arsa/db";
+import { and, eq, getDb, videos } from "@arsa/db";
 import { r2FromEnv } from "@arsa/providers";
 import type { TemplateId } from "@arsa/shared";
 import { Worker } from "bullmq";
@@ -46,7 +46,8 @@ function redisConnection() {
 async function processVideo(videoId: string) {
   const [v] = await db.select().from(videos).where(eq(videos.id, videoId));
   if (!v) throw new Error(`video yok: ${videoId}`);
-  if (v.status === "done") return;
+  // failed: kuyrukta beklerken yönetici iptal etti (yeniden deneme önce queued yapar).
+  if (v.status === "done" || v.status === "failed") return;
   const pipeline = PIPELINES[v.template];
   if (!pipeline) throw new Error(`Bilinmeyen şablon: ${v.template}`);
   const log = (m: string) => console.log(`[${videoId.slice(0, 8)} ${v.template}] ${m}`);
@@ -76,7 +77,8 @@ async function processVideo(videoId: string) {
     await db
       .update(videos)
       .set({ status: "done", stage: "done", progress: 1, reelKey, keyframeKey, durationSec: r.durationSec, stats: r.stats ?? null, finishedAt: new Date() })
-      .where(eq(videos.id, videoId));
+      // Üretim sürerken yönetici iptal ettiyse iptal kalır.
+      .where(and(eq(videos.id, videoId), eq(videos.status, "running")));
     log(`hazır (${r.durationSec.toFixed(1)} sn video)`);
   } finally {
     await rm(workDir, { recursive: true, force: true });

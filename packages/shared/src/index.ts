@@ -5,3 +5,4 @@ export * from "./templates.js";
 export * from "./speech.js";
 export * from "./listing-text.js";
 export * from "./presenters.js";
+export * from "./pricing.js";

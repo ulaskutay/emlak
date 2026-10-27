@@ -4,7 +4,7 @@ import * as schema from "./schema.js";
 
 export * from "./schema.js";
 export { schema };
-export { and, desc, eq, sql } from "drizzle-orm";
+export { and, count, desc, eq, gte, ilike, inArray, ne, or, sql, sum } from "drizzle-orm";
 
 /** Tek bağlantı havuzu (Next.js geliştirme modunda sıcak yeniden yüklemede çoğalmasın). */
 const g = globalThis as unknown as { __arsaSql?: ReturnType<typeof postgres> };

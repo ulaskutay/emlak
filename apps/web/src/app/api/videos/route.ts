@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { desc, eq, getDb, videos } from "@arsa/db";
-import { TEMPLATES, TemplateOrder } from "@arsa/shared";
+import { TEMPLATES, TemplateOrder, videoCredits, type TemplateInput } from "@arsa/shared";
 import { NextResponse } from "next/server";
 import { apiUser, badRequest, unauthorized } from "@/lib/api";
+import { addCredits, creditBalance, creditsEnforced, getPricing } from "@/lib/credits";
 import { summarizeParcel } from "@/lib/parcel";
 import { enqueueReel } from "@/lib/queue";
 
@@ -35,8 +36,12 @@ export async function POST(req: Request) {
   if (!parsed.success) return badRequest(parsed.error.issues[0]?.message ?? "Geçersiz istek");
   const order = parsed.data;
   if (TEMPLATES[order.template].hidden) return badRequest("Bu şablon henüz sipariş almıyor");
+  // Kredi hesabı sahne/fotoğraf sayısına ve kaliteye bakar; siparişte ikisi de girdiyle aynı adda.
+  const credits = videoCredits(order.template, order as unknown as TemplateInput, await getPricing());
+  if (creditsEnforced() && (await creditBalance(user.id)) < credits)
+    return NextResponse.json({ error: `Bu video için ${credits} kredi gerekiyor, bakiyeniz yetersiz` }, { status: 402 });
   const id = randomUUID();
-  const base = { id, userId: user.id, template: order.template, listing: order.listing, music: order.music };
+  const base = { id, userId: user.id, template: order.template, listing: order.listing, music: order.music, credits };
 
   if (order.template === "ilan-videosu") {
     // Fotoğraflar yalnızca kullanıcının kendi yüklemeleri olabilir.
@@ -69,6 +74,7 @@ export async function POST(req: Request) {
     }
     else await getDb().insert(videos).values({ ...base, ...parcel, voiceId: order.voiceId ?? null });
   }
+  await addCredits({ userId: user.id, delta: -credits, reason: "video", videoId: id });
   await enqueueReel(id);
   return NextResponse.json({ id }, { status: 201 });
 }

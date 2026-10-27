@@ -8,6 +8,10 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
+  /** "admin": süper yönetici paneli (/admin). ADMIN_EMAILS ortam değişkenindeki adresler de yöneticidir. */
+  role: text("role").$type<"user" | "admin">().notNull().default("user"),
+  /** Engelli kullanıcı oturum açsa da panele ve API'ye giremez. */
+  banned: boolean("banned").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -96,6 +100,10 @@ export const videos = pgTable(
     /** Aşama süreleri, render ayrıntısı. */
     stats: jsonb("stats").$type<Record<string, unknown>>(),
     attempts: integer("attempts").notNull().default(0),
+    /** Siparişte düşülen kullanıcı kredisi. */
+    credits: integer("credits").notNull().default(0),
+    /** Gerçek maliyet (TL, yönetici girer); boşsa ayarlardaki tahmin kullanılır. */
+    costTry: real("cost_try"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp("started_at", { withTimezone: true }),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
@@ -111,3 +119,59 @@ export const parcelContexts = pgTable("parcel_contexts", {
 });
 
 export type Video = typeof videos.$inferSelect;
+
+// ---- Kredi ve ödeme ----
+export type CreditReason = "admin" | "purchase" | "video" | "refund";
+
+/** Kredi hareketleri: bakiye = delta toplamı (eksiye düşebilir, CREDITS_ENFORCED açık değilse). */
+export const creditLedger = pgTable(
+  "credit_ledger",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    delta: integer("delta").notNull(),
+    reason: text("reason").$type<CreditReason>().notNull(),
+    videoId: text("video_id"),
+    paymentId: text("payment_id"),
+    note: text("note"),
+    /** Elle yapılan hareketlerde yöneticinin kimliği. */
+    createdBy: text("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("credit_ledger_user_idx").on(t.userId, t.createdAt)],
+);
+
+export type PaymentStatus = "paid" | "pending" | "refunded";
+export type PaymentMethod = "havale" | "kart" | "nakit" | "diger";
+
+/** Ödemeler: ödeme altyapısı gelene kadar yönetici elle girer (havale/EFT). */
+export const payments = pgTable(
+  "payments",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    amountTry: real("amount_try").notNull(),
+    credits: integer("credits").notNull().default(0),
+    method: text("method").$type<PaymentMethod>().notNull().default("havale"),
+    status: text("status").$type<PaymentStatus>().notNull().default("paid"),
+    /** Ödeme sağlayıcısındaki işlem numarası ya da dekont no. */
+    reference: text("reference"),
+    note: text("note"),
+    createdBy: text("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("payments_created_idx").on(t.createdAt)],
+);
+
+/** Uygulama ayarları (anahtar → JSON): fiyatlandırma ve maliyet tahmini. */
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type Payment = typeof payments.$inferSelect;
