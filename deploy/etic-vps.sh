@@ -59,18 +59,21 @@ echo "Çalışan derleme $ACTIVE; yeni derleme $NEXT klasörüne."
 rm -rf "$WEB/$NEXT"
 # tsconfig .next/types'ı tip denetimine katar; eski düzenden kalan tipler silinmiş sayfaları arayıp derlemeyi bozar.
 # Çalışan site bunları kullanmaz.
-rm -rf "$WEB/.next/types" "$WEB/.next/dev"
+# .next artık aktif derlemeye bağlantı; yalnız gerçek klasörse (eski düzen) içinden silinir.
+[ -L "$WEB/.next" ] || rm -rf "$WEB/.next/types" "$WEB/.next/dev"
 
 su -s /bin/bash www -c "export PATH=/www/server/nodejs/v22.22.3/bin:/usr/bin:/bin HOME=/home/www NEXT_TELEMETRY_DISABLED=1 NEXT_DIST_DIR=$NEXT
   cd $DIR && pnpm install --frozen-lockfile && pnpm --filter @arsa/web build && pnpm db:migrate"
 
 echo "NEXT_DIST_DIR=$NEXT" > "$ACTIVE_ENV" && chown www:www "$ACTIVE_ENV"
+# nginx /_next/static'i apps/web/.next/static'ten verir (2026-10-27: .next silinince CSS/JS 404, site stilsiz açıldı).
+# .next her zaman aktif derlemeye bağlantı olur.
+[ -L "$WEB/.next" ] || rm -rf "$WEB/.next"
+ln -sfn "$NEXT" "$WEB/.next" && chown -h www:www "$WEB/.next"
 systemctl restart arsa-video-web arsa-video-worker
 sleep 5
 systemctl is-active arsa-video-web arsa-video-worker
 curl -s -o /dev/null -w "site %{http_code}\n" http://127.0.0.1:3050/
-# Eski tek klasörlü düzenden kalan derleme artık kullanılmaz.
-[ "$ACTIVE" = .next ] && rm -rf "$WEB/.next" || true
 REMOTE
 # Yalnız başarılı yüklemeden sonra: bir sonraki yükleme silinenleri bu commit'e göre bulur.
 git rev-parse HEAD | ssh etic-vps "cat > $DIR/.deployed-commit && chown www:www $DIR/.deployed-commit"
