@@ -151,8 +151,8 @@ export const TEMPLATES: Record<TemplateId, TemplateInfo> = {
     category: "Konut",
     needs: ["2–4 fotoğraf: odalar ve isterseniz binanın dışı (sahibinden.com ilanından aktarılır)", "Her fotoğraf için oda tipi", "İlan linki ya da sayfa metni (anlatım için)"],
     includes: ["Sahne başına odada yürüyerek anlatan sunucu", "İlandan ve yakın yerlerden canlı Türkçe anlatım", "Kelime kelime altyazı", "İsteğe bağlı döşeme (temsili)", "Oda başlıkları, fiyat ve iletişim kartı", "Müzik"],
-    duration: "~40 sn",
-    preview: { video: "/media/sablon-sunucu.mp4", poster: "/media/sablon-sunucu-poster.jpg" },
+    duration: "~36 sn",
+    preview: { video: "/media/sablon-sunucu-2.mp4", poster: "/media/sablon-sunucu-2-poster.jpg" },
     badge: "Yeni",
     stages: [
       { id: "photos", label: "Fotoğraflar" },

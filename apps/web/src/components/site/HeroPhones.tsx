@@ -11,8 +11,8 @@ const PHONES = [
     from: "Ada ve parsel no ile",
   },
   {
-    src: "/media/sablon-sunucu.mp4",
-    poster: "/media/sablon-sunucu-poster.jpg",
+    src: "/media/sablon-sunucu-2.mp4",
+    poster: "/media/sablon-sunucu-2-poster.jpg",
     cls: "z-10 scale-[1.08]",
     icon: "🎙️",
     title: "Sunuculu tur",
