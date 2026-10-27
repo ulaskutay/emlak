@@ -1,7 +1,0 @@
-/* Pazarlama sitesi: gövde Instrument Sans (font-sans), başlıklar Bricolage Grotesque.
-   Büyük boyda dar (wdth 90) ve en büyük optik kesim (opsz 96): keskin, karakterli. Panel ve yönetim bundan etkilenmez. */
-.site h1,
-.site h2 {
-  font-family: var(--font-display);
-  font-variation-settings: "opsz" 96, "wdth" 90;
-}

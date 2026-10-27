@@ -58,7 +58,7 @@ function Adimlar({ adimlar }: { adimlar: Adim[] }) {
     <ol className="border-b border-white/15">
       {adimlar.map((a, i) => (
         <li key={a.baslik} className="grid grid-cols-[2.25rem_1fr] gap-x-3 border-t border-white/15 py-4">
-          <span className="font-display text-xl font-extrabold text-gunes tabular-nums">{i + 1}</span>
+          <span className="text-xl font-extrabold text-gunes tabular-nums">{i + 1}</span>
           <div>
             <div className="font-bold">{a.baslik}</div>
             <p className="mt-0.5 text-[#b9c3d9]">{a.text}</p>
@@ -247,7 +247,7 @@ export default function Home() {
           <ol className="grid gap-x-8 sm:grid-cols-3">
             {UC_ADIM.map((a, i) => (
               <li key={a.baslik} className="border-t border-white/15 pt-5 pb-8 sm:pb-0">
-                <span className="font-display block text-[4rem] leading-none font-extrabold text-gunes tabular-nums">{i + 1}</span>
+                <span className="block text-[4rem] leading-none font-extrabold text-gunes tabular-nums">{i + 1}</span>
                 <h3 className="mt-5 text-xl font-bold">{a.baslik}</h3>
                 <p className="mt-2 leading-relaxed text-[#b9c3d9]">{a.text}</p>
               </li>

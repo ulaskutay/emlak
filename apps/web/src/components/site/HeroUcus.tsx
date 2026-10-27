@@ -5,10 +5,10 @@ import { useEffect, useRef, useState } from "react";
 const sure = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
 /**
- * Ana sayfa hero'su: tam ekran vizör. Zeminde gerçek drone çıktısı (Dalyan Köyü, Ezine) sessiz döngüde oynar;
+ * Ana sayfa hero'su: tam ekran vizör. Zeminde aynı parselin 1080p drone render'ından kesilmiş sessiz döngü (hero-drone.mp4; 576 px'lik reel geniş ekranda pikselleniyordu);
  * geniş ekranda videonun yalnız orta şeridi görünür, gömülü başlık ve altyazı dışarıda kalır;
  * telefonda video üstte kalır, yazı alanı koyu geçişle örtülür. Köşe işaretleri
- * ekranın kendisini çerçeveler; sağ üstte videodan okunan künye, sol altta başlık ve çağrı.
+ * ekranın kendisini çerçeveler (üsttekiler menünün altından başlar); sağ üstte videodan okunan künye, sol altta başlık ve çağrı.
  */
 export function HeroUcus() {
   const video = useRef<HTMLVideoElement>(null);
@@ -24,15 +24,15 @@ export function HeroUcus() {
     <section className="relative isolate -mt-[76px] flex min-h-[100svh] flex-col justify-end overflow-hidden bg-lacivert text-white">
       <video
         ref={video}
-        src="/media/ornek-reel.mp4"
-        poster="/media/ornek-reel-poster.jpg"
+        src="/media/hero-drone.mp4"
+        poster="/media/hero-drone-poster.jpg"
         muted
         loop
         playsInline
         preload="metadata"
         onTimeUpdate={(e) => setAn(e.currentTarget.currentTime)}
         aria-label="Arsa drone turu örnek videosu"
-        className="absolute inset-0 -z-20 h-full w-full object-cover object-[50%_35%] max-lg:object-center"
+        className="absolute inset-0 -z-20 h-full w-full object-cover object-[50%_42%] max-lg:object-center"
       />
       <div
         aria-hidden
@@ -40,7 +40,7 @@ export function HeroUcus() {
       />
 
       {/* Vizör köşeleri: ekranın kendisi vizördür */}
-      <div aria-hidden className="pointer-events-none absolute inset-3 sm:inset-5">
+      <div aria-hidden className="pointer-events-none absolute inset-x-3 top-[5.25rem] bottom-3 sm:inset-x-5 sm:bottom-5">
         <span className="absolute top-0 left-0 h-9 w-9 rounded-tl-2xl border-t-[3px] border-l-[3px] border-gunes" />
         <span className="absolute top-0 right-0 h-9 w-9 rounded-tr-2xl border-t-[3px] border-r-[3px] border-gunes" />
         <span className="absolute bottom-0 left-0 h-9 w-9 rounded-bl-2xl border-b-[3px] border-l-[3px] border-gunes" />

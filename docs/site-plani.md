@@ -149,3 +149,15 @@ Higgsfield tarzı yapıya geçildi: kullanıcı şablonu seçer, şablon kendi f
 **Ana sayfa sırası:** hero → örnek video şeridi → arsa / konut / proje anlatımları → şablon kataloğu → üç adım → karşılaştırma → son çağrı.
 
 **Kaçınılanlar:** emojili hap etiketler, başlıkta tek kelimeyi renklendirme, bulanık renk lekeleri, uydurma müşteri yorumu ve logo.
+
+## 9. Güncelleme (2026-10-27, akşam): ana sayfa baştan — "Uçuş"
+Bölüm 8'deki vizör rötuşu yetersiz bulundu; ana sayfa sıfırdan kuruldu. Ayrıntı: [design-dna.json](design-dna.json).
+
+- **Sayfa baştan sona koyu** (lacivert `#0D1B3E`, değişimli bantlar `#070E22`); tek vurgu parsel sarısı `#FFC93C`. Gök mavisi yalnız alt sayfa gövdelerinde ve panelde.
+- **Hero tam ekran vizör** (`HeroUcus.tsx`): zemin, Dalyan Köyü parselinin 1080×1920 gerçek drone render'ı (`public/media/hero-drone.mp4`); köşe işaretleri ekranın köşelerinde, sağ üstte videodan okunan künye, sol altta canlı süre ve dev başlık "Drone uçurmadan, arsanızın drone videosu." Geniş ekranda videonun yalnız orta şeridi görünür (gömülü kartlar dışarıda); telefonda video üstte, yazı alanı koyu geçişle örtülür.
+- **Film şeridi** (`FilmSeridi.tsx`): altı şablonun gerçek çıktıları ekran boyu dikey, snap kaydırmalı; görünen video sessiz oynar.
+- **Üç anlatım, üçü de gerçek malzemeyle:** arsa (parsel sınırlı kare + künye), konut (`OnceSonra.tsx`: boş/döşenmiş oda sürgüsü), proje (dört inşaat karesi).
+- Karşılaştırma, üç adım ve son çağrı koyu dilde; **menü koyu cam hap**, tüm sayfalarda.
+- **Yazı tipi:** her yerde Plus Jakarta Sans. Bricolage Grotesque denemesi aynı akşam geri alındı.
+- **Hareket:** yalnız videolar ve kullanıcının sürüklediği sürgü; giriş animasyonu, kaydırma tetikli belirme yok.
+- Eski çizim bileşenleri (DroneCizim, KonutCizim, ProjeCizim, AnlatimBolumu) ana sayfada kullanılmıyor; dosyalar duruyor.

@@ -1,7 +1,7 @@
 {
   "meta": {
-    "name": "Arsa Video — Gökyüzü + Vizör",
-    "description": "Pazarlama sitesi, kullanıcı paneli ve yönetim için tasarım DNA'sı. Açık 'Gökyüzü' paleti; imza dil 'drone vizörü' (sarı köşe işaretleri + videodan okunan künye). Rakip analizleri meta.source_references ve design-dna-sanaldrone.json'da.",
+    "name": "Arsa Video — Uçuş (koyu sinematik)",
+    "description": "Pazarlama sitesi için tasarım DNA'sı. Sayfa bir drone uçuşu: baştan sona lacivert zemin, tam ekran gerçek drone videosu üstünde vizör, parsel sarısı tek vurgu, Plus Jakarta Sans (çok büyük, sıkı aralıklı başlıklar). Panel ve yönetim Gökyüzü paletinde, aynı yazı tipi. Rakip analizleri meta.source_references ve design-dna-sanaldrone.json'da.",
     "source_references": [
       {
         "site": "https://id.land",
@@ -77,33 +77,34 @@
     ],
     "created_at": "2026-10-18",
     "updated_at": "2026-10-27",
-    "history": "2026-10-18 'Pafta' (yeşil-gri harita kâğıdı + mürekkep) → 2026-10 'Gökyüzü' (site ve panel) → 2026-10-27 vizör dili (hero, anlatım bölümleri, karşılaştırma). Pafta tonları yalnız panelin koyu şablon galerisinde kalır (globals.css)."
+    "history": "2026-10-18 'Pafta' → 2026-10 'Gökyüzü' (açık, gök mavisi) → 2026-10-27 öğleden sonra vizör köşeleri ve künye eklendi → 2026-10-27 akşam ana sayfa baştan: koyu sinematik 'Uçuş'. Gökyüzü paleti panelde ve alt sayfa gövdelerinde sürüyor. Bricolage Grotesque başlık denemesi aynı akşam geri alındı (kullanıcı beğenmedi); yazı tipi her yerde Plus Jakarta Sans."
   },
   "design_system": {
     "color": {
-      "palette_type": "complementary — gök mavisi ana renk, parsel sarısı vurgu",
+      "palette_type": "tek koyu zemin + tek sıcak vurgu — lacivert üstünde parsel sarısı; gök mavisi yalnız alt sayfa gövdelerinde ve panelde",
       "primary": {
-        "hex": "#2B6CFF",
-        "role": "Gök — açık zeminde birincil buton, bağlantı, bölüm üst satırı, adım numarası (koyu hali #1A55E3, açık zemin #E9F0FF)"
+        "hex": "#0D1B3E",
+        "role": "Lacivert — ana sayfanın tamamı, menü camı, alt sayfa üst bantları, footer"
       },
       "secondary": {
-        "hex": "#0D1B3E",
-        "role": "Lacivert — metin, hero bandı ve son çağrı zemini, seçili sekme"
+        "hex": "#070E22",
+        "role": "Gece — ana sayfada değişimli koyu bantlar (konut, karşılaştırma)"
       },
       "accent": {
         "hex": "#FFC93C",
-        "role": "Parsel sarısı — render'daki parsel çizgisiyle aynı renk. Koyu zeminde birincil CTA ve vurgu metni; her yerde vizör köşe işaretleri. Açık zeminde metin rengi olarak kullanılmaz."
+        "role": "Parsel sarısı — render'daki parsel çizgisiyle aynı. Birincil buton, vizör köşeleri, adım rakamları, bölüm üst satırı, 'Arsa Video ile' sütunu. Koyu zeminde tek vurgu; açık zeminde metin olarak kullanılmaz."
       },
       "neutral": {
         "scale": [
           "#FFFFFF",
-          "#F5F8FD",
-          "#E2E8F3",
+          "#C3CCE0",
           "#B9C3D9",
-          "#56627A",
-          "#0D1B3E"
+          "rgba(255,255,255,.6)",
+          "rgba(255,255,255,.15)",
+          "#0D1B3E",
+          "#070E22"
         ],
-        "usage": "#F5F8FD sayfa zemini, #FFFFFF kart, #E2E8F3 ayraç/künye çizgisi, #56627A ikincil metin, #0D1B3E gövde metni. Koyu bantta ikincil metin #C3CCE0."
+        "usage": "Koyu zeminde beyaz başlık, #C3CCE0 / #B9C3D9 gövde, beyaz %55–60 künye etiketi, beyaz %15 künye çizgisi, beyaz %12 menü kenarı. Alt sayfa gövdeleri açık (#F5F8FD zemin, #0D1B3E metin, #E2E8F3 çizgi)."
       },
       "semantic": {
         "success": "#12A26A",
@@ -112,24 +113,24 @@
         "info": "#2B6CFF"
       },
       "surface": {
-        "background": "#F5F8FD",
-        "card": "#FFFFFF",
-        "elevated": "#0D1B3E"
+        "background": "#0D1B3E",
+        "card": "rgba(0,0,0,1) — video ve görsel kutuları",
+        "elevated": "rgba(13,27,62,.7) + backdrop-blur — menü ve görsel üstü künye"
       },
-      "contrast_strategy": "Açık zeminde lacivert metin; hero ve son çağrı lacivert bantlarda beyaz metin + sarı CTA. Mercan #FF6B4A yalnız kayıt noktası ve uyarılar için."
+      "contrast_strategy": "Koyu zeminde beyaz metin; video üstünde yazı yalnız koyu geçiş (gradient) örten alanda. Mercan #FF6B4A yalnız kayıt noktası."
     },
     "typography": {
       "type_scale": {
         "display": {
-          "size": "clamp(3rem, 7vw, 6rem)",
-          "weight": "700",
-          "line_height": "0.95",
-          "tracking": "-0.035em"
+          "size": "clamp(3rem, 9vw, 8.5rem)",
+          "weight": "800",
+          "line_height": "0.9",
+          "tracking": "-0.03em"
         },
         "heading_1": {
-          "size": "clamp(2.25rem, 4.5vw, 3.75rem)",
-          "weight": "700",
-          "line_height": "1.02",
+          "size": "clamp(2.25rem, 5vw, 4.5rem)",
+          "weight": "800",
+          "line_height": "0.95",
           "tracking": "-0.03em"
         },
         "heading_2": {
@@ -170,11 +171,11 @@
         }
       },
       "font_families": {
-        "heading": "Plus Jakarta Sans (site; extrabold, -0.035/-0.045em sıkı aralık)",
-        "body": "Plus Jakarta Sans",
+        "heading": "Plus Jakarta Sans 800 (font-site); başlıklarda -0.03em aralık",
+        "body": "Plus Jakarta Sans 400–600",
         "mono": "Yok — ada/parsel, m², süre tabular-nums ile"
       },
-      "font_style_notes": "Başlıklar büyük ve sıkı; ada/parsel numaraları tipografik öğe olarak kullanılır (ör. '230 ada 3 parsel' büyük yazılır). Tümü büyük harf etiket yok, tek kelime renklendirme yok."
+      "font_style_notes": "Tek aile. Başlıklar çok büyük (hero clamp 3rem–8.5rem, bölüm 2.25–4.5rem), satır 0.9–0.95, sıkı aralık; tek kelime vurgulanmaz, alt çizgi yok. Gövde 17–21 px, satır 1.6. Etiketler düz cümle, büyük harf yok."
     },
     "spacing": {
       "base_unit": "4px",
@@ -246,36 +247,36 @@
       "philosophy": "cinematic ama tek yerde — hareket videonun kendisinde"
     },
     "components": {
-      "button_style": "Hap biçimli (rounded-full), 48–56 px. Açık zeminde gök dolgu; koyu bantta sarı dolgu + lacivert metin, ikincil beyaz/25 çerçeve. Metne ok eklenmez.",
+      "button_style": "Hap, 52–56 px. Birincil sarı dolgu + lacivert metin; ikincil beyaz %30 çerçeve. Metne ok eklenmez.",
       "input_style": "Beyaz zemin, 1px #B4BBAE, odakta 2px sarı halka + mürekkep çerçeve",
-      "card_style": "Kart kiti yok. Öne çıkan tek içerik VizorCercevesi içinde (beyaz kart ya da video); karşı taraf çerçevesiz, ince çizgili künye.",
-      "navigation_pattern": "Süzülen beyaz hap menü (sticky); hero koyu bandın arkasına uzanır. Mobilde açılır liste.",
+      "card_style": "Kart yok. Görseller siyah zeminde 16 px köşeli kutular; metin doğrudan zemin üstünde, künye çizgileriyle.",
+      "navigation_pattern": "Koyu cam hap menü (lacivert %70 + blur), tüm sayfalarda tam ekran videonun ya da lacivert bandın üstünde süzülür. Sarı CTA. Mobilde açılır liste.",
       "modal_style": "Ortada, #F7F8F3, video önizleme için koyu tam ekran",
-      "list_style": "Künye satırları: küçük gri etiket (dt) + kalın değer (dd), aralarında 1px #E2E8F3 çizgi. Sıralı adımlarda solda yalnız rakam.",
-      "component_notes": "İmza bileşenler: (1) VizorCercevesi — dört sarı köşe işareti (28 px, 2 px, köşesi yuvarlak), hero videosu, anlatım çizimleri ve karşılaştırmada. (2) Künye — videodan okunan gerçek bilgi (Dalyan Köyü, Ezine · ada/parsel 230/3 · 11.091 m²). (3) Hero şablon sekmeleri vizördeki videoyu değiştirir. Bölüm üstünde hap etiket/emoji yok; gerekiyorsa düz renkli tek satır."
+      "list_style": "Künye: küçük soluk etiket + kalın değer, beyaz %15 çizgilerle. Sıralı adımlarda solda sarı Bricolage rakam.",
+      "component_notes": "İmza anlar: (1) HeroUcus — ekranın kendisi vizör: tam ekran gerçek drone videosu, dört köşe işareti ekran köşelerinde (üsttekiler menünün altından başlar), sağ üstte videodan okunan künye, sol altta canlı süre ve dev başlık. (2) FilmSeridi — altı şablonun gerçek çıktıları ekran boyu dikey, snap kaydırmalı; görünen oynar. (3) OnceSonra — boş/döşenmiş oda sürgüsü, hareket yalnız kullanıcının elinde. (4) İnşaat dört kare. VizorCercevesi alt sayfalarda ve son çağrıda sürüyor."
     }
   },
   "design_style": {
     "aesthetic": {
       "mood": [
-        "aydınlık",
-        "güven veren",
+        "sinematik",
         "havadan bakış",
+        "kararlı",
         "somut"
       ],
-      "visual_metaphor": "Drone vizörü: köşe işaretleri arasında gerçek çekim, yanında ölçülü künye",
+      "visual_metaphor": "Drone uçuşu: kalkış (tam ekran vizör), havada (film şeridi ve gerçek kareler), iniş (son çağrı)",
       "era_influence": "Çağdaş harita/ölçüm arayüzleri, harita mühendisi paftaları",
-      "genre": "dikey (emlak) SaaS, ürün çıktısı öncelikli",
+      "genre": "dikey emlak SaaS; ürün çıktısı sayfanın kendisi",
       "personality_traits": [
         "işini bilen",
         "sade",
         "sonuç gösteren"
       ],
       "adjectives": [
-        "ölçülü",
-        "gök",
-        "aydınlık",
-        "somut"
+        "koyu",
+        "geniş",
+        "gerçek",
+        "ölçülü"
       ]
     },
     "visual_language": {
@@ -283,9 +284,9 @@
       "ornamentation": "none — tek motif parsel konturu",
       "whitespace_usage": "cömert, metin blokları dar",
       "visual_weight_distribution": "Ağırlık video bantlarında",
-      "focal_strategy": "single hero element (drone videosu + parsel çizgisi)",
+      "focal_strategy": "single hero element — tam ekran video; sonrası disiplinli",
       "contrast_level": "high",
-      "texture_usage": "Çok hafif kontur çizgisi deseni yalnız hero arkasında (eş yükselti eğrileri)"
+      "texture_usage": "Doku yalnız gerçek uydu/drone görüntüsü; bulanık leke, desen, gradient süsü yok"
     },
     "composition": {
       "hierarchy_method": "scale contrast",
@@ -318,19 +319,23 @@
   },
   "visual_effects": {
     "overview": {
-      "effect_intensity": "subtle-accent",
-      "performance_tier": "medium",
-      "fallback_strategy": "Mobil/reduced-motion: video yerine poster kare, çizim animasyonu yerine son hali",
-      "primary_technology": "video + SVG path-draw + scroll ile kare dizisi (Canvas 2D)"
+      "effect_intensity": "moderate",
+      "performance_tier": "lightweight",
+      "fallback_strategy": "Hareket azaltılmışsa videolar oynamaz, kapak kalır; sürgü çalışır",
+      "primary_technology": "CSS + native video + IntersectionObserver"
     },
     "background_effects": {
       "type": "video-bg",
-      "description": "Hero'da gerçek drone çıktısı (sessiz, döngü, 6–8 sn)",
-      "technology": "<video> AV1/H.264, R2/CDN",
+      "description": "Hero: tam ekran gerçek drone render'ı (public/media/hero-drone.mp4, 1080×1920, assets/parcels/ezine-230-ada-3/drone.mp4'ten 3. saniyeden itibaren, sessiz). Geniş ekranda object-position 50% 35% ile üst ve alt bilgi kartları kadraj dışında kalır; üstünde alttan yukarı lacivert geçiş. Son çağrı: bulanık kapak karesi.",
+      "technology": "HTML video + CSS gradient",
       "params": {
-        "color_palette": "doğal uydu görüntüsü",
-        "speed": "1x",
-        "density": "n/a",
+        "color_palette": [
+          "#0D1B3E",
+          "rgba(13,27,62,.78)",
+          "rgba(13,27,62,.2)"
+        ],
+        "speed": "videonun kendi hızı",
+        "density": "tam bant",
         "opacity": "1",
         "blend_mode": "normal"
       }
@@ -421,13 +426,13 @@
     },
     "image_effects": {
       "type": "reveal-clip",
-      "description": "Önce/sonra: ilan fotoğrafı ↔ drone videosu sürgüsü",
-      "technology": "CSS clip-path + pointer",
+      "description": "OnceSonra: döşenmiş oda clip-path inset ile sürgüye bağlı; FilmSeridi: görünen video oynar",
+      "technology": "CSS clip-path + range input; IntersectionObserver",
       "params": {
         "filter_pipeline": "yok",
         "hover_transform": "yok",
-        "reveal_animation": "kullanıcı sürükler",
-        "distortion_type": "none"
+        "reveal_animation": "kullanıcı sürgüsü",
+        "distortion_type": "yok"
       }
     },
     "glassmorphism_neumorphism": {
@@ -465,6 +470,6 @@
         "filter_effects": "hafif glow (drop-shadow sarı %40)"
       }
     },
-    "composite_notes": "Tek imza an hero: lacivert bant, zeminde seçili videonun bulanık kapağı (blur-2xl, %55), vizörde sessiz döngü video ve canlı süre sayacı. Diğer bölümlerde efekt yok; vizör köşeleri statik. Hareket azaltılmışsa video oynamaz, kapak kalır. Mobilde hero'daki madde listesi gizlenir ki vizör ilk ekrana yaklaşsın."
+    "composite_notes": "Sayfada kendiliğinden hareket eden tek şey videolar. Giriş animasyonu, kaydırma tetikli belirme, hover büyüme yok. Vizör köşeleri statik. Mobilde hero videosu üstte kalır, alt %60 neredeyse düz lacivert geçişle örtülür; künye gizlenir."
   }
 }
