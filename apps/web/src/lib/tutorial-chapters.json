@@ -1,0 +1,126 @@
+{
+  "arsa-drone": [
+    {
+      "t": 0,
+      "label": "Parsel dosyasını yükleyin"
+    },
+    {
+      "t": 6.5,
+      "label": "Yakın noktaları seçin"
+    },
+    {
+      "t": 17,
+      "label": "Fiyat ve ofis bilgilerini girin"
+    },
+    {
+      "t": 28.2,
+      "label": "Sesi ve müziği seçin"
+    },
+    {
+      "t": 34.6,
+      "label": "Video hazır"
+    }
+  ],
+  "ilan-videosu": [
+    {
+      "t": 0,
+      "label": "İlan fotoğraflarını yükleyin"
+    },
+    {
+      "t": 6.3,
+      "label": "Sahne başlıklarını yazın"
+    },
+    {
+      "t": 15.7,
+      "label": "Fiyat ve iletişim bilgisini girin"
+    },
+    {
+      "t": 24.5,
+      "label": "Video hazır"
+    }
+  ],
+  "bitmis-hali": [
+    {
+      "t": 0,
+      "label": "Parsel dosyasını yükleyin"
+    },
+    {
+      "t": 4.9,
+      "label": "Yapı tipini ve kat sayısını seçin"
+    },
+    {
+      "t": 12.5,
+      "label": "Fiyat ve iletişim bilgisini girin"
+    },
+    {
+      "t": 21.5,
+      "label": "Video hazır"
+    }
+  ],
+  "insaat-videosu": [
+    {
+      "t": 0,
+      "label": "Parsel dosyasını yükleyin"
+    },
+    {
+      "t": 4.8,
+      "label": "Yapı tipini ve kat sayısını seçin"
+    },
+    {
+      "t": 8,
+      "label": "Emsal ve TAKS değerlerini girin"
+    },
+    {
+      "t": 13.9,
+      "label": "Kapanış kartını doldurun"
+    },
+    {
+      "t": 23.7,
+      "label": "Video hazır"
+    }
+  ],
+  "dosenmis-ev": [
+    {
+      "t": 0,
+      "label": "Boş oda fotoğraflarını yükleyin"
+    },
+    {
+      "t": 2.5,
+      "label": "Oda tipini ve döşeme tarzını seçin"
+    },
+    {
+      "t": 9.4,
+      "label": "İlan bilgilerini girin"
+    },
+    {
+      "t": 19.9,
+      "label": "Fiyat ve iletişim bilgisini girin"
+    },
+    {
+      "t": 28.7,
+      "label": "Video hazır"
+    }
+  ],
+  "sunucu-ev": [
+    {
+      "t": 0,
+      "label": "Oda fotoğraflarını yükleyin"
+    },
+    {
+      "t": 2.5,
+      "label": "Oda tiplerini seçin"
+    },
+    {
+      "t": 9.3,
+      "label": "İlan bilgilerini girin"
+    },
+    {
+      "t": 19.1,
+      "label": "Sunucuyu seçin"
+    },
+    {
+      "t": 30.5,
+      "label": "Video hazır"
+    }
+  ]
+}

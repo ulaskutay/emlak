@@ -5,7 +5,7 @@ import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { SiteLogo } from "./site/SiteLogo";
 
-export function AuthForm({ mode }: { mode: "login" | "signup" }) {
+export function AuthForm({ mode, next }: { mode: "login" | "signup"; next?: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -34,7 +34,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       );
       return;
     }
-    router.replace("/panel");
+    router.replace(next ?? "/panel");
     router.refresh();
   }
 
@@ -66,7 +66,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           <button className="btn-primary w-full" disabled={busy}>{busy ? "Bekleyin…" : signup ? "Kayıt ol" : "Giriş yap"}</button>
           <p className="text-center text-sm text-mute">
             {signup ? "Hesabınız var mı? " : "Hesabınız yok mu? "}
-            <Link className="font-semibold text-neon hover:underline" href={signup ? "/giris" : "/kayit"}>
+            <Link className="font-semibold text-neon hover:underline" href={`${signup ? "/giris" : "/kayit"}${next ? `?sonra=${encodeURIComponent(next)}` : ""}`}>
               {signup ? "Giriş yapın" : "Kayıt olun"}
             </Link>
           </p>

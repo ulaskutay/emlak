@@ -15,7 +15,7 @@ export const site = {
 
 export const nav = [
   { href: "/sablonlar", label: "Şablonlar" },
-  { href: "/#nasil-calisir", label: "Nasıl çalışır" },
+  { href: "/#nasil-yapilir", label: "Nasıl yapılır" },
   { href: "/#sss", label: "SSS" },
   { href: "/iletisim", label: "İletişim" },
 ];

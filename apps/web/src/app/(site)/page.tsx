@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { SOON_TEMPLATES, templateList } from "@arsa/shared";
+import { HowTo } from "@/components/site/HowTo";
 import { VideoWall } from "@/components/site/VideoWall";
 import { TemplateGallery } from "@/components/templates/TemplateGallery";
 import { site } from "@/lib/site";
+import { tutorials } from "@/lib/tutorials";
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 const sss = [
   {
     s: "Hangi videoları hazırlayabilirim?",
-    c: "Şu anda üç şablon var: parsel dosyasından arsa drone turu, ilan fotoğraflarından sinematik ilan videosu ve boş arsadan yükselen projeyi gösteren bitmiş hali videosu. Yeni şablonlar ekledikçe şablonlar sayfasında görünür.",
+    c: `Şu anda ${templateList.length} şablon var: ${templateList.map((t) => t.name.toLocaleLowerCase("tr")).join(", ")}. Her birinin panelde nasıl hazırlandığını ana sayfadaki kayıtlardan izleyebilirsiniz; yeni şablonlar ekledikçe şablonlar sayfasında görünür.`,
   },
   {
     s: "Parsel dosyasını nereden alırım?",
@@ -59,20 +60,6 @@ const jsonLd = {
 };
 
 export default function Home() {
-  const steps = [
-    {
-      title: "Şablonu seçin",
-      text: "Arsa, konut ya da proje: ilanınıza uyan video türünü seçin. Her şablonun örnek videosunu önceden izleyebilirsiniz.",
-    },
-    {
-      title: "İstediği bilgileri girin",
-      text: "Arsa şablonları TKGM parsel dosyasını, ilan şablonu fotoğraflarınızı ister. Fiyat, ofis adı ve telefon her şablonda isteğe bağlı.",
-    },
-    {
-      title: "Videoyu indirin",
-      text: "Aşamaları panelde izlersiniz. Dikey video hazır olunca indirip Reels, TikTok, Shorts ya da ilan sitesinde paylaşırsınız.",
-    },
-  ];
 
   return (
     <>
@@ -92,11 +79,11 @@ export default function Home() {
               dakikada panelinizde.
             </p>
             <div className="mt-9 flex flex-wrap justify-center gap-3">
-              <Link href="/kayit" className="site-btn-primary">
-                Ücretsiz deneyin
+              <Link href="#sablonlar" className="site-btn-primary">
+                Hemen oluşturun
               </Link>
-              <Link href="#sablonlar" className="site-btn border border-white/40 text-kagit hover:bg-white/10">
-                Şablonlara bakın
+              <Link href="#nasil-yapilir" className="site-btn border border-white/40 text-kagit hover:bg-white/10">
+                Nasıl yapıldığını izleyin
               </Link>
             </div>
             <ul className="mt-10 flex flex-wrap justify-center gap-2 text-sm">
@@ -120,56 +107,44 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Şablonlar */}
+      {/* Nasıl yapılır: panelin ekran kayıtları */}
+      {tutorials.length > 0 && (
+        <section id="nasil-yapilir" className="scroll-mt-6 px-3 pt-20 sm:px-4 md:pt-28">
+          <div className="mx-auto max-w-[1240px] px-1 sm:px-2">
+            <div className="grid gap-6 md:grid-cols-[1.1fr_0.9fr] md:items-end">
+              <h2 className="max-w-2xl font-display text-[clamp(2rem,4.5vw,3.5rem)] leading-[1.02] font-bold tracking-[-0.03em] text-balance">
+                Videonuzu nasıl hazırlayacağınızı izleyin
+              </h2>
+              <p className="max-w-[34rem] text-[1.0625rem] leading-relaxed text-soluk">
+                Her şablonu panelde baştan sona kaydettik: hangi bilgiyi girdiğinizi ve sonunda çıkan videoyu görürsünüz.
+                Aynısını kendi ilanınızla birkaç dakikada yaparsınız.
+              </p>
+            </div>
+          </div>
+          <div className="mx-auto mt-10 max-w-[1400px] rounded-[1.75rem] bg-gece px-4 py-8 text-kagit sm:px-8 sm:py-10 lg:px-12 lg:py-12">
+            <HowTo tutorials={tutorials} />
+          </div>
+        </section>
+      )}
+
+      {/* Şablonlar: her biri doğrudan forma götürür */}
       <section id="sablonlar" className="mx-auto max-w-[1240px] scroll-mt-6 px-4 pt-20 pb-24 sm:px-6 md:pt-28">
         <div className="flex flex-wrap items-end justify-between gap-6">
-          <h2 className="max-w-2xl font-display text-[clamp(2rem,4.5vw,3.5rem)] leading-[1.02] font-bold tracking-[-0.03em] text-balance">
-            Her ilan için bir şablon
-          </h2>
+          <div>
+            <h2 className="max-w-2xl font-display text-[clamp(2rem,4.5vw,3.5rem)] leading-[1.02] font-bold tracking-[-0.03em] text-balance">
+              Şablonu seçin, hemen oluşturun
+            </h2>
+            <p className="mt-4 max-w-[36rem] text-[1.0625rem] leading-relaxed text-soluk">
+              Kartın üzerine gelince örnek video oynar. "Hemen oluşturun" sizi doğrudan o şablonun formuna götürür;
+              hesabınız yoksa önce kısa bir kayıt açılır.
+            </p>
+          </div>
           <Link href="/sablonlar" className="font-semibold text-zeytin underline-offset-4 hover:underline">
             Tüm şablonlar
           </Link>
         </div>
         <div className="mt-10">
-          <TemplateGallery tone="light" />
-        </div>
-      </section>
-
-      {/* Nasıl çalışır */}
-      <section id="nasil-calisir" className="scroll-mt-6 border-t border-sinir">
-        <div className="mx-auto max-w-[1240px] px-4 py-20 sm:px-6 md:py-24">
-          <h2 className="font-display text-[clamp(2rem,4.5vw,3.5rem)] leading-[1.02] font-bold tracking-[-0.03em]">
-            Üç adımda video
-          </h2>
-          <ol className="mt-12 grid gap-10 md:grid-cols-3 md:gap-8">
-            {steps.map((st, i) => (
-              <li key={st.title} className="border-t-2 border-murekkep pt-6">
-                <span className="font-display text-5xl font-bold text-zeytin tabular-nums">{i + 1}</span>
-                <h3 className="mt-3 font-display text-[1.5rem] leading-tight font-semibold tracking-[-0.02em]">{st.title}</h3>
-                <p className="mt-3 text-[1.0625rem] leading-relaxed text-soluk">{st.text}</p>
-              </li>
-            ))}
-          </ol>
-          <div className="mt-14 grid grid-cols-3 gap-3 sm:grid-cols-6">
-            {[
-              ["/media/duvar/arsa-1.jpg", "Arsa drone turu: açılış"],
-              ["/media/kare-15.jpg", "Arsa drone turu: parsel künyesi"],
-              ["/media/duvar/ilan-1.jpg", "İlan videosu: dış cephe"],
-              ["/media/duvar/ilan-3.jpg", "İlan videosu: mutfak"],
-              ["/media/duvar/bitmis-1.jpg", "Bitmiş hali: başlangıç karesi"],
-              ["/media/kare-23.jpg", "Arsa drone turu: alan ve fiyat"],
-            ].map(([src, alt]) => (
-              <Image
-                key={src}
-                src={src!}
-                alt={alt!}
-                width={270}
-                height={480}
-                sizes="(min-width: 640px) 190px, 30vw"
-                className="aspect-[9/16] w-full rounded-xl object-cover"
-              />
-            ))}
-          </div>
+          <TemplateGallery tone="light" cta howTo={tutorials.map((x) => x.template.id)} />
         </div>
       </section>
 
