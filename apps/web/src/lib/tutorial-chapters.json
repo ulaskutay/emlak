@@ -5,19 +5,19 @@
       "label": "Parsel dosyasını yükleyin"
     },
     {
-      "t": 6.5,
+      "t": 11.8,
       "label": "Yakın noktaları seçin"
     },
     {
-      "t": 17,
+      "t": 22.8,
       "label": "Fiyat ve ofis bilgilerini girin"
     },
     {
-      "t": 28.2,
+      "t": 33.6,
       "label": "Sesi ve müziği seçin"
     },
     {
-      "t": 34.6,
+      "t": 42.6,
       "label": "Video hazır"
     }
   ],
@@ -27,11 +27,11 @@
       "label": "İlan fotoğraflarını yükleyin"
     },
     {
-      "t": 6.3,
+      "t": 6.6,
       "label": "Sahne başlıklarını yazın"
     },
     {
-      "t": 15.7,
+      "t": 15.9,
       "label": "Fiyat ve iletişim bilgisini girin"
     },
     {
@@ -45,15 +45,15 @@
       "label": "Parsel dosyasını yükleyin"
     },
     {
-      "t": 4.9,
+      "t": 7.4,
       "label": "Yapı tipini ve kat sayısını seçin"
     },
     {
-      "t": 12.5,
+      "t": 15.5,
       "label": "Fiyat ve iletişim bilgisini girin"
     },
     {
-      "t": 21.5,
+      "t": 24.3,
       "label": "Video hazır"
     }
   ],
@@ -63,19 +63,19 @@
       "label": "Parsel dosyasını yükleyin"
     },
     {
-      "t": 4.8,
+      "t": 6.7,
       "label": "Yapı tipini ve kat sayısını seçin"
     },
     {
-      "t": 8,
+      "t": 10.5,
       "label": "Emsal ve TAKS değerlerini girin"
     },
     {
-      "t": 13.9,
+      "t": 16.2,
       "label": "Kapanış kartını doldurun"
     },
     {
-      "t": 23.7,
+      "t": 25.8,
       "label": "Video hazır"
     }
   ],
@@ -89,15 +89,15 @@
       "label": "Oda tipini ve döşeme tarzını seçin"
     },
     {
-      "t": 9.4,
+      "t": 9.7,
       "label": "İlan bilgilerini girin"
     },
     {
-      "t": 19.9,
+      "t": 20.3,
       "label": "Fiyat ve iletişim bilgisini girin"
     },
     {
-      "t": 28.7,
+      "t": 29.3,
       "label": "Video hazır"
     }
   ],
@@ -107,19 +107,19 @@
       "label": "Oda fotoğraflarını yükleyin"
     },
     {
-      "t": 2.5,
+      "t": 2.4,
       "label": "Oda tiplerini seçin"
     },
     {
-      "t": 9.3,
+      "t": 9.1,
       "label": "İlan bilgilerini girin"
     },
     {
-      "t": 19.1,
+      "t": 18.8,
       "label": "Sunucuyu seçin"
     },
     {
-      "t": 30.5,
+      "t": 30,
       "label": "Video hazır"
     }
   ]

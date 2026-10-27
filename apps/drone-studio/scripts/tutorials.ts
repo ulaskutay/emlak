@@ -159,7 +159,7 @@ class Rec {
 }
 
 /**
- * Her sayfaya: sahte imleç + tıklama halkası; hesap adı ve Next.js geliştirici rozeti gizlenir.
+ * Her sayfaya: sahte imleç + tıklama halkası; hesap adı, yönetim bağlantısı ve Next.js geliştirici rozeti gizlenir.
  * Düz metin: tsx'in fonksiyonlara eklediği yardımcılar tarayıcıda tanımsız olurdu.
  */
 const CURSOR_SCRIPT = String.raw`(() => {
@@ -170,6 +170,7 @@ const CURSOR_SCRIPT = String.raw`(() => {
     "@keyframes __r{from{transform:scale(.25);opacity:1}to{transform:scale(1.35);opacity:0}}",
     "nextjs-portal{display:none!important}",
     "header span.text-sm.text-mute{visibility:hidden!important}",
+    'header a[href^="/admin"]{display:none!important}',
   ].join(" ");
   let cur = null;
   let pos = [640, 400];
@@ -223,6 +224,12 @@ type Flow = (r: Rec, p: Page) => Promise<void>;
 async function parcelStep(r: Rec, p: Page) {
   r.chapter("Parsel dosyasını yükleyin");
   await sleep(700);
+  // Parsel adımı "TKGM'den sorgula" sekmesiyle açılıyorsa dosya yükleme sekmesine geçilir.
+  const fileTab = p.getByRole("tab", { name: "Dosya yükle" });
+  if (await fileTab.isVisible().catch(() => false)) {
+    await r.click(fileTab);
+    await sleep(500);
+  }
   await r.upload(p.getByText("Parsel dosyasını sürükleyin ya da seçin"), [PARCEL]);
   const next = p.getByRole("button", { name: "Devam →" }).first();
   await next.waitFor({ timeout: 20_000 });
