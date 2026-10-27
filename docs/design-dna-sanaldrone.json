@@ -1,0 +1,178 @@
+{
+  "meta": {
+    "name": "SanalDrone (rakip) — Design DNA",
+    "description": "sanaldrone.com ana sayfasının üç boyutlu tasarım profili ve Arsa Video için yorumu. Renkler ekran görüntülerinden ölçüldü (measure-colors.mjs, k=8).",
+    "source_references": ["https://sanaldrone.com (masaüstü 1024 px, 2026-10-27)"],
+    "created_at": "2026-10-27"
+  },
+  "design_system": {
+    "color": {
+      "palette_type": "complementary",
+      "primary": { "hex": "#ED7D22", "role": "Marka turuncusu: logo, başlık, birincil buton, seçili sekme" },
+      "secondary": { "hex": "#1A2B72", "role": "Lacivert: 'Nasıl oluştururum' kartları, koyu ikincil buton" },
+      "accent": { "hex": "#E8AC78", "role": "Soluk turuncu: 'Hemen Dene' hap butonu zemini, vurgu çizgileri" },
+      "neutral": {
+        "scale": ["#F7F7F6", "#E0DBD0", "#DADAD6", "#A3A5AD", "#6C6E78", "#343742", "#141A30", "#020C34"],
+        "usage": "Açık zemin #F7F7F6, kart sınırları #E0DBD0; metin lacivertimsi siyah #141A30 / #020C34, ikincil metin #6C6E78"
+      },
+      "semantic": { "success": "#2E9E5B", "warning": "#ED7D22", "error": "#D42723", "info": "#1A2B72" },
+      "surface": { "background": "#F7F7F6", "card": "#FFFFFF", "elevated": "#293126" },
+      "contrast_strategy": "dark-on-light dominant; tek koyu bant (drone fotoğrafı üstünde koyu cam kart) beyaz metinle",
+      "measurement": { "tool": "scripts/measure-colors.mjs", "k": 8, "inputs": ["hero", "arsa bandı", "nasıl oluştururum"] },
+      "measured_palette": [
+        { "hex": "#F6F7F6", "coverage": 0.85, "role": "background" },
+        { "hex": "#E0DBD0", "coverage": 0.086, "role": "unassigned" },
+        { "hex": "#ED7D22", "coverage": 0.023, "role": "accent" },
+        { "hex": "#E8AC78", "coverage": 0.018, "role": "unassigned" },
+        { "hex": "#343742", "coverage": 0.006, "role": "text" },
+        { "hex": "#1A2B72", "coverage": 0.09, "role": "accent (nasıl bölümü)" },
+        { "hex": "#293126", "coverage": 0.133, "role": "text (arsa bandı, koyu cam)" },
+        { "hex": "#444C3D", "coverage": 0.178, "role": "unassigned (uydu/arazi fotoğrafı)" }
+      ]
+    },
+    "typography": {
+      "type_scale": {
+        "display": { "size": "48px", "weight": "600", "line_height": "1.5", "tracking": "0" },
+        "heading_1": { "size": "32px", "weight": "600", "line_height": "1.5", "tracking": "0" },
+        "heading_2": { "size": "24px", "weight": "600", "line_height": "1.5", "tracking": "0" },
+        "heading_3": { "size": "18px", "weight": "600", "line_height": "1.5", "tracking": "0" },
+        "body": { "size": "18px", "weight": "400", "line_height": "1.5", "tracking": "0.15px" },
+        "body_small": { "size": "16px", "weight": "400", "line_height": "1.5", "tracking": "0.15px" },
+        "caption": { "size": "14px", "weight": "500", "line_height": "1.4", "tracking": "0.15px" },
+        "overline": { "size": "12px", "weight": "600", "line_height": "1.4", "tracking": "0.5px" }
+      },
+      "font_families": { "heading": "Cal Sans", "body": "Inter", "mono": "yok" },
+      "font_style_notes": "Geometrik, yuvarlak hatlı Cal Sans başlık + Inter gövde; MUI kalıntısı Roboto butonlarda. Başlık satır aralığı 1.5 — gevşek, display için fazla açık."
+    },
+    "spacing": {
+      "base_unit": "8px",
+      "scale": ["8", "16", "24", "32", "48", "64", "96"],
+      "content_density": "comfortable",
+      "section_rhythm": "Bölümler arası ~96–120 px; bölüm içi sıkı, kartlar bitişik"
+    },
+    "layout": {
+      "grid_system": "MUI Container + flex",
+      "max_content_width": "1200px",
+      "columns": "12 (çoğunlukla 2 sütun: metin + görsel)",
+      "gutter": "24px",
+      "breakpoints": ["600", "900", "1200", "1536"],
+      "alignment_tendency": "mixed — hero sola, bölüm başlıkları ortaya"
+    },
+    "shape": {
+      "border_radius": { "small": "8px", "medium": "12px", "large": "24px", "pill": "9999px" },
+      "border_usage": "subtle 1px — turuncu ince çerçeveli bölüm kutuları",
+      "divider_style": "yok; bölümler zemin rengiyle ayrılır"
+    },
+    "elevation": {
+      "shadow_style": "soft diffused",
+      "levels": {
+        "low": "0 1px 3px rgba(0,0,0,.08)",
+        "medium": "0 8px 24px rgba(0,0,0,.10)",
+        "high": "0 24px 48px rgba(0,0,0,.18)"
+      },
+      "depth_cues": "overlapping layers + blur/glass (menü ve arsa bandındaki koyu cam kart)"
+    },
+    "iconography": { "style": "dolu turuncu daire içinde onay işareti; emoji (📍)", "stroke_weight": "2px", "size_scale": ["16", "20", "24"], "preferred_set": "MUI icons + özel SVG" },
+    "motion": {
+      "easing": "ease-out",
+      "duration_scale": { "micro": "150ms", "normal": "300ms", "macro": "600ms" },
+      "entrance_pattern": "yok denecek kadar az; yatay sonsuz kayan yorum ve logo şeritleri",
+      "exit_pattern": "yok",
+      "philosophy": "minimal functional"
+    },
+    "components": {
+      "button_style": "Dolu turuncu, 8–10 px köşe, sağda ok; ikincil koyu lacivert ya da beyaz çerçeveli",
+      "input_style": "MUI outlined, gri çerçeve",
+      "card_style": "Beyaz kart, ince sınır, logo + tırnaklı alıntı; koyu lacivert adım kartları",
+      "navigation_pattern": "Süzülen hap menü, turuncu çerçeve, bayrak dil seçici, sağda soluk turuncu 'Hemen Dene'",
+      "modal_style": "Video oynatıcı kaplaması",
+      "list_style": "Turuncu onay rozetli madde listesi",
+      "component_notes": "Gayrimenkul türü hap sekmeleri (Arsa/Konut/Emlak Araştırıcı); il-ilçe etiketli dikey video şeridi; 'VS' karşılaştırma tablosu; sabit sağ alt canlı destek balonu"
+    }
+  },
+  "design_style": {
+    "aesthetic": {
+      "mood": ["enerjik", "satışçı", "güven arayan", "kalabalık"],
+      "visual_metaphor": "Drone ile çekilmiş arazi; turuncu = gün batımı/uyarı",
+      "era_influence": "2023–24 Türk SaaS açılış sayfası",
+      "genre": "dönüşüm odaklı SaaS",
+      "personality_traits": ["iddialı", "aceleci", "samimi"],
+      "adjectives": ["turuncu", "açık", "kart ağırlıklı", "sosyal kanıtlı"]
+    },
+    "visual_language": {
+      "complexity": "rich",
+      "ornamentation": "subtle accents",
+      "whitespace_usage": "Hero bol, alt bölümler sıkışık",
+      "visual_weight_distribution": "Üstte ağır (hero + yorum şeridi + logo şeridi)",
+      "focal_strategy": "distributed interest",
+      "contrast_level": "orta",
+      "texture_usage": "Gerçek arazi/uydu fotoğrafı tek koyu bantta doku olarak"
+    },
+    "composition": {
+      "hierarchy_method": "color weight",
+      "balance_type": "asymmetric",
+      "flow_direction": "Z deseni: hero → sosyal kanıt → ürün türü → örnek → fiyat → yorum → karşılaştırma → adımlar",
+      "grouping_strategy": "Kutulara alınmış bölümler",
+      "negative_space_role": "Hero'da nefes; sonrasında azalıyor"
+    },
+    "imagery": {
+      "photo_treatment": "Gerçek drone/uydu kareleri, koyu cam kart altında",
+      "illustration_style": "Ekran görüntüsü mockup'ları (form, monitör)",
+      "graphic_elements": "Turuncu ok, onay rozetleri, ofis logoları",
+      "pattern_usage": "yok",
+      "image_shape": "Yuvarlak köşeli dikdörtgen, dikey 9:16 video kartları"
+    },
+    "interaction_feel": {
+      "feedback_style": "Renk değişimi",
+      "hover_behavior": "Hafif koyulaşma",
+      "transition_personality": "fade-subtle",
+      "loading_style": "Yok",
+      "microinteraction_density": "düşük"
+    },
+    "brand_voice_in_ui": {
+      "tone": "Sen dili, iddialı, sonuç vaat eden",
+      "formality": "samimi",
+      "cta_style": "direct imperative",
+      "empty_state_approach": "yok",
+      "error_tone": "yok"
+    }
+  },
+  "visual_effects": {
+    "overview": { "effect_intensity": "subtle-accent", "performance_tier": "lightweight", "fallback_strategy": "reduce to CSS", "primary_technology": "CSS only" },
+    "background_effects": {
+      "type": "video-bg",
+      "description": "Arsa bandında arazi fotoğrafı zemin, üstünde koyu cam kart",
+      "technology": "CSS background-image + backdrop-filter",
+      "params": { "color_palette": ["#444C3D", "#293126"], "speed": "statik", "density": "tam bant", "opacity": "1", "blend_mode": "normal" }
+    },
+    "particle_systems": { "enabled": false, "type": "none", "description": "yok", "technology": "yok", "params": { "count": "0", "shape": "yok", "size_range": "yok", "movement_pattern": "yok", "color_behavior": "yok", "interaction": "none", "spawn_area": "yok" } },
+    "3d_elements": { "enabled": false, "type": "none", "description": "yok", "technology": "yok", "params": { "renderer": "yok", "lighting": "yok", "camera": "yok", "materials": "yok", "geometry": "yok", "post_processing": [], "interaction_model": "yok" } },
+    "shader_effects": { "enabled": false, "type": "none", "description": "yok", "technology": "yok", "params": { "uniforms": "yok", "vertex_manipulation": "yok", "fragment_output": "yok", "noise_type": "yok", "distortion": "yok" } },
+    "scroll_effects": {
+      "parallax": { "enabled": false, "layers": "0", "depth_range": "yok", "speed_curve": "yok" },
+      "scroll_triggered_animations": { "enabled": false, "trigger_points": "yok", "animation_type": "yok", "scrub_behavior": "yok" },
+      "scroll_morphing": { "enabled": false, "description": "yok" }
+    },
+    "text_effects": { "type": "none", "description": "Turuncu düz başlık, efekt yok", "technology": "yok", "params": { "split_strategy": "yok", "animation_per_unit": "yok", "stagger": "yok", "effect_style": "yok" } },
+    "cursor_effects": { "enabled": false, "type": "none", "description": "yok", "params": { "shape": "yok", "size": "yok", "blend_mode": "yok", "trail": "yok", "interaction_zone": "yok" } },
+    "image_effects": { "type": "none", "description": "Sonsuz yatay kayan yorum ve logo şeritleri", "technology": "CSS keyframes", "params": { "filter_pipeline": "yok", "hover_transform": "yok", "reveal_animation": "yok", "distortion_type": "yok" } },
+    "glassmorphism_neumorphism": { "enabled": true, "style": "frosted-layers", "params": { "blur_radius": "12px", "transparency": "0.35–0.6", "border_treatment": "1px yarı saydam beyaz/turuncu", "shadow_type": "soft", "light_source_angle": "yukarıdan" } },
+    "canvas_drawings": { "enabled": false, "type": "none", "description": "yok", "technology": "yok", "params": { "draw_method": "yok", "animation_loop": "yok", "color_scheme": "yok", "responsiveness": "yok", "interaction": "yok" } },
+    "svg_animations": { "enabled": false, "type": "none", "description": "yok", "params": { "animation_method": "yok", "path_morphing": "yok", "stroke_animation": "yok", "filter_effects": "yok" } },
+    "composite_notes": "Efekt az; sayfanın en güçlü anı arsa bandı (gerçek arazi fotoğrafı + koyu cam kart). Zayıflıklar: başlık satırlarının elle kırılması, üç yazı ailesinin karışması, hero'da form ekran görüntüsünün ürünü değil formu göstermesi, her yerde turuncu.",
+    "arsa_video_yorumu": {
+      "alinan": [
+        "Ürünün kendisi ilk ekranda: rakip formu gösteriyor, biz çıktıyı (drone videosu) gösteriyoruz",
+        "Gerçek arazi görüntüsü üstünde koyu yüzey: hero bandını uydu karesinden kuruyoruz",
+        "Gerçek yer adı kanıt olarak: videodaki parselin köyü, ada/parsel ve m² bilgisi vizörde",
+        "Çekim ekibi ile karşılaştırma: süre farkı tek bakışta"
+      ],
+      "reddedilen": [
+        "Her yerde turuncu ve üç yazı ailesi",
+        "Uydurma müşteri yorumları ve ofis logoları (bizde gerçek veri yok)",
+        "Tek kelimeyi renklendiren başlık; başlığın altını çizen dalga"
+      ],
+      "imza": "Drone vizörü: hero, videodaki gerçek parselin uydu karesinde; sağda dikey vizör çerçevesinde gerçek drone çıktısı oynar, köşe işaretleri ve parsel künyesi (Dalyan Köyü, Ezine · Ada 230 / Parsel 3 · 11.091 m²) render'daki parsel sarısıyla (#FFC93C)."
+    }
+  }
+}

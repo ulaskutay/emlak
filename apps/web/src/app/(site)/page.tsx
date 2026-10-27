@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { DroneAnlatim } from "@/components/site/DroneAnlatim";
 import { KonutAnlatim, ProjeAnlatim } from "@/components/site/SablonAnlatimlari";
-import { HeroPhones } from "@/components/site/HeroPhones";
+import { HeroVizor } from "@/components/site/HeroVizor";
 import { SablonKatalogu } from "@/components/site/SablonKatalogu";
 import { SonCagri } from "@/components/site/SonCagri";
 import { VideoTile } from "@/components/site/VideoTile";
@@ -35,69 +35,13 @@ export default function Home() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div aria-hidden className="pointer-events-none absolute -top-32 -left-40 h-[520px] w-[520px] rounded-full bg-gok/15 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute top-40 -right-32 h-[420px] w-[420px] rounded-full bg-gunes/25 blur-3xl" />
-        <div className="relative mx-auto grid max-w-[1240px] items-center gap-14 px-4 pt-12 pb-20 sm:px-6 md:pt-16 lg:grid-cols-[1.05fr_1fr] lg:gap-10 lg:pb-28">
-          <div className="text-center lg:text-left">
-            <span className="site-etiket">
-              <span aria-hidden>🚁</span> Drone uçurmadan, çekim ekibi olmadan
-            </span>
-            <h1 className="mt-6 text-[clamp(2.6rem,6vw,4.75rem)] leading-[1.02] font-extrabold tracking-[-0.045em] text-balance">
-              İlanınızın videosu{" "}
-              <span className="relative whitespace-nowrap text-gok">
-                dakikalar içinde
-                <svg aria-hidden viewBox="0 0 300 14" preserveAspectRatio="none" className="absolute -bottom-2 left-0 h-3 w-full text-gunes">
-                  <path d="M3 10C80 3 210 2 297 8" stroke="currentColor" strokeWidth="6" strokeLinecap="round" fill="none" />
-                </svg>
-              </span>{" "}
-              hazır.
-            </h1>
-            <p className="mx-auto mt-7 max-w-[34rem] text-[clamp(1.0625rem,1.6vw,1.25rem)] leading-relaxed text-gri lg:mx-0">
-              Parsel dosyanızı ya da ilan fotoğraflarınızı yükleyin; seslendirmeli, müzikli, dikey tanıtım videonuz panelinize
-              gelsin.
-            </p>
-            <div className="mt-9 flex flex-wrap justify-center gap-3 lg:justify-start">
-              <Link href="/sablonlar" className="site-btn-primary h-14 px-8 text-base">
-                Hemen oluşturun
-              </Link>
-              <Link href="/nasil-yapilir" className="site-btn-secondary h-14 px-6 text-base">
-                <span aria-hidden className="grid h-7 w-7 place-items-center rounded-full bg-gok-acik text-gok">
-                  <svg viewBox="0 0 24 24" className="ml-0.5 h-3.5 w-3.5">
-                    <path d="M7 4.5v15l12-7.5z" fill="currentColor" />
-                  </svg>
-                </span>
-                Nasıl yapılır izleyin
-              </Link>
-            </div>
-            <ul className="mt-9 flex flex-wrap justify-center gap-x-6 gap-y-2 text-[0.9375rem] font-semibold text-gri lg:justify-start">
-              {["Reels, TikTok ve Shorts için 9:16", "Türkçe seslendirme ve altyazı", "Ofis adınız ve telefonunuz videoda"].map((x) => (
-                <li key={x} className="flex items-center gap-2">
-                  <span aria-hidden className="grid h-5 w-5 place-items-center rounded-full bg-cimen-acik text-xs text-cimen">
-                    ✓
-                  </span>
-                  {x}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <HeroPhones />
-        </div>
-      </section>
-
-      <DroneAnlatim />
-      <KonutAnlatim />
-      <ProjeAnlatim />
-
-      <SablonKatalogu />
+      <HeroVizor />
 
       {/* Örnek videolar şeridi */}
       <section className="overflow-hidden bg-white py-20 md:py-24">
         <div className="mx-auto flex max-w-[1240px] flex-wrap items-end justify-between gap-6 px-4 sm:px-6">
           <div>
-            <span className="site-etiket">Örnekler</span>
-            <h2 className="mt-4 max-w-2xl text-[clamp(2rem,4vw,3rem)] leading-[1.08] font-extrabold tracking-[-0.035em] text-balance">
+            <h2 className="max-w-2xl text-[clamp(2rem,4vw,3rem)] leading-[1.08] font-extrabold tracking-[-0.035em] text-balance">
               Arsa Video ile hazırlanan videolar
             </h2>
             <p className="mt-3 max-w-xl text-[1.0625rem] text-gri">Hepsi ilan sitelerine ve sosyal medyaya uygun dikey videolar.</p>
@@ -120,6 +64,14 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <div className="pt-20 md:pt-28">
+        <DroneAnlatim />
+        <KonutAnlatim />
+        <ProjeAnlatim />
+      </div>
+
+      <SablonKatalogu />
 
       {/* Üç adım */}
       <section className="mx-auto max-w-[1240px] px-4 py-24 sm:px-6">
