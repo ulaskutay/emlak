@@ -105,7 +105,7 @@ export function HowTo({ tutorials }: { tutorials: Tutorial[] }) {
             onClick={() => setIndex(i)}
             onKeyDown={(e) => onTabKey(e, i)}
             className={`shrink-0 scroll-mt-28 rounded-full px-4 py-2 text-sm font-semibold whitespace-nowrap transition-colors ${
-              i === index ? "bg-sari text-murekkep" : "border border-white/20 text-[#c9d0c6] hover:border-white/50 hover:text-kagit"
+              i === index ? "bg-gok text-white shadow-[0_8px_20px_-10px_rgba(43,108,255,.8)]" : "border border-ayrac bg-white text-gri hover:border-gok hover:text-gok"
             }`}
           >
             {x.template.name}
@@ -121,14 +121,14 @@ export function HowTo({ tutorials }: { tutorials: Tutorial[] }) {
       >
         <div ref={frame}>
           {/* Tarayıcı çerçevesi: kaydın panelde geçtiği belli olsun */}
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0d1310] shadow-[0_40px_80px_-30px_rgba(0,0,0,.7)]">
-            <div className="flex items-center gap-3 border-b border-white/10 px-4 py-2.5">
+          <div className="overflow-hidden rounded-2xl border border-ayrac bg-white shadow-[0_40px_80px_-40px_rgba(13,27,62,.45)]">
+            <div className="flex items-center gap-3 border-b border-ayrac px-4 py-2.5">
               <span aria-hidden className="flex gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
-                <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
-                <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+                <span className="h-2.5 w-2.5 rounded-full bg-mercan" />
+                <span className="h-2.5 w-2.5 rounded-full bg-gunes" />
+                <span className="h-2.5 w-2.5 rounded-full bg-cimen" />
               </span>
-              <span className="min-w-0 flex-1 truncate rounded-md bg-white/5 px-3 py-1 text-center text-xs text-[#8f988c]">
+              <span className="min-w-0 flex-1 truncate rounded-full bg-zemin px-3 py-1 text-center text-xs font-semibold text-gri">
                 Panel · {t.name}
               </span>
             </div>
@@ -147,17 +147,17 @@ export function HowTo({ tutorials }: { tutorials: Tutorial[] }) {
                 onPlay={() => setPaused(false)}
                 onPause={() => setPaused(true)}
                 onClick={(e) => (e.currentTarget.paused ? e.currentTarget.play().catch(() => {}) : e.currentTarget.pause())}
-                className="block aspect-video w-full cursor-pointer bg-gece object-cover"
+                className="block aspect-video w-full cursor-pointer bg-lacivert object-cover"
                 aria-label={`${t.name}: panelde video hazırlama kaydı`}
               />
               {paused && (
                 <button
                   type="button"
                   onClick={() => video.current?.play().catch(() => {})}
-                  className="absolute inset-0 grid place-items-center bg-gece/30"
+                  className="absolute inset-0 grid place-items-center bg-lacivert/25"
                   aria-label="Kaydı oynat"
                 >
-                  <span className="grid h-16 w-16 place-items-center rounded-full bg-sari text-murekkep shadow-lg">
+                  <span className="grid h-16 w-16 place-items-center rounded-full bg-gok text-white shadow-[0_12px_30px_-8px_rgba(43,108,255,.9)]">
                     <svg viewBox="0 0 24 24" className="ml-1 h-7 w-7" aria-hidden>
                       <path d="M7 4.5v15l12-7.5z" fill="currentColor" />
                     </svg>
@@ -181,8 +181,8 @@ export function HowTo({ tutorials }: { tutorials: Tutorial[] }) {
                   style={{ flexGrow: len }}
                   className="group h-5 basis-0 py-2"
                 >
-                  <span className="block h-1 overflow-hidden rounded-full bg-white/15 group-hover:bg-white/30">
-                    <span className="block h-full rounded-full bg-sari" style={{ width: `${fill * 100}%` }} />
+                  <span className="block h-1.5 overflow-hidden rounded-full bg-ayrac group-hover:bg-[#cdd7ea]">
+                    <span className="block h-full rounded-full bg-gok" style={{ width: `${fill * 100}%` }} />
                   </span>
                 </button>
               );
@@ -191,31 +191,31 @@ export function HowTo({ tutorials }: { tutorials: Tutorial[] }) {
         </div>
 
         <div className="flex flex-col">
-          <p className="text-sm text-[#8f988c]">
+          <p className="text-sm font-semibold text-gri">
             {t.category} · video <span className="tabular-nums">{t.duration}</span>
           </p>
-          <h3 className="mt-1 font-display text-[1.75rem] leading-tight font-bold tracking-[-0.02em]">{t.name}</h3>
-          <p className="mt-2 text-[1rem] leading-relaxed text-[#c9d0c6]">{t.tagline}</p>
+          <h3 className="mt-1 text-[1.75rem] leading-tight font-extrabold tracking-[-0.03em]">{t.name}</h3>
+          <p className="mt-2 text-[1rem] leading-relaxed text-gri">{t.tagline}</p>
 
-          <ol className="mt-6 border-t border-white/10">
+          <ol className="mt-6 space-y-1.5">
             {tut.chapters.map((c, i) => (
-              <li key={c.t} className="border-b border-white/10">
+              <li key={c.t}>
                 <button
                   type="button"
                   onClick={() => seek(c.t)}
                   aria-current={i === active ? "step" : undefined}
-                  className={`flex w-full items-center gap-4 py-3.5 text-left transition-colors ${
-                    i === active ? "text-kagit" : "text-[#8f988c] hover:text-kagit"
+                  className={`flex w-full items-center gap-4 rounded-2xl px-3 py-3 text-left transition-colors ${
+                    i === active ? "bg-gok-acik text-lacivert" : "text-gri hover:bg-white hover:text-lacivert"
                   }`}
                 >
                   <span
                     className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-sm font-bold tabular-nums transition-colors ${
-                      i === active ? "bg-sari text-murekkep" : "border border-white/20"
+                      i === active ? "bg-gok text-white" : "border border-ayrac bg-white"
                     }`}
                   >
                     {i + 1}
                   </span>
-                  <span className="flex-1 text-[1rem] font-semibold">{c.label}</span>
+                  <span className="flex-1 text-[1rem] font-bold">{c.label}</span>
                   <span className="text-xs tabular-nums opacity-70">{clock(c.t)}</span>
                 </button>
               </li>
@@ -226,7 +226,7 @@ export function HowTo({ tutorials }: { tutorials: Tutorial[] }) {
             <Link href={createHref(t.id)} className="site-btn-primary">
               Hemen oluşturun
             </Link>
-            <Link href={`/sablonlar/${t.id}`} className="font-semibold text-kagit underline-offset-4 hover:underline">
+            <Link href={`/sablonlar/${t.id}`} className="font-bold text-gok underline-offset-4 hover:underline">
               Şablonu inceleyin
             </Link>
           </div>

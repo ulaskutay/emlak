@@ -1,215 +1,233 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { SOON_TEMPLATES, templateList } from "@arsa/shared";
-import { HowTo } from "@/components/site/HowTo";
-import { VideoWall } from "@/components/site/VideoWall";
-import { TemplateGallery } from "@/components/templates/TemplateGallery";
+import { TEMPLATE_CATEGORIES, templateList, type TemplateCategory } from "@arsa/shared";
+import { HeroPhones } from "@/components/site/HeroPhones";
+import { SonCagri } from "@/components/site/SonCagri";
+import { VideoTile } from "@/components/site/VideoTile";
+import { ornekAdi, sablonOrnekleri, digerOrnekler } from "@/lib/ornekler";
 import { site } from "@/lib/site";
-import { tutorials } from "@/lib/tutorials";
+import { createHref } from "@/lib/tutorials";
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
 
-const sss = [
-  {
-    s: "Hangi videoları hazırlayabilirim?",
-    c: `Şu anda ${templateList.length} şablon var: ${templateList.map((t) => t.name.toLocaleLowerCase("tr")).join(", ")}. Her birinin panelde nasıl hazırlandığını ana sayfadaki kayıtlardan izleyebilirsiniz; yeni şablonlar ekledikçe şablonlar sayfasında görünür.`,
-  },
-  {
-    s: "Parsel dosyasını nereden alırım?",
-    c: "parselsorgu.tkgm.gov.tr adresinde il, ilçe, mahalle, ada ve parseli seçin; sonuç ekranından KML ya da GeoJSON dosyasını indirin. Arsa Video'ya bu dosyayı yüklemeniz yeterli.",
-  },
-  {
-    s: "Çekim ekibi ya da drone gerekiyor mu?",
-    c: "Hayır. Arsa şablonları Google'ın uydu ve 3D harita görüntüleri üzerinde uçan sanal bir kamerayla, ilan şablonu ise elinizdeki fotoğraflardan hazırlanır. Mülke gitmeniz gerekmez.",
-  },
-  {
-    s: "Harita görüntüleri güncel mi?",
-    c: "Arsa şablonlarındaki görüntüler Google'ın harita verisinden gelir; çekim tarihi bölgeye göre birkaç yıl öncesine ait olabilir. Parsel sınırı ise doğrudan TKGM dosyanızdan çizilir.",
-  },
-  {
-    s: "Video ne kadar sürede hazır olur?",
-    c: "Siparişten sonra genellikle birkaç dakika. Aşamaları panelde canlı izlersiniz; video hazır olduğunda indirip paylaşabilirsiniz.",
-  },
-  {
-    s: "Videoyu nerede kullanabilirim?",
-    c: "Video dikey (9:16) hazırlanır: Instagram Reels, TikTok, YouTube Shorts, WhatsApp durumu ve ilan sitelerinin video alanı için uygundur.",
-  },
-  {
-    s: "Ücreti ne kadar?",
-    c: "Şu anda ücretsiz deneyebilirsiniz. Ücretli paketler yayına girmeden önce kayıtlı kullanıcılara e-postayla duyurulacak.",
-  },
-];
-
 const jsonLd = {
   "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "SoftwareApplication",
-      name: site.name,
-      applicationCategory: "MultimediaApplication",
-      operatingSystem: "Web",
-      description: site.description,
-      url: site.url,
-      inLanguage: "tr",
-    },
-    {
-      "@type": "FAQPage",
-      mainEntity: sss.map((q) => ({ "@type": "Question", name: q.s, acceptedAnswer: { "@type": "Answer", text: q.c } })),
-    },
-  ],
+  "@type": "SoftwareApplication",
+  name: site.name,
+  applicationCategory: "MultimediaApplication",
+  operatingSystem: "Web",
+  description: site.description,
+  url: site.url,
+  inLanguage: "tr",
 };
 
+/** Kategori kartlarının renkleri ve tek cümlelik açıklamaları. */
+const KATEGORI: Record<TemplateCategory, { ikon: string; text: string; renk: string; zemin: string }> = {
+  Arsa: { ikon: "🛰️", text: "Ada/parsel dosyasından havadan tanıtım; arsaya gitmeden.", renk: "text-gok", zemin: "bg-gok-acik" },
+  Konut: { ikon: "🏡", text: "İlan fotoğraflarından sinematik tur, döşeme ve sunuculu anlatım.", renk: "text-mercan", zemin: "bg-mercan-acik" },
+  Proje: { ikon: "🏗️", text: "Boş arsadan yükselen binayı gösteren inşaat videoları.", renk: "text-[#b7860b]", zemin: "bg-gunes-acik" },
+  "Sosyal medya": { ikon: "📣", text: "Satıldı ve fiyat güncellemesi gibi kısa paylaşımlar.", renk: "text-cimen", zemin: "bg-cimen-acik" },
+};
+
+const ADIMLAR = [
+  { ikon: "🧩", baslik: "Şablonu seçin", text: "Arsa, konut ya da proje: ilanınıza uyan video türünü seçin, örneğini önceden izleyin." },
+  { ikon: "✍️", baslik: "Bilgileri girin", text: "Parsel dosyası ya da fotoğraflar, fiyat ve telefon. Formu şablonun kendisi adım adım sorar." },
+  { ikon: "🎬", baslik: "Videoyu paylaşın", text: "Birkaç dakikada panelinizde. Reels, TikTok, Shorts ve ilan sitelerine hazır dikey video." },
+];
+
 export default function Home() {
+  const kategoriler = TEMPLATE_CATEGORIES.map((k) => ({ k, sablonlar: templateList.filter((t) => t.category === k) })).filter(
+    (x) => x.sablonlar.length > 0,
+  );
+  const serit = [...sablonOrnekleri.filter((o) => o.src), ...digerOrnekler];
 
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      {/* Hero: şablon çıktılarından video duvarı */}
-      <section className="px-3 sm:px-4">
-        <div className="relative mx-auto h-[clamp(560px,84vh,780px)] max-w-[1400px] overflow-hidden rounded-[1.75rem] bg-gece text-kagit">
-          <VideoWall />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_50%_50%,rgba(18,26,22,0.94)_0%,rgba(18,26,22,0.82)_45%,rgba(18,26,22,0.35)_100%)]" />
-          <div className="relative flex h-full flex-col items-center justify-center px-5 text-center">
-            <h1 className="max-w-4xl font-display text-[clamp(2.6rem,7vw,5.75rem)] leading-[0.95] font-bold tracking-[-0.035em] text-balance">
-              İlanınızı videoya çeviren şablonlar.
+      {/* Hero */}
+      <section className="relative overflow-hidden">
+        <div aria-hidden className="pointer-events-none absolute -top-32 -left-40 h-[520px] w-[520px] rounded-full bg-gok/15 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute top-40 -right-32 h-[420px] w-[420px] rounded-full bg-gunes/25 blur-3xl" />
+        <div className="relative mx-auto grid max-w-[1240px] items-center gap-14 px-4 pt-12 pb-20 sm:px-6 md:pt-16 lg:grid-cols-[1.05fr_1fr] lg:gap-10 lg:pb-28">
+          <div className="text-center lg:text-left">
+            <span className="site-etiket">
+              <span aria-hidden>🚁</span> Drone uçurmadan, çekim ekibi olmadan
+            </span>
+            <h1 className="mt-6 text-[clamp(2.6rem,6vw,4.75rem)] leading-[1.02] font-extrabold tracking-[-0.045em] text-balance">
+              İlanınızın videosu{" "}
+              <span className="relative whitespace-nowrap text-gok">
+                dakikalar içinde
+                <svg aria-hidden viewBox="0 0 300 14" preserveAspectRatio="none" className="absolute -bottom-2 left-0 h-3 w-full text-gunes">
+                  <path d="M3 10C80 3 210 2 297 8" stroke="currentColor" strokeWidth="6" strokeLinecap="round" fill="none" />
+                </svg>
+              </span>{" "}
+              hazır.
             </h1>
-            <p className="mt-6 max-w-[36rem] text-[clamp(1.0625rem,1.6vw,1.25rem)] leading-relaxed text-[#c9d0c6]">
-              Arsa, konut ya da proje: şablonu seçin, istediği bilgileri girin. Müzikli, yazılı, dikey video birkaç
-              dakikada panelinizde.
+            <p className="mx-auto mt-7 max-w-[34rem] text-[clamp(1.0625rem,1.6vw,1.25rem)] leading-relaxed text-gri lg:mx-0">
+              Parsel dosyanızı ya da ilan fotoğraflarınızı yükleyin; seslendirmeli, müzikli, dikey tanıtım videonuz panelinize
+              gelsin.
             </p>
-            <div className="mt-9 flex flex-wrap justify-center gap-3">
-              <Link href="#sablonlar" className="site-btn-primary">
+            <div className="mt-9 flex flex-wrap justify-center gap-3 lg:justify-start">
+              <Link href="/sablonlar" className="site-btn-primary h-14 px-8 text-base">
                 Hemen oluşturun
               </Link>
-              <Link href="#nasil-yapilir" className="site-btn border border-white/40 text-kagit hover:bg-white/10">
-                Nasıl yapıldığını izleyin
+              <Link href="/nasil-yapilir" className="site-btn-secondary h-14 px-6 text-base">
+                <span aria-hidden className="grid h-7 w-7 place-items-center rounded-full bg-gok-acik text-gok">
+                  <svg viewBox="0 0 24 24" className="ml-0.5 h-3.5 w-3.5">
+                    <path d="M7 4.5v15l12-7.5z" fill="currentColor" />
+                  </svg>
+                </span>
+                Nasıl yapılır izleyin
               </Link>
             </div>
-            <ul className="mt-10 flex flex-wrap justify-center gap-2 text-sm">
-              {templateList.map((t) => (
-                <li key={t.id}>
-                  <Link
-                    href={`/sablonlar/${t.id}`}
-                    className="inline-block rounded-full border border-white/20 bg-gece/60 px-3.5 py-1.5 text-[#e3e8df] backdrop-blur hover:border-sari hover:text-sari"
-                  >
-                    {t.name}
-                  </Link>
+            <ul className="mt-9 flex flex-wrap justify-center gap-x-6 gap-y-2 text-[0.9375rem] font-semibold text-gri lg:justify-start">
+              {["Reels, TikTok ve Shorts için 9:16", "Türkçe seslendirme ve altyazı", "Ofis adınız ve telefonunuz videoda"].map((x) => (
+                <li key={x} className="flex items-center gap-2">
+                  <span aria-hidden className="grid h-5 w-5 place-items-center rounded-full bg-cimen-acik text-xs text-cimen">
+                    ✓
+                  </span>
+                  {x}
                 </li>
               ))}
-              <li>
-                <Link href="#sablonlar" className="inline-block rounded-full px-3.5 py-1.5 text-[#a9b2a6] hover:text-kagit">
-                  {SOON_TEMPLATES.length} şablon yakında
-                </Link>
-              </li>
             </ul>
           </div>
+          <HeroPhones />
         </div>
       </section>
 
-      {/* Nasıl yapılır: panelin ekran kayıtları */}
-      {tutorials.length > 0 && (
-        <section id="nasil-yapilir" className="scroll-mt-6 px-3 pt-20 sm:px-4 md:pt-28">
-          <div className="mx-auto max-w-[1240px] px-1 sm:px-2">
-            <div className="grid gap-6 md:grid-cols-[1.1fr_0.9fr] md:items-end">
-              <h2 className="max-w-2xl font-display text-[clamp(2rem,4.5vw,3.5rem)] leading-[1.02] font-bold tracking-[-0.03em] text-balance">
-                Videonuzu nasıl hazırlayacağınızı izleyin
-              </h2>
-              <p className="max-w-[34rem] text-[1.0625rem] leading-relaxed text-soluk">
-                Her şablonu panelde baştan sona kaydettik: hangi bilgiyi girdiğinizi ve sonunda çıkan videoyu görürsünüz.
-                Aynısını kendi ilanınızla birkaç dakikada yaparsınız.
-              </p>
-            </div>
-          </div>
-          <div className="mx-auto mt-10 max-w-[1400px] rounded-[1.75rem] bg-gece px-4 py-8 text-kagit sm:px-8 sm:py-10 lg:px-12 lg:py-12">
-            <HowTo tutorials={tutorials} />
-          </div>
-        </section>
-      )}
+      {/* Ne tanıtmak istiyorsunuz? */}
+      <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-6">
+        <div className="text-center">
+          <span className="site-etiket">Gayrimenkul türünü seçin</span>
+          <h2 className="mx-auto mt-4 max-w-2xl text-[clamp(2rem,4vw,3rem)] leading-[1.08] font-extrabold tracking-[-0.035em] text-balance">
+            Ne tanıtmak istiyorsunuz?
+          </h2>
+        </div>
+        <div className={`mt-12 grid gap-5 ${kategoriler.length > 2 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+          {kategoriler.map(({ k, sablonlar }) => {
+            const c = KATEGORI[k];
+            return (
+              <div key={k} className="site-kart flex flex-col p-6 sm:p-7">
+                <span aria-hidden className={`grid h-14 w-14 place-items-center rounded-2xl text-2xl ${c.zemin}`}>
+                  {c.ikon}
+                </span>
+                <h3 className="mt-5 text-2xl font-extrabold tracking-[-0.03em]">{k}</h3>
+                <p className="mt-2 leading-relaxed text-gri">{c.text}</p>
+                <ul className="mt-5 space-y-2">
+                  {sablonlar.map((t) => (
+                    <li key={t.id}>
+                      <Link
+                        href={createHref(t.id)}
+                        className={`group flex items-center justify-between gap-3 rounded-2xl px-4 py-3 font-bold transition-colors ${c.zemin} hover:brightness-[0.97]`}
+                      >
+                        <span>{t.name}</span>
+                        <span className={`text-sm whitespace-nowrap ${c.renk}`}>
+                          Oluşturun <span aria-hidden className="inline-block transition-transform group-hover:translate-x-0.5">→</span>
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
-      {/* Şablonlar: her biri doğrudan forma götürür */}
-      <section id="sablonlar" className="mx-auto max-w-[1240px] scroll-mt-6 px-4 pt-20 pb-24 sm:px-6 md:pt-28">
-        <div className="flex flex-wrap items-end justify-between gap-6">
+      {/* Örnek videolar şeridi */}
+      <section className="overflow-hidden bg-white py-20 md:py-24">
+        <div className="mx-auto flex max-w-[1240px] flex-wrap items-end justify-between gap-6 px-4 sm:px-6">
           <div>
-            <h2 className="max-w-2xl font-display text-[clamp(2rem,4.5vw,3.5rem)] leading-[1.02] font-bold tracking-[-0.03em] text-balance">
-              Şablonu seçin, hemen oluşturun
+            <span className="site-etiket">Örnekler</span>
+            <h2 className="mt-4 max-w-2xl text-[clamp(2rem,4vw,3rem)] leading-[1.08] font-extrabold tracking-[-0.035em] text-balance">
+              Arsa Video ile hazırlanan videolar
             </h2>
-            <p className="mt-4 max-w-[36rem] text-[1.0625rem] leading-relaxed text-soluk">
-              Kartın üzerine gelince örnek video oynar. "Hemen oluşturun" sizi doğrudan o şablonun formuna götürür;
-              hesabınız yoksa önce kısa bir kayıt açılır.
-            </p>
+            <p className="mt-3 max-w-xl text-[1.0625rem] text-gri">Hepsi ilan sitelerine ve sosyal medyaya uygun dikey videolar.</p>
           </div>
-          <Link href="/sablonlar" className="font-semibold text-zeytin underline-offset-4 hover:underline">
-            Tüm şablonlar
+          <Link href="/ornekler" className="site-btn-secondary">
+            Tüm örnekler
           </Link>
         </div>
-        <div className="mt-10">
-          <TemplateGallery tone="light" cta howTo={tutorials.map((x) => x.template.id)} />
-        </div>
-      </section>
-
-      {/* Eski yol */}
-      <section className="bg-gece text-kagit">
-        <div className="mx-auto max-w-[1240px] px-4 py-20 sm:px-6 md:py-28">
-          <h2 className="max-w-3xl font-display text-[clamp(2rem,4.5vw,3.5rem)] leading-[1.02] font-bold tracking-[-0.03em] text-balance">
-            İlanda fotoğraf yetmiyor. Çekim ekibi ise her ilana değmiyor.
-          </h2>
-          <div className="mt-14 grid gap-12 md:grid-cols-2">
-            <div>
-              <h3 className="font-display text-xl font-semibold text-[#a9b2a6]">Çekim ekibiyle</h3>
-              <ul className="mt-5 space-y-4 text-[1.0625rem] text-[#a9b2a6]">
-                <li className="border-t border-white/10 pt-4">Çekim gününü ve drone iznini ayarlarsınız</li>
-                <li className="border-t border-white/10 pt-4">Havanın uygun olmasını beklersiniz</li>
-                <li className="border-t border-white/10 pt-4">Kurgu ve seslendirme ayrı bir iş olur</li>
-                <li className="border-t border-white/10 pt-4">Bir ilan için günler geçer</li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-display text-xl font-semibold text-sari">Arsa Video ile</h3>
-              <ul className="mt-5 space-y-4 text-[1.0625rem]">
-                <li className="border-t border-sari/40 pt-4">Şablonu seçip bilgileri girersiniz</li>
-                <li className="border-t border-sari/40 pt-4">Kamera hareketi, yazılar ve müzik hazır gelir</li>
-                <li className="border-t border-sari/40 pt-4">Ofis adınız ve telefonunuz videoda yer alır</li>
-                <li className="border-t border-sari/40 pt-4">Video birkaç dakikada panelinizde olur</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* SSS */}
-      <section id="sss" className="mx-auto max-w-[1240px] scroll-mt-6 px-4 py-20 sm:px-6 md:py-28">
-        <div className="grid gap-10 md:grid-cols-[0.8fr_1.2fr]">
-          <h2 className="font-display text-[clamp(2rem,4.5vw,3.5rem)] leading-[1.02] font-bold tracking-[-0.03em]">
-            Sık sorulanlar
-          </h2>
-          <div className="border-t border-sinir">
-            {sss.map((q) => (
-              <details key={q.s} className="group border-b border-sinir">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 font-display text-[1.1875rem] font-semibold [&::-webkit-details-marker]:hidden">
-                  {q.s}
-                  <span aria-hidden className="text-2xl leading-none text-zeytin transition-transform group-open:rotate-45">
-                    +
-                  </span>
-                </summary>
-                <p className="max-w-[62ch] pb-6 text-[1.0625rem] leading-relaxed text-soluk">{q.c}</p>
-              </details>
+        <div className="mt-12">
+          <div className="serit flex w-max gap-4 px-4">
+            {[...serit, ...serit].map((o, i) => (
+              <VideoTile
+                key={i}
+                src={o.src}
+                poster={o.poster}
+                label={ornekAdi(o)}
+                className="w-[170px] sm:w-[200px]"
+              />
             ))}
           </div>
         </div>
       </section>
 
-      {/* Son çağrı */}
-      <section className="border-t border-sinir">
-        <div className="mx-auto flex max-w-[1240px] flex-col items-start justify-between gap-8 px-4 py-16 sm:px-6 md:flex-row md:items-center">
-          <h2 className="max-w-2xl font-display text-[clamp(1.75rem,3.5vw,2.75rem)] leading-[1.05] font-bold tracking-[-0.025em] text-balance">
-            Satıştaki ilanınızın videosunu bugün hazırlayın.
+      {/* Üç adım */}
+      <section className="mx-auto max-w-[1240px] px-4 py-24 sm:px-6">
+        <div className="text-center">
+          <span className="site-etiket">Nasıl çalışır</span>
+          <h2 className="mx-auto mt-4 max-w-2xl text-[clamp(2rem,4vw,3rem)] leading-[1.08] font-extrabold tracking-[-0.035em] text-balance">
+            Üç adımda hazır
           </h2>
-          <Link href="/kayit" className="site-btn-primary shrink-0">
-            Ücretsiz deneyin
+        </div>
+        <ol className="mt-12 grid gap-5 md:grid-cols-3">
+          {ADIMLAR.map((a, i) => (
+            <li key={a.baslik} className="site-kart relative p-7">
+              <span className="absolute top-6 right-7 text-5xl font-extrabold text-gok/10 tabular-nums">{i + 1}</span>
+              <span aria-hidden className="grid h-14 w-14 place-items-center rounded-2xl bg-gok-acik text-2xl">
+                {a.ikon}
+              </span>
+              <h3 className="mt-5 text-xl font-extrabold tracking-[-0.02em]">{a.baslik}</h3>
+              <p className="mt-2 leading-relaxed text-gri">{a.text}</p>
+            </li>
+          ))}
+        </ol>
+        <div className="mt-10 text-center">
+          <Link href="/nasil-yapilir" className="font-bold text-gok underline-offset-4 hover:underline">
+            Her şablonun panelde nasıl hazırlandığını izleyin →
           </Link>
         </div>
       </section>
+
+      {/* Çekim ekibi ile karşılaştırma */}
+      <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-6">
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="rounded-3xl border border-ayrac bg-white/60 p-7 sm:p-9">
+            <h3 className="text-xl font-extrabold text-gri">Çekim ekibiyle</h3>
+            <ul className="mt-6 space-y-4 text-[1.0625rem] text-gri">
+              {["Çekim gününü ve drone iznini ayarlarsınız", "Havanın uygun olmasını beklersiniz", "Kurgu ve seslendirme ayrı bir iş olur", "Bir ilan için günler geçer"].map(
+                (x) => (
+                  <li key={x} className="flex gap-3">
+                    <span aria-hidden className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ayrac text-sm">
+                      ✕
+                    </span>
+                    {x}
+                  </li>
+                ),
+              )}
+            </ul>
+          </div>
+          <div className="rounded-3xl bg-gok p-7 text-white shadow-[0_30px_60px_-30px_rgba(43,108,255,.9)] sm:p-9">
+            <h3 className="text-xl font-extrabold">Arsa Video ile</h3>
+            <ul className="mt-6 space-y-4 text-[1.0625rem]">
+              {["Şablonu seçip bilgileri girersiniz", "Kamera hareketi, yazılar ve müzik hazır gelir", "Ofis adınız ve telefonunuz videoda yer alır", "Video birkaç dakikada panelinizde olur"].map(
+                (x) => (
+                  <li key={x} className="flex gap-3">
+                    <span aria-hidden className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gunes text-sm font-bold text-lacivert">
+                      ✓
+                    </span>
+                    {x}
+                  </li>
+                ),
+              )}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <SonCagri />
     </>
   );
 }

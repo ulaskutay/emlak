@@ -30,10 +30,10 @@ export function TemplateGallery({
       on
         ? tone === "dark"
           ? "bg-kagit text-murekkep"
-          : "bg-murekkep text-kagit"
+          : "bg-gok text-white"
         : tone === "dark"
           ? "border border-white/20 text-[#c9d0c6] hover:border-white/50"
-          : "border border-sinir text-soluk hover:border-murekkep hover:text-murekkep"
+          : "border border-ayrac bg-white text-gri hover:border-gok hover:text-gok"
     }`;
 
   return (
@@ -49,26 +49,24 @@ export function TemplateGallery({
         ))}
       </div>
       {live.length === 0 && (
-        <p className={`mt-8 ${tone === "dark" ? "text-[#c9d0c6]" : "text-soluk"}`}>Bu kategoride şablonlar yakında.</p>
+        <p className={`mt-8 ${tone === "dark" ? "text-[#c9d0c6]" : "text-gri"}`}>Bu kategoride şablonlar yakında.</p>
       )}
       <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {live.map((t, i) => (
-          <div key={t.id} className="flex flex-col">
+          <div key={t.id} className={`flex flex-col ${tone === "light" ? "site-kart p-2.5 pb-4" : ""}`}>
             <TemplateCard t={t} href={`${hrefBase}${t.id}`} tone={tone} priority={i < 4} />
             {cta && (
-              <div className="mt-auto flex flex-col items-start gap-2 pt-4">
+              <div className={`mt-auto flex flex-col items-start gap-2 pt-4 ${tone === "light" ? "px-1.5" : ""}`}>
                 <Link
                   href={createHref(t.id)}
-                  className={`site-btn h-10 w-full px-3 text-sm ${
-                    tone === "dark" ? "bg-sari text-murekkep hover:bg-[#ffb21a]" : "bg-murekkep text-kagit hover:bg-gece"
-                  }`}
+                  className={tone === "dark" ? "site-btn h-10 w-full bg-sari px-3 text-sm text-murekkep hover:bg-[#ffb21a]" : "site-btn-primary h-10 w-full px-3 text-sm"}
                 >
                   Hemen oluşturun
                 </Link>
                 {howTo.includes(t.id) && (
                   <a
-                    href={`#nasil-tab-${t.id}`}
-                    className={`text-sm font-semibold underline-offset-4 hover:underline ${tone === "dark" ? "text-[#c9d0c6]" : "text-zeytin"}`}
+                    href={`/nasil-yapilir#nasil-tab-${t.id}`}
+                    className={`self-center text-sm font-semibold underline-offset-4 hover:underline ${tone === "dark" ? "text-[#c9d0c6]" : "text-gok"}`}
                   >
                     Nasıl yapılır?
                   </a>
@@ -79,8 +77,8 @@ export function TemplateGallery({
         ))}
       </div>
       {soon.length > 0 && (
-        <div className={`mt-12 border-t pt-6 ${tone === "dark" ? "border-white/10" : "border-sinir"}`}>
-          <h3 className={`font-display text-lg font-semibold ${tone === "dark" ? "text-kagit" : "text-murekkep"}`}>Yakında</h3>
+        <div className={`mt-12 border-t pt-6 ${tone === "dark" ? "border-white/10" : "border-ayrac"}`}>
+          <h3 className={`text-lg font-bold ${tone === "dark" ? "font-display text-kagit" : "text-lacivert"}`}>Yakında</h3>
           <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {soon.map((t) => (
               <SoonCard key={t.slug} t={t} tone={tone} />

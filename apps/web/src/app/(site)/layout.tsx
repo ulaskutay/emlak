@@ -16,10 +16,10 @@ const plausible = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN;
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`site flex min-h-dvh flex-col font-body text-murekkep`}>
+    <div className="site flex min-h-dvh flex-col bg-zemin font-site text-lacivert">
       <a
         href="#icerik"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-sari focus:px-4 focus:py-2"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-gok focus:px-4 focus:py-2 focus:text-white"
       >
         İçeriğe geç
       </a>

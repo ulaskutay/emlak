@@ -9,7 +9,22 @@
   --color-neon: #ffc24d;
   --color-amber: #ffc24d;
 
-  /* Pazarlama sitesi — "Pafta" (docs/design-dna.json) */
+  /* Pazarlama sitesi — "Gökyüzü": beyaz/açık mavi zemin, gök mavisi ana renk, güneş ve mercan vurgular */
+  --color-zemin: #f5f8fd;
+  --color-lacivert: #0d1b3e;
+  --color-gri: #56627a;
+  --color-ayrac: #e2e8f3;
+  --color-gok: #2b6cff;
+  --color-gok-koyu: #1a55e3;
+  --color-gok-acik: #e9f0ff;
+  --color-gunes: #ffc93c;
+  --color-gunes-acik: #fff4d4;
+  --color-mercan: #ff6b4a;
+  --color-mercan-acik: #ffe8e1;
+  --color-cimen: #12a26a;
+  --color-cimen-acik: #def6ea;
+
+  /* Eski "Pafta" tonları: panelin koyu şablon galerisi kullanır */
   --color-pafta: #edefe8;
   --color-kagit: #f7f8f3;
   --color-murekkep: #1e2a23;
@@ -26,6 +41,7 @@
   --font-sans: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
   --font-body: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --font-site: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
 }
 
 html,
@@ -34,16 +50,11 @@ body {
   color: #edefe8;
 }
 
-/* Site sayfaları açık pafta zeminde (panel koyu kalır). */
+/* Site sayfaları açık zeminde (panel koyu kalır). */
 html:has(.site),
 body:has(.site) {
-  background: var(--color-pafta);
-  color: var(--color-murekkep);
-}
-html:has(.site-koyu),
-body:has(.site-koyu) {
-  background: var(--color-gece);
-  color: #edefe8;
+  background: var(--color-zemin);
+  color: var(--color-lacivert);
 }
 
 @utility card {
@@ -67,39 +78,54 @@ body:has(.site-koyu) {
 
 /* ——— Site bileşenleri ——— */
 @utility site-btn {
-  @apply inline-flex h-12 items-center justify-center gap-2 rounded-xl px-5 text-[0.9375rem] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+  @apply inline-flex h-12 items-center justify-center gap-2 rounded-full px-6 text-[0.9375rem] font-bold transition disabled:cursor-not-allowed disabled:opacity-60;
 }
 @utility site-btn-primary {
-  @apply site-btn bg-sari text-murekkep hover:bg-[#ffb21a];
+  @apply site-btn bg-gok text-white shadow-[0_10px_24px_-10px_rgba(43,108,255,.7)] hover:-translate-y-px hover:bg-gok-koyu;
 }
 @utility site-btn-secondary {
-  @apply site-btn border border-murekkep/80 text-murekkep hover:bg-murekkep hover:text-kagit;
+  @apply site-btn border border-ayrac bg-white text-lacivert hover:border-gok hover:text-gok;
 }
 @utility site-input {
-  @apply h-12 w-full rounded-xl border border-sinir bg-white px-4 text-base text-murekkep outline-none placeholder:text-soluk/60 focus:border-murekkep focus:ring-2 focus:ring-sari;
+  @apply h-12 w-full rounded-xl border border-ayrac bg-white px-4 text-base text-lacivert outline-none placeholder:text-gri/60 focus:border-gok focus:ring-4 focus:ring-gok/15;
 }
 @utility site-label {
-  @apply mb-1.5 block text-sm font-semibold text-murekkep;
+  @apply mb-1.5 block text-sm font-semibold text-lacivert;
+}
+@utility site-kart {
+  @apply rounded-3xl border border-ayrac bg-white shadow-[0_1px_2px_rgba(13,27,62,.04),0_12px_32px_-18px_rgba(13,27,62,.18)];
+}
+@utility site-etiket {
+  @apply inline-flex items-center gap-1.5 rounded-full bg-gok-acik px-3 py-1 text-sm font-bold text-gok;
 }
 
 .site :focus-visible {
-  outline: 2px solid var(--color-murekkep);
+  outline: 2px solid var(--color-gok);
   outline-offset: 3px;
 }
-.site .bg-gece :focus-visible {
-  outline-color: var(--color-sari);
-}
 
-/* Hero video duvarı: sütun içeriği iki kez dizilir, yarısı kadar kayınca başa döner */
-@keyframes video-duvar {
-  from { transform: translateY(0); }
-  to { transform: translateY(calc(-50% - 0.375rem)); }
+/* Hafif süzülme: hero'daki rozetler */
+@keyframes suzul {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
-.video-duvar-sutun {
-  animation: video-duvar 60s linear infinite;
+.suzul {
+  animation: suzul 5s ease-in-out infinite;
+}
+/* Örnek video şeridi: içerik iki kez dizilir, yarısı kadar kayınca başa döner */
+@keyframes serit {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-50% - 0.5rem)); }
+}
+.serit {
+  animation: serit 70s linear infinite;
+}
+.serit:hover {
+  animation-play-state: paused;
 }
 @media (prefers-reduced-motion: reduce) {
-  .video-duvar-sutun {
+  .suzul,
+  .serit {
     animation: none;
   }
 }

@@ -8,7 +8,7 @@ type Tone = "light" | "dark";
 const text = (tone: Tone) =>
   tone === "dark"
     ? { title: "text-kagit group-hover:text-sari", body: "text-[#c9d0c6]", meta: "text-[#8f988c]", box: "bg-[#1d2a23]" }
-    : { title: "text-murekkep group-hover:text-zeytin", body: "text-soluk", meta: "text-soluk/80", box: "bg-cizgi" };
+    : { title: "text-lacivert group-hover:text-gok", body: "text-gri", meta: "text-gri/80", box: "bg-gok-acik" };
 
 /** Galeri kartı: kapak görünür, üzerine gelince (ya da odakta) örnek video sessiz oynar. */
 export function TemplateCard({ t, href, tone = "dark", priority = false }: { t: TemplateInfo; href: string; tone?: Tone; priority?: boolean }) {
@@ -32,9 +32,9 @@ export function TemplateCard({ t, href, tone = "dark", priority = false }: { t: 
       onMouseLeave={stop}
       onFocus={play}
       onBlur={stop}
-      className="group block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sari"
+      className={`group block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 ${tone === "dark" ? "focus-visible:outline-sari" : "focus-visible:outline-gok"}`}
     >
-      <div className={`relative aspect-[4/5] overflow-hidden rounded-xl ${c.box}`}>
+      <div className={`relative aspect-[4/5] overflow-hidden ${tone === "dark" ? "rounded-xl" : "rounded-2xl"} ${c.box}`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={t.preview.poster}
@@ -54,10 +54,14 @@ export function TemplateCard({ t, href, tone = "dark", priority = false }: { t: 
           />
         )}
         {t.badge && (
-          <span className="absolute top-2.5 left-2.5 rounded-full bg-sari px-2 py-0.5 text-xs font-semibold text-murekkep">{t.badge}</span>
+          <span
+            className={`absolute top-2.5 left-2.5 rounded-full px-2.5 py-0.5 text-xs font-bold ${tone === "dark" ? "bg-sari text-murekkep" : "bg-gunes text-lacivert"}`}
+          >
+            {t.badge}
+          </span>
         )}
       </div>
-      <h3 className={`mt-3 font-display text-[1.0625rem] leading-tight font-semibold tracking-[-0.01em] ${c.title}`}>{t.name}</h3>
+      <h3 className={`mt-3 text-[1.0625rem] leading-tight font-bold tracking-[-0.01em] ${tone === "dark" ? "font-display" : ""} ${c.title}`}>{t.name}</h3>
       <p className={`mt-1 text-sm leading-snug ${c.body}`}>{t.tagline}</p>
       <p className={`mt-1.5 text-[0.8125rem] ${c.meta}`}>
         {t.category} <span className="tabular-nums">{t.duration}</span>
@@ -70,9 +74,9 @@ export function TemplateCard({ t, href, tone = "dark", priority = false }: { t: 
 export function SoonCard({ t, tone = "dark" }: { t: SoonTemplate; tone?: Tone }) {
   const c = text(tone);
   return (
-    <li className={`rounded-xl border border-dashed p-4 ${tone === "dark" ? "border-white/15" : "border-sinir"}`}>
+    <li className={`border border-dashed p-4 ${tone === "dark" ? "rounded-xl border-white/15" : "rounded-2xl border-[#c9d3e6] bg-white/60"}`}>
       <div className="flex items-baseline justify-between gap-3">
-        <span className={`font-display text-[1.0625rem] font-semibold ${tone === "dark" ? "text-kagit" : "text-murekkep"}`}>{t.name}</span>
+        <span className={`text-[1.0625rem] font-bold ${tone === "dark" ? "font-display text-kagit" : "text-lacivert"}`}>{t.name}</span>
         <span className={`shrink-0 text-[0.8125rem] ${c.meta}`}>{t.category}</span>
       </div>
       <p className={`mt-1 text-sm leading-snug ${c.body}`}>{t.tagline}</p>

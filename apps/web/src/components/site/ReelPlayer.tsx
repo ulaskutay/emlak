@@ -6,13 +6,11 @@ export function ReelPlayer({
   src,
   poster,
   label = "Örnek video",
-  tone = "light",
   className = "",
 }: {
   src: string;
   poster: string;
   label?: string;
-  tone?: "light" | "dark";
   className?: string;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
@@ -49,7 +47,7 @@ export function ReelPlayer({
 
   return (
     <div className={className}>
-      <div className="overflow-hidden rounded-[2rem] border-[7px] border-gece bg-gece shadow-[0_30px_60px_-20px_rgba(18,26,22,.45)]">
+      <div className="overflow-hidden rounded-[2.25rem] border-[8px] border-lacivert bg-lacivert shadow-[0_40px_80px_-30px_rgba(13,27,62,.55)]">
       <video
         ref={ref}
         src={src}
@@ -68,14 +66,14 @@ export function ReelPlayer({
         <button
           type="button"
           onClick={togglePlay}
-          className={`rounded-full border px-4 py-2 text-sm font-semibold ${tone === "dark" ? "border-white/30 text-kagit hover:bg-white/10" : "border-murekkep/70 bg-kagit text-murekkep hover:bg-white"}`}
+          className="rounded-full border border-ayrac bg-white px-4 py-2 text-sm font-bold text-lacivert hover:border-gok hover:text-gok"
         >
           {paused ? "Oynat" : "Durdur"}
         </button>
         <button
           type="button"
           onClick={toggleSound}
-          className="rounded-full bg-sari px-4 py-2 text-sm font-semibold text-murekkep hover:bg-[#ffb21a]"
+          className="rounded-full bg-gok px-4 py-2 text-sm font-bold text-white hover:bg-gok-koyu"
         >
           {muted ? "Sesli izleyin" : "Sesi kapat"}
         </button>
