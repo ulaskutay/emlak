@@ -77,8 +77,8 @@ export default async function SettingsPage() {
           <Field name="costUsd.ilan-videosu.perPhoto" label={`${n("ilan-videosu")} · fotoğraf başına`} value={c["ilan-videosu"].perPhoto} unit="$" />
           <Field name="costUsd.dosenmis-ev.base" label={`${n("dosenmis-ev")} · sabit`} value={c["dosenmis-ev"].base} unit="$" />
           <Field name="costUsd.dosenmis-ev.perRoom" label={`${n("dosenmis-ev")} · oda başına`} value={c["dosenmis-ev"].perRoom} unit="$" />
-          <Field name="costUsd.sunucu-ev.higgsfieldPerScene.orta" label={`${n("sunucu-ev")} · orta, sahne başına`} value={c["sunucu-ev"].higgsfieldPerScene.orta} unit="kredi" />
-          <Field name="costUsd.sunucu-ev.higgsfieldPerScene.yuksek" label={`${n("sunucu-ev")} · yüksek, sahne başına`} value={c["sunucu-ev"].higgsfieldPerScene.yuksek} unit="kredi" />
+          <Field name="costUsd.sunucu-ev.higgsfieldPerScene.orta" label={`${n("sunucu-ev")} · orta, Higgsfield kredisi/sahne`} value={c["sunucu-ev"].higgsfieldPerScene.orta} unit="HF" />
+          <Field name="costUsd.sunucu-ev.higgsfieldPerScene.yuksek" label={`${n("sunucu-ev")} · yüksek, Higgsfield kredisi/sahne`} value={c["sunucu-ev"].higgsfieldPerScene.yuksek} unit="HF" />
           <Field name="costUsd.sunucu-ev.extraUsdPerScene" label={`${n("sunucu-ev")} · ek maliyet, sahne başına`} value={c["sunucu-ev"].extraUsdPerScene} unit="$" />
         </section>
         <section className="adm-kart p-5">
