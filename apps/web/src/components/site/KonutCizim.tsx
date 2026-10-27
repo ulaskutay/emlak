@@ -1,60 +1,71 @@
 /**
- * Konut görseli: kendi "Boş evi döşe" videomuzdan gerçek yatak odası kareleri (public/media/oda-bos.webp, oda-doseli.webp).
- * Döşenmiş hali boş odanın üstünde belirip kaybolur; sağ önde Higgsfield sunucu karesi (sunucu-kare.webp) anlatır.
+ * Konut görseli: "Sunuculu ev turu" videosunun bir karesi gibi. Kendi "Boş evi döşe" videomuzdan gerçek yatak odası
+ * (public/media/oda-bos.webp → oda-doseli.webp, belirip kaybolur), odanın içinde Higgsfield sunucu karesi (sunucu-kare.webp),
+ * altta videodaki gibi altyazı.
  */
 export function KonutCizim({ className = "" }: { className?: string }) {
   return (
     <svg viewBox="0 0 640 520" className={className} aria-hidden>
       <defs>
         <clipPath id="kn-kart">
-          <rect x="80" y="10" width="370" height="500" rx="28" />
+          <rect x="120" y="10" width="400" height="500" rx="28" />
         </clipPath>
         <linearGradient id="kn-alt" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#0d1b3e" stopOpacity="0" />
-          <stop offset="1" stopColor="#0d1b3e" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#0d1b3e" stopOpacity="0.6" />
         </linearGradient>
+        <radialGradient id="kn-ayak">
+          <stop offset="0" stopColor="#0d1b3e" stopOpacity="0.35" />
+          <stop offset="1" stopColor="#0d1b3e" stopOpacity="0" />
+        </radialGradient>
       </defs>
 
-      {/* Video karesi: gerçek oda, boş → döşenmiş */}
-      <rect x="80" y="10" width="370" height="500" rx="28" fill="#0d1b3e" />
+      <rect x="120" y="10" width="400" height="500" rx="28" fill="#0d1b3e" />
       <g clipPath="url(#kn-kart)">
-        <image href="/media/oda-bos.webp" x="80" y="10" width="370" height="500" preserveAspectRatio="xMidYMid slice" />
-        <image className="konut-doseli" href="/media/oda-doseli.webp" x="80" y="10" width="370" height="500" preserveAspectRatio="xMidYMid slice" />
-        <rect x="80" y="380" width="370" height="130" fill="url(#kn-alt)" />
+        {/* Oda: boş → döşenmiş */}
+        <image href="/media/oda-bos.webp" x="120" y="10" width="400" height="500" preserveAspectRatio="xMidYMid slice" />
+        <image className="konut-doseli" href="/media/oda-doseli.webp" x="120" y="10" width="400" height="500" preserveAspectRatio="xMidYMid slice" />
 
-        {/* Oda adı */}
-        <rect x="96" y="26" width="118" height="30" rx="15" fill="#0d1b3e" opacity="0.75" />
-        <text x="155" y="46" textAnchor="middle" fill="#ffffff" fontSize="14" fontWeight="700" fontFamily="inherit">
-          Yatak odası
+        {/* Sunucu odanın içinde, sağda; ayaklarının altında zemin gölgesi */}
+        <ellipse cx="425" cy="500" rx="80" ry="14" fill="url(#kn-ayak)" />
+        <image href="/media/sunucu-kare.webp" x="322" y="118" width="200" height="396" preserveAspectRatio="xMidYMax meet" />
+        <g fill="#ffffff">
+          {[0, 1, 2, 3].map((i) => (
+            <rect key={i} className="konut-ses" x={356 + i * 8} y="150" width="4.5" height="22" rx="2.25" style={{ animationDelay: `${i * 0.12}s` }} />
+          ))}
+        </g>
+
+        {/* Alt karartma ve altyazı: videodaki gibi vurgulu kelime */}
+        <rect x="120" y="360" width="400" height="150" fill="url(#kn-alt)" />
+        <text x="320" y="470" textAnchor="middle" fill="#ffffff" fontSize="19" fontWeight="800" fontFamily="inherit" style={{ paintOrder: "stroke", stroke: "#0d1b3e", strokeWidth: 4, strokeLinejoin: "round" }}>
+          Güney cepheli, <tspan fill="#ffd166">on sekiz metrekare</tspan>
+        </text>
+        <text x="320" y="494" textAnchor="middle" fill="#ffffff" fontSize="19" fontWeight="800" fontFamily="inherit" style={{ paintOrder: "stroke", stroke: "#0d1b3e", strokeWidth: 4, strokeLinejoin: "round" }}>
+          yatak odası sizi bekliyor.
         </text>
 
-        {/* Durum etiketi: boş / döşendi */}
+        {/* Oda adı ve döşeme durumu */}
+        <rect x="136" y="26" width="118" height="30" rx="15" fill="#0d1b3e" opacity="0.75" />
+        <text x="195" y="46" textAnchor="middle" fill="#ffffff" fontSize="14" fontWeight="700" fontFamily="inherit">
+          Yatak odası
+        </text>
         <g className="konut-bos">
-          <rect x="96" y="454" width="92" height="30" rx="15" fill="#ffffff" />
-          <circle cx="112" cy="469" r="5" fill="#9aa3b5" />
-          <text x="124" y="474" fill="#0d1b3e" fontSize="14" fontWeight="700" fontFamily="inherit">
+          <rect x="412" y="26" width="92" height="30" rx="15" fill="#ffffff" />
+          <circle cx="428" cy="41" r="5" fill="#9aa3b5" />
+          <text x="440" y="46" fill="#0d1b3e" fontSize="14" fontWeight="700" fontFamily="inherit">
             Boş hali
           </text>
         </g>
         <g className="konut-doseli">
-          <rect x="96" y="454" width="160" height="30" rx="15" fill="#ffffff" />
-          <circle cx="112" cy="469" r="5" fill="#2fa36b" />
-          <text x="124" y="474" fill="#0d1b3e" fontSize="14" fontWeight="700" fontFamily="inherit">
+          <rect x="344" y="26" width="160" height="30" rx="15" fill="#ffffff" />
+          <circle cx="360" cy="41" r="5" fill="#2fa36b" />
+          <text x="372" y="46" fill="#0d1b3e" fontSize="14" fontWeight="700" fontFamily="inherit">
             Sanal döşeme hazır
           </text>
         </g>
-        <text x="434" y="498" textAnchor="end" fill="#ffffff" fontSize="10" fontFamily="inherit" opacity="0.8">
+        <text x="136" y="500" fill="#ffffff" fontSize="10" fontFamily="inherit" opacity="0.75">
           Temsilî döşeme
         </text>
-      </g>
-
-      {/* Sunucu: kartın önünde, konuşurken ses dalgası */}
-      <ellipse cx="506" cy="508" rx="88" ry="8" fill="#0d1b3e" opacity="0.2" />
-      <image href="/media/sunucu-kare.webp" x="404" y="162" width="178" height="350" preserveAspectRatio="xMidYMax meet" />
-      <g fill="#2b6cff">
-        {[0, 1, 2, 3].map((i) => (
-          <rect key={i} className="konut-ses" x={428 + i * 9} y="184" width="5" height="26" rx="2.5" style={{ animationDelay: `${i * 0.12}s` }} />
-        ))}
       </g>
     </svg>
   );
