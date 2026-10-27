@@ -21,8 +21,10 @@
   --color-gunes-acik: #fff4d4;
   --color-mercan: #ff6b4a;
   --color-mercan-acik: #ffe8e1;
+  --color-mercan-koyu: #d23f1f;
   --color-cimen: #12a26a;
   --color-cimen-acik: #def6ea;
+  --color-cimen-koyu: #0b7a4f;
 
   /* Eski "Pafta" tonları: panelin koyu şablon galerisi kullanır */
   --color-pafta: #edefe8;
@@ -50,9 +52,11 @@ body {
   color: #edefe8;
 }
 
-/* Site sayfaları açık zeminde (panel koyu kalır). */
+/* Site ve yönetim sayfaları açık zeminde (kullanıcı paneli koyu kalır). */
 html:has(.site),
-body:has(.site) {
+body:has(.site),
+html:has(.admin),
+body:has(.admin) {
   background: var(--color-zemin);
   color: var(--color-lacivert);
 }
@@ -99,7 +103,31 @@ body:has(.site) {
   @apply inline-flex items-center gap-1.5 rounded-full bg-gok-acik px-3 py-1 text-sm font-bold text-gok;
 }
 
-.site :focus-visible {
+/* ——— Yönetim paneli: sitenin Gökyüzü paleti, sıkı ölçüler ——— */
+@utility adm-kart {
+  @apply rounded-2xl border border-ayrac bg-white shadow-[0_1px_2px_rgba(13,27,62,.04),0_8px_24px_-18px_rgba(13,27,62,.16)];
+}
+@utility adm-btn {
+  @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60;
+}
+@utility adm-btn-primary {
+  @apply adm-btn bg-gok text-white shadow-[0_8px_18px_-10px_rgba(43,108,255,.7)] hover:bg-gok-koyu;
+}
+@utility adm-btn-ghost {
+  @apply adm-btn border border-ayrac bg-white text-lacivert hover:border-gok hover:text-gok;
+}
+@utility adm-btn-danger {
+  @apply adm-btn border border-mercan/40 bg-white text-mercan-koyu hover:bg-mercan-acik;
+}
+@utility adm-input {
+  @apply h-10 w-full rounded-xl border border-ayrac bg-white px-3.5 text-sm text-lacivert outline-none placeholder:text-gri/60 focus:border-gok focus:ring-4 focus:ring-gok/15;
+}
+@utility adm-label {
+  @apply mb-1.5 block text-[0.8125rem] font-semibold text-gri;
+}
+
+.site :focus-visible,
+.admin :focus-visible {
   outline: 2px solid var(--color-gok);
   outline-offset: 3px;
 }

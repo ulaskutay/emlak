@@ -31,22 +31,22 @@ export default async function ProductionDetail({ params }: { params: Promise<{ i
 
   return (
     <>
-      <Link href="/admin/uretimler" className="text-sm text-mute hover:text-white">← Üretimler</Link>
-      <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <PageTitle
+          back={{ href: "/admin/uretimler", label: "Üretimler" }}
           sub={
             <>
-              {TEMPLATES[v.template]?.name} · <Link href={`/admin/kullanicilar/${v.userId}`} className="hover:text-white">{email}</Link> · {formatDate(v.createdAt)}
+              {TEMPLATES[v.template]?.name} · <Link href={`/admin/kullanicilar/${v.userId}`} className="hover:text-gok">{email}</Link> · {formatDate(v.createdAt)}
             </>
           }
         >
           {videoTitle(v)}
         </PageTitle>
-        <div className="flex flex-wrap gap-2">
+        <div className="mb-7 flex flex-wrap gap-2">
           {active ? (
             <form action={cancelVideo}>
               <input type="hidden" name="id" value={v.id} />
-              <ConfirmButton className="btn border border-red-500/40 text-red-300 hover:bg-red-500/10" message="Üretim iptal edilsin mi? Süren iş durdurulamaz, ama sonucu kaydedilmez.">
+              <ConfirmButton className="adm-btn-danger" message="Üretim iptal edilsin mi? Süren iş durdurulamaz, ama sonucu kaydedilmez.">
                 İptal et
               </ConfirmButton>
             </form>
@@ -54,7 +54,7 @@ export default async function ProductionDetail({ params }: { params: Promise<{ i
           {v.status === "failed" || v.status === "done" ? (
             <form action={retryVideo}>
               <input type="hidden" name="id" value={v.id} />
-              <ConfirmButton className="btn-ghost" message="Video baştan yeniden üretilsin mi? Kredi yeniden düşülmez, maliyet yeniden oluşur.">
+              <ConfirmButton className="adm-btn-ghost" message="Video baştan yeniden üretilsin mi? Kredi yeniden düşülmez, maliyet yeniden oluşur.">
                 Yeniden üret
               </ConfirmButton>
             </form>
@@ -62,12 +62,12 @@ export default async function ProductionDetail({ params }: { params: Promise<{ i
           {v.credits && !refunds.length ? (
             <form action={refundVideo}>
               <input type="hidden" name="id" value={v.id} />
-              <ConfirmButton className="btn-ghost" message={`${v.credits} kredi kullanıcıya iade edilsin mi?`}>
+              <ConfirmButton className="adm-btn-ghost" message={`${v.credits} kredi kullanıcıya iade edilsin mi?`}>
                 {v.credits} krediyi iade et
               </ConfirmButton>
             </form>
           ) : refunds.length ? (
-            <span className="btn border border-line text-mute">Kredi iade edildi</span>
+            <span className="adm-btn border border-ayrac bg-zemin text-gri">Kredi iade edildi</span>
           ) : null}
         </div>
       </div>
@@ -83,28 +83,28 @@ export default async function ProductionDetail({ params }: { params: Promise<{ i
         <Stat label="Video süresi" value={v.durationSec ? `${v.durationSec.toFixed(1)} sn` : "—"} hint={v.startedAt && v.finishedAt ? `üretim ${Math.round((v.finishedAt.getTime() - v.startedAt.getTime()) / 60000)} dk` : undefined} />
       </div>
 
-      {v.error ? <pre className="card mt-4 whitespace-pre-wrap border-red-500/30 p-4 text-sm text-red-300">{v.error}</pre> : null}
+      {v.error ? <pre className="mt-3 whitespace-pre-wrap rounded-2xl border border-mercan/30 bg-mercan-acik/60 p-4 text-sm text-mercan-koyu">{v.error}</pre> : null}
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,20rem)_1fr]">
+      <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,20rem)_1fr]">
         <div className="space-y-4">
           {play ? (
-            <video src={play} poster={poster ?? undefined} controls playsInline className="aspect-[9/16] w-full rounded-2xl border border-line bg-black" />
+            <video src={play} poster={poster ?? undefined} controls playsInline className="aspect-[9/16] w-full rounded-2xl bg-lacivert shadow-[0_16px_32px_-20px_rgba(13,27,62,.8)]" />
           ) : poster ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={poster} alt="" className="w-full rounded-2xl border border-line" />
+            <img src={poster} alt="" className="w-full rounded-2xl border border-ayrac" />
           ) : (
-            <div className="card flex aspect-[9/16] items-center justify-center text-sm text-mute">Video yok</div>
+            <div className="adm-kart flex aspect-[9/16] items-center justify-center text-sm text-gri">Video yok</div>
           )}
-          <form action={setVideoCost} className="card space-y-3 p-4">
+          <form action={setVideoCost} className="adm-kart space-y-3 p-5">
             <input type="hidden" name="id" value={v.id} />
-            <label className="label" htmlFor="costTry">Gerçek maliyet (₺)</label>
-            <input id="costTry" name="costTry" inputMode="decimal" defaultValue={v.costTry ?? ""} placeholder={`boş = tahmin (${formatTry(estimate)})`} className="input" />
-            <button className="btn-ghost w-full">Maliyeti kaydet</button>
+            <label className="adm-label" htmlFor="costTry">Gerçek maliyet (₺)</label>
+            <input id="costTry" name="costTry" inputMode="decimal" defaultValue={v.costTry ?? ""} placeholder={`boş = tahmin (${formatTry(estimate)})`} className="adm-input" />
+            <button className="adm-btn-ghost w-full">Maliyeti kaydet</button>
           </form>
         </div>
-        <section className="card min-w-0 p-4">
-          <h2 className="mb-2 font-bold">Sipariş ve üretim ayrıntısı</h2>
-          <pre className="max-h-[36rem] overflow-auto text-xs leading-relaxed text-mute">{JSON.stringify(raw, null, 2)}</pre>
+        <section className="adm-kart min-w-0 p-5">
+          <h2 className="mb-3 font-extrabold">Sipariş ve üretim ayrıntısı</h2>
+          <pre className="max-h-[36rem] overflow-auto rounded-xl bg-zemin p-4 font-mono text-xs leading-relaxed text-gri">{JSON.stringify(raw, null, 2)}</pre>
         </section>
       </div>
     </>

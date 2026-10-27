@@ -22,8 +22,8 @@ export default async function PaymentsPage() {
   return (
     <>
       <PageTitle sub="Ödeme altyapısı bağlanana kadar ödemeler kullanıcı sayfasından elle girilir.">Ödemeler</PageTitle>
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Toplam tahsilat" value={formatTry(sumOf("paid"))} hint={`${rows.filter((r) => r.p.status === "paid").length} ödeme`} />
+      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat featured label="Toplam tahsilat" value={formatTry(sumOf("paid"))} hint={`${rows.filter((r) => r.p.status === "paid").length} ödeme`} />
         <Stat label="Son 30 gün" value={formatTry(rows.filter((r) => r.p.status === "paid" && r.p.createdAt >= month).reduce((a, r) => a + r.p.amountTry, 0))} />
         <Stat label="Bekleyen" value={formatTry(sumOf("pending"))} />
         <Stat label="İade" value={formatTry(sumOf("refunded"))} />
@@ -31,25 +31,25 @@ export default async function PaymentsPage() {
       <Table head={["Tarih", "Kullanıcı", "Tutar", "Kredi", "Yöntem", "Dekont / not", "Durum"]} empty={!rows.length}>
         {rows.map(({ p, email }) => (
           <tr key={p.id}>
-            <td className="px-4 py-3 text-mute">{formatDate(p.createdAt)}</td>
-            <td className="px-4 py-3"><Link href={`/admin/kullanicilar/${p.userId}`} className="hover:text-neon">{email}</Link></td>
+            <td className="px-4 py-3 text-gri">{formatDate(p.createdAt)}</td>
+            <td className="px-4 py-3"><Link href={`/admin/kullanicilar/${p.userId}`} className="hover:text-gok">{email}</Link></td>
             <td className="px-4 py-3 font-semibold tabular-nums">{formatTry(p.amountTry)}</td>
             <td className="px-4 py-3 tabular-nums">{formatInt(p.credits)}</td>
             <td className="px-4 py-3">{METHOD[p.method]}</td>
-            <td className="px-4 py-3 text-mute">{[p.reference, p.note].filter(Boolean).join(" · ")}</td>
+            <td className="px-4 py-3 text-gri">{[p.reference, p.note].filter(Boolean).join(" · ")}</td>
             <td className="px-4 py-3">
               <form action={setPaymentStatus} className="flex gap-2">
                 <input type="hidden" name="id" value={p.id} />
-                <select name="status" defaultValue={p.status} className="input py-1.5">
+                <select name="status" defaultValue={p.status} className="adm-input h-9 w-auto">
                   {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
-                <button className="btn-ghost py-1.5">Kaydet</button>
+                <button className="adm-btn-ghost h-9">Kaydet</button>
               </form>
             </td>
           </tr>
         ))}
       </Table>
-      <p className="mt-3 text-xs text-mute">Ödendi’den çıkan ödemenin kredisi kullanıcıdan düşülür, Ödendi’ye geçende verilir.</p>
+      <p className="mt-3 text-xs text-gri">Ödendi’den çıkan ödemenin kredisi kullanıcıdan düşülür, Ödendi’ye geçende verilir.</p>
     </>
   );
 }

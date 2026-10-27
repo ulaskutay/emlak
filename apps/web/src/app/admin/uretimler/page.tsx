@@ -41,7 +41,7 @@ export default async function ProductionsPage({ searchParams }: { searchParams: 
   return (
     <>
       <PageTitle sub={`son ${rows.length} kayıt`}>Üretimler</PageTitle>
-      <div className="mb-4 flex flex-col gap-2">
+      <div className="mb-4 flex flex-col items-start gap-2">
         <Filters current={durum} items={STATUSES.map((s) => ({ ...s, href: qs({ durum: s.value }) }))} />
         <Filters
           current={sablon ?? ""}
@@ -50,25 +50,25 @@ export default async function ProductionsPage({ searchParams }: { searchParams: 
       </div>
       <Table head={["Video", "Kullanıcı", "Durum", "Tarih", "Süre", "Kredi", "Maliyet"]} empty={!rows.length}>
         {rows.map((v) => (
-          <tr key={v.id} className="hover:bg-white/[0.02]">
+          <tr key={v.id}>
             <td className="px-4 py-3">
-              <Link href={`/admin/uretimler/${v.id}`} className="font-semibold hover:text-neon">{videoTitle(v)}</Link>
-              <div className="text-xs text-mute">{TEMPLATES[v.template]?.name}</div>
+              <Link href={`/admin/uretimler/${v.id}`} className="font-bold hover:text-gok">{videoTitle(v)}</Link>
+              <div className="text-xs text-gri">{TEMPLATES[v.template]?.name}</div>
             </td>
             <td className="px-4 py-3">
-              <Link href={`/admin/kullanicilar/${v.userId}`} className="text-mute hover:text-white">{v.email}</Link>
+              <Link href={`/admin/kullanicilar/${v.userId}`} className="text-gri hover:text-gok">{v.email}</Link>
             </td>
             <td className="px-4 py-3">
               <StatusBadge status={v.status} />
-              {v.status === "running" ? <div className="mt-1 text-xs text-mute tabular-nums">%{Math.round(overallProgress(v.status, v.stage, v.progress, v.template) * 100)}</div> : null}
-              {v.status === "failed" && v.error ? <div className="mt-1 max-w-56 truncate text-xs text-red-300" title={v.error}>{v.error}</div> : null}
+              {v.status === "running" ? <div className="mt-1 text-xs text-gri tabular-nums">%{Math.round(overallProgress(v.status, v.stage, v.progress, v.template) * 100)}</div> : null}
+              {v.status === "failed" && v.error ? <div className="mt-1 max-w-56 truncate text-xs text-mercan-koyu" title={v.error}>{v.error}</div> : null}
             </td>
-            <td className="px-4 py-3 text-mute">{formatDate(v.createdAt)}</td>
-            <td className="px-4 py-3 text-mute tabular-nums">{dur(v.startedAt, v.finishedAt)}</td>
+            <td className="px-4 py-3 text-gri">{formatDate(v.createdAt)}</td>
+            <td className="px-4 py-3 text-gri tabular-nums">{dur(v.startedAt, v.finishedAt)}</td>
             <td className="px-4 py-3 tabular-nums">{v.credits}</td>
             <td className="px-4 py-3 tabular-nums">
               {formatTry(videoCost(v, pricing))}
-              {v.costTry == null ? <span className="ml-1 text-xs text-mute">tahmin</span> : null}
+              {v.costTry == null ? <span className="ml-1.5 text-xs text-gri">tahmin</span> : null}
             </td>
           </tr>
         ))}
