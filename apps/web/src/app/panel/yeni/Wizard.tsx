@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { ParcelShape } from "@/components/ParcelShape";
 import { formatArea, parcelPlace, parcelTitle } from "@/lib/format";
 import { PoiStep, type PoiItem } from "./PoiStep";
+import { ParcelMap, TkgmQuery } from "./TkgmQuery";
 
 type Summary = {
   areaM2: number;
@@ -18,7 +19,7 @@ type Summary = {
 };
 export type Parsed = { fileName: string; text: string; summary: Summary; ring: { lat: number; lng: number }[]; hook: string };
 
-const STEPS = ["Parsel dosyası", "Yakın noktalar", "İlan bilgileri", "Ses ve müzik"];
+const STEPS = ["Parsel", "Yakın noktalar", "İlan bilgileri", "Ses ve müzik"];
 export const OFFICE_KEY = "arsa-video:office";
 
 export function Wizard() {
@@ -170,6 +171,7 @@ export function ParcelStep({ parcel, onParsed, onNext }: { parcel: Parsed | null
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
+  const [mode, setMode] = useState<"tkgm" | "dosya">("tkgm");
   const input = useRef<HTMLInputElement>(null);
 
   async function load(file: File) {
@@ -187,34 +189,48 @@ export function ParcelStep({ parcel, onParsed, onNext }: { parcel: Parsed | null
 
   return (
     <div className="space-y-4">
-      <div
-        className={`card grid cursor-pointer place-items-center border-dashed p-10 text-center transition ${drag ? "border-neon bg-neon/5" : "hover:border-neon/50"}`}
-        onClick={() => input.current?.click()}
-        onDragOver={(e) => (e.preventDefault(), setDrag(true))}
-        onDragLeave={() => setDrag(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDrag(false);
-          const f = e.dataTransfer.files[0];
-          if (f) load(f);
-        }}
-      >
-        <input ref={input} type="file" accept=".geojson,.json,.kml" hidden onChange={(e) => e.target.files?.[0] && load(e.target.files[0])} />
-        <div className="text-4xl">📍</div>
-        <div className="mt-3 font-semibold">{busy ? "Okunuyor…" : "Parsel dosyasını sürükleyin ya da seçin"}</div>
-        <div className="mt-1 text-sm text-mute">TKGM Parsel Sorgu → Dışa aktar → GeoJSON veya KML</div>
+      <div className="flex gap-2" role="tablist">
+        {([["tkgm", "TKGM'den sorgula"], ["dosya", "Dosya yükle"]] as const).map(([m, label]) => (
+          <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => (setMode(m), setError(null))}
+            className={`rounded-xl border px-4 py-2 text-sm font-semibold ${mode === m ? "border-neon/60 bg-neon/10 text-white" : "border-line text-mute hover:text-white"}`}>
+            {label}
+          </button>
+        ))}
       </div>
+      {mode === "tkgm" && <TkgmQuery onParsed={onParsed} />}
+      {mode === "dosya" && (
+        <div
+          className={`card grid cursor-pointer place-items-center border-dashed p-10 text-center transition ${drag ? "border-neon bg-neon/5" : "hover:border-neon/50"}`}
+          onClick={() => input.current?.click()}
+          onDragOver={(e) => (e.preventDefault(), setDrag(true))}
+          onDragLeave={() => setDrag(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDrag(false);
+            const f = e.dataTransfer.files[0];
+            if (f) load(f);
+          }}
+        >
+          <input ref={input} type="file" accept=".geojson,.json,.kml" hidden onChange={(e) => e.target.files?.[0] && load(e.target.files[0])} />
+          <div className="text-4xl">📍</div>
+          <div className="mt-3 font-semibold">{busy ? "Okunuyor…" : "Parsel dosyasını sürükleyin ya da seçin"}</div>
+          <div className="mt-1 text-sm text-mute">TKGM Parsel Sorgu → Dışa aktar → GeoJSON veya KML</div>
+        </div>
+      )}
       {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
       {parcel && (
-        <div className="card flex items-center gap-5 p-5">
-          <ParcelShape ring={parcel.ring} className="h-28 w-28 shrink-0" />
-          <div className="min-w-0 flex-1">
-            <div className="text-lg font-extrabold">{parcelTitle(parcel.summary)}</div>
-            <div className="text-sm text-mute">{parcelPlace(parcel.summary)}</div>
-            <div className="mt-2 text-2xl font-black text-neon">{formatArea(parcel.summary.areaM2)}</div>
-            <div className="mt-1 truncate text-xs text-mute">{parcel.fileName}</div>
+        <div className="card space-y-4 p-5">
+          <ParcelMap key={parcel.fileName} ring={parcel.ring} />
+          <div className="flex items-center gap-5">
+            <ParcelShape ring={parcel.ring} className="h-28 w-28 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <div className="text-lg font-extrabold">{parcelTitle(parcel.summary)}</div>
+              <div className="text-sm text-mute">{parcelPlace(parcel.summary)}</div>
+              <div className="mt-2 text-2xl font-black text-neon">{formatArea(parcel.summary.areaM2)}</div>
+              <div className="mt-1 truncate text-xs text-mute">{parcel.fileName}</div>
+            </div>
+            <button className="btn-primary" onClick={onNext}>Devam →</button>
           </div>
-          <button className="btn-primary" onClick={onNext}>Devam →</button>
         </div>
       )}
     </div>

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { loadMaps } from "@/lib/maps";
 
 /** Videoda anlatılacak çevre noktası (@arsa/shared ReelPoi ile aynı biçim). */
 export type PoiItem = {
@@ -24,22 +25,6 @@ function distanceM(a: { lat: number; lng: number }, b: { lat: number; lng: numbe
 }
 export const formatDistance = (m: number) =>
   m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toLocaleString("tr-TR", { maximumFractionDigits: 1 })} km`;
-
-/** Google Maps JavaScript API'yi bir kez yükler. */
-let mapsPromise: Promise<any> | null = null;
-function loadMaps(key: string): Promise<any> {
-  const w = window as any;
-  if (w.google?.maps?.importLibrary) return Promise.resolve(w.google.maps);
-  mapsPromise ??= new Promise((resolve, reject) => {
-    w.__arsaMapsReady = () => resolve(w.google.maps);
-    const s = document.createElement("script");
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async&language=tr&region=TR&callback=__arsaMapsReady`;
-    s.async = true;
-    s.onerror = () => reject(new Error("Google Haritalar yüklenemedi"));
-    document.head.appendChild(s);
-  });
-  return mapsPromise;
-}
 
 export function PoiStep({
   center,
