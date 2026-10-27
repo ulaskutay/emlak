@@ -201,14 +201,22 @@ body:has(.admin) {
 .drone-isik {
   animation: drone-isik 1.2s ease-in-out infinite;
 }
-/* Konut çizimi: eşyalar sırayla belirir, sunucunun ses çubukları oynar */
-@keyframes konut-esya {
-  0%, 100% { opacity: 0; transform: translateY(14px); }
-  8%, 86% { opacity: 1; transform: translateY(0); }
-  94% { opacity: 0; transform: translateY(0); }
+/* Konut çizimi: boş odanın üstünde döşenmiş hali belirir/kaybolur, etiketler ters fazda; sunucunun ses çubukları oynar */
+@keyframes konut-doseli {
+  0%, 30% { opacity: 0; }
+  42%, 88% { opacity: 1; }
+  100% { opacity: 0; }
 }
-.konut-esya {
-  animation: konut-esya 9s ease-in-out infinite;
+.konut-doseli {
+  animation: konut-doseli 9s ease-in-out infinite;
+}
+@keyframes konut-bos {
+  0%, 30% { opacity: 1; }
+  42%, 88% { opacity: 0; }
+  100% { opacity: 1; }
+}
+.konut-bos {
+  animation: konut-bos 9s ease-in-out infinite;
 }
 @keyframes konut-ses {
   0%, 100% { transform: scaleY(0.3); }
@@ -244,7 +252,8 @@ body:has(.admin) {
   .drone-isik,
   .drone-isin,
   .drone-tarama,
-  .konut-esya,
+  .konut-doseli,
+  .konut-bos,
   .konut-ses,
   .proje-kat,
   .proje-kanca,
