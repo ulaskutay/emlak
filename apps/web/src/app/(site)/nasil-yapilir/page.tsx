@@ -20,7 +20,7 @@ export default function Page() {
         text="Her şablonu panelde baştan sona kaydettik: hangi bilgiyi girdiğinizi ve sonunda çıkan videoyu görürsünüz. Aynısını kendi ilanınızla birkaç dakikada yaparsınız."
       />
       <section className="px-3 pb-24 sm:px-4">
-        <div className="site-kart mx-auto max-w-[1320px] bg-white/70 p-4 sm:p-8 lg:p-10">
+        <div className="site-kart mx-auto max-w-[1320px] bg-white/70 p-3 sm:p-8 lg:p-10">
           <HowTo tutorials={tutorials} />
         </div>
         <p className="mx-auto mt-8 max-w-[1240px] px-1 text-center text-gri">

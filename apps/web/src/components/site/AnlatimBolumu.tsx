@@ -24,7 +24,7 @@ export function AnlatimBolumu({ etiket, baslik, text, adimlar, birincil, ikincil
       <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
         <div aria-hidden className={`relative mx-auto w-full max-w-[540px] ${ters ? "lg:order-2" : ""}`}>
           <div className={`absolute inset-6 rounded-full blur-3xl ${parilti}`} />
-          <div className="relative drop-shadow-[0_30px_40px_-20px_rgba(13,27,62,.45)]">{cizim}</div>
+          <div className="relative">{cizim}</div>
         </div>
 
         <div className="text-center lg:text-left">

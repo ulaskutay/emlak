@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { TEMPLATE_CATEGORIES, templateList, type TemplateCategory } from "@arsa/shared";
 import { DroneAnlatim } from "@/components/site/DroneAnlatim";
 import { KonutAnlatim, ProjeAnlatim } from "@/components/site/SablonAnlatimlari";
 import { HeroPhones } from "@/components/site/HeroPhones";
+import { SablonKatalogu } from "@/components/site/SablonKatalogu";
 import { SonCagri } from "@/components/site/SonCagri";
 import { VideoTile } from "@/components/site/VideoTile";
 import { ornekAdi, sablonOrnekleri, digerOrnekler } from "@/lib/ornekler";
 import { site } from "@/lib/site";
-import { createHref } from "@/lib/tutorials";
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
 
@@ -23,14 +22,6 @@ const jsonLd = {
   inLanguage: "tr",
 };
 
-/** Kategori kartlarının renkleri ve tek cümlelik açıklamaları. */
-const KATEGORI: Record<TemplateCategory, { ikon: string; text: string; renk: string; zemin: string }> = {
-  Arsa: { ikon: "🛰️", text: "Ada/parsel dosyasından havadan tanıtım; arsaya gitmeden.", renk: "text-gok", zemin: "bg-gok-acik" },
-  Konut: { ikon: "🏡", text: "İlan fotoğraflarından sinematik tur, döşeme ve sunuculu anlatım.", renk: "text-mercan", zemin: "bg-mercan-acik" },
-  Proje: { ikon: "🏗️", text: "Boş arsadan yükselen binayı gösteren inşaat videoları.", renk: "text-[#b7860b]", zemin: "bg-gunes-acik" },
-  "Sosyal medya": { ikon: "📣", text: "Satıldı ve fiyat güncellemesi gibi kısa paylaşımlar.", renk: "text-cimen", zemin: "bg-cimen-acik" },
-};
-
 const ADIMLAR = [
   { ikon: "🧩", baslik: "Şablonu seçin", text: "Arsa, konut ya da proje: ilanınıza uyan video türünü seçin, örneğini önceden izleyin." },
   { ikon: "✍️", baslik: "Bilgileri girin", text: "Parsel dosyası ya da fotoğraflar, fiyat ve telefon. Formu şablonun kendisi adım adım sorar." },
@@ -38,9 +29,6 @@ const ADIMLAR = [
 ];
 
 export default function Home() {
-  const kategoriler = TEMPLATE_CATEGORIES.map((k) => ({ k, sablonlar: templateList.filter((t) => t.category === k) })).filter(
-    (x) => x.sablonlar.length > 0,
-  );
   const serit = [...sablonOrnekleri.filter((o) => o.src), ...digerOrnekler];
 
   return (
@@ -102,44 +90,7 @@ export default function Home() {
       <KonutAnlatim />
       <ProjeAnlatim />
 
-      {/* Ne tanıtmak istiyorsunuz? */}
-      <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-6">
-        <div className="text-center">
-          <span className="site-etiket">Gayrimenkul türünü seçin</span>
-          <h2 className="mx-auto mt-4 max-w-2xl text-[clamp(2rem,4vw,3rem)] leading-[1.08] font-extrabold tracking-[-0.035em] text-balance">
-            Ne tanıtmak istiyorsunuz?
-          </h2>
-        </div>
-        <div className={`mt-12 grid gap-5 ${kategoriler.length > 2 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
-          {kategoriler.map(({ k, sablonlar }) => {
-            const c = KATEGORI[k];
-            return (
-              <div key={k} className="site-kart flex flex-col p-6 sm:p-7">
-                <span aria-hidden className={`grid h-14 w-14 place-items-center rounded-2xl text-2xl ${c.zemin}`}>
-                  {c.ikon}
-                </span>
-                <h3 className="mt-5 text-2xl font-extrabold tracking-[-0.03em]">{k}</h3>
-                <p className="mt-2 leading-relaxed text-gri">{c.text}</p>
-                <ul className="mt-5 space-y-2">
-                  {sablonlar.map((t) => (
-                    <li key={t.id}>
-                      <Link
-                        href={createHref(t.id)}
-                        className={`group flex items-center justify-between gap-3 rounded-2xl px-4 py-3 font-bold transition-colors ${c.zemin} hover:brightness-[0.97]`}
-                      >
-                        <span>{t.name}</span>
-                        <span className={`text-sm whitespace-nowrap ${c.renk}`}>
-                          Oluşturun <span aria-hidden className="inline-block transition-transform group-hover:translate-x-0.5">→</span>
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <SablonKatalogu />
 
       {/* Örnek videolar şeridi */}
       <section className="overflow-hidden bg-white py-20 md:py-24">

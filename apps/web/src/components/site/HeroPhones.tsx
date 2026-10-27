@@ -23,7 +23,7 @@ const PHONES = [
     poster: "/media/sablon-dosenmis-poster.jpg",
     cls: "rotate-[8deg] translate-y-8",
     icon: "🛋️",
-    title: "Sanal döşeme",
+    title: "Sanal eşya döşeme",
     from: "Boş daire fotoğrafından",
   },
 ];

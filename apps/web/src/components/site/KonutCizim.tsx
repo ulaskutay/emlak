@@ -57,10 +57,10 @@ export function KonutCizim({ className = "" }: { className?: string }) {
           </text>
         </g>
         <g className="konut-doseli">
-          <rect x="344" y="26" width="160" height="30" rx="15" fill="#ffffff" />
-          <circle cx="360" cy="41" r="5" fill="#2fa36b" />
-          <text x="372" y="46" fill="#0d1b3e" fontSize="14" fontWeight="700" fontFamily="inherit">
-            Sanal döşeme hazır
+          <rect x="340" y="26" width="164" height="30" rx="15" fill="#ffffff" />
+          <circle cx="356" cy="41" r="5" fill="#2fa36b" />
+          <text x="368" y="46" fill="#0d1b3e" fontSize="14" fontWeight="700" fontFamily="inherit">
+            Sanal eşya döşendi
           </text>
         </g>
         <text x="136" y="500" fill="#ffffff" fontSize="10" fontFamily="inherit" opacity="0.75">

@@ -1,5 +1,5 @@
 /**
- * Çizim drone: 3/4 üstten bakış, katlanır kollu kamera drone'u. Pervaneler perspektifte döner, gövde süzülür.
+ * Çizim drone: 3/4 üstten bakış, katlanır kollu kamera drone'u; altında gerçek parsel karesi. Pervaneler perspektifte döner, gövde süzülür.
  * Katman sırası: arka pervaneler → arka kollar → gövde → ön kollar → ön pervaneler → gimbal.
  */
 type Motor = { x: number; y: number; arka: boolean; isik: string };
@@ -50,7 +50,13 @@ export function DroneCizim({ className = "" }: { className?: string }) {
   const arka = MOTORLAR.filter((m) => m.arka);
   const on = MOTORLAR.filter((m) => !m.arka);
   return (
-    <svg viewBox="0 0 640 520" className={className} aria-hidden>
+    <div className={`relative aspect-[640/612] ${className}`} aria-hidden>
+      {/* Zemin: kendi drone videomuzdan parsel karesi; ayrı katman, animasyonsuz */}
+      <div className="absolute top-[60.9%] left-[12.3%] h-[38.7%] w-[69.4%] overflow-hidden rounded-[6%] border-[3px] border-white bg-lacivert shadow-[0_20px_40px_-24px_rgba(13,27,62,.6)] sm:border-4">
+        <img src="/media/arsa-zemin.webp" alt="" className="h-full w-full object-cover" />
+      </div>
+      <div className="drone-golge absolute top-[75.3%] left-[31.25%] h-[4.6%] w-[37.5%] rounded-[50%] bg-[radial-gradient(closest-side,rgba(13,27,62,.35),transparent)]" />
+      <svg viewBox="0 0 640 612" className="drone-suzul absolute inset-0 h-full w-full">
       <defs>
         <linearGradient id="dr-ust" x1="0" y1="0" x2="0.3" y2="1">
           <stop offset="0" stopColor="#ffffff" />
@@ -101,31 +107,17 @@ export function DroneCizim({ className = "" }: { className?: string }) {
           <stop offset="0" stopColor="#2b6cff" stopOpacity="0.45" />
           <stop offset="1" stopColor="#2b6cff" stopOpacity="0.04" />
         </linearGradient>
-        <filter id="dr-isik-glow" x="-200%" y="-200%" width="500%" height="500%">
-          <feGaussianBlur stdDeviation="3" />
-        </filter>
+        <radialGradient id="dr-isik-kirmizi">
+          <stop offset="0" stopColor="#ff5a4a" stopOpacity="0.9" />
+          <stop offset="1" stopColor="#ff5a4a" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id="dr-isik-yesil">
+          <stop offset="0" stopColor="#43d17a" stopOpacity="0.9" />
+          <stop offset="1" stopColor="#43d17a" stopOpacity="0" />
+        </radialGradient>
       </defs>
 
-      {/* Zemin: çekilen parselin çizgi çerçevesi ve gölge; fotoğraf yok */}
-      <ellipse className="drone-golge" cx="320" cy="452" rx="160" ry="16" fill="url(#dr-golge)" />
-      <g stroke="#c3c9d6" strokeWidth="1.5" opacity="0.6" fill="none">
-        <path d="M120 470 L520 470" />
-        <path d="M150 440 L490 440" />
-        <path d="M185 412 L455 412" />
-      </g>
-      <g className="drone-parsel">
-        <path d="M232 428 L412 418 L444 466 L256 478 Z" fill="#ffd166" fillOpacity="0.14" stroke="#f2b705" strokeWidth="3" strokeLinejoin="round" />
-        {[
-          [232, 428],
-          [412, 418],
-          [444, 466],
-          [256, 478],
-        ].map(([x, y], i) => (
-          <circle key={i} cx={x} cy={y} r="4.5" fill="#ffffff" stroke="#f2b705" strokeWidth="2.5" />
-        ))}
-      </g>
-
-      <g className="drone-suzul">
+      <g>
         {/* Arka pervaneler ve kollar (gövdenin arkasında kalır) */}
         {arka.map((m, i) => (
           <Pervane key={i} x={m.x} y={m.y} i={i} />
@@ -165,7 +157,7 @@ export function DroneCizim({ className = "" }: { className?: string }) {
         {/* Seyir ışıkları: arkada kırmızı, önde yeşil */}
         {MOTORLAR.map((m, i) => (
           <g key={i}>
-            <circle cx={m.x} cy={m.y + 8} r="5" fill={m.isik} filter="url(#dr-isik-glow)" className="drone-isik" />
+            <circle cx={m.x} cy={m.y + 8} r="9" fill={`url(#${m.arka ? "dr-isik-kirmizi" : "dr-isik-yesil"})`} className="drone-isik" />
             <circle cx={m.x} cy={m.y + 8} r="2.2" fill="#ffffff" opacity="0.9" />
           </g>
         ))}
@@ -176,7 +168,7 @@ export function DroneCizim({ className = "" }: { className?: string }) {
         ))}
 
         {/* Kamera ışını: lensten parsele doğru açılan koni ve tarayan çizgi */}
-        <path className="drone-isin" d="M312 322 L236 446 L404 446 L328 322 Z" fill="url(#dr-isin)" />
+        <path className="drone-isin" d="M312 322 L262 475 L378 475 L328 322 Z" fill="url(#dr-isin)" />
         <line className="drone-tarama" x1="262" y1="400" x2="378" y2="400" stroke="#ffffff" strokeWidth="2" opacity="0.8" />
 
         {/* Gimbal kamera */}
@@ -189,6 +181,7 @@ export function DroneCizim({ className = "" }: { className?: string }) {
         <circle cx="314" cy="306" r="2.5" fill="#ffffff" opacity="0.85" />
         <circle cx="325" cy="318" r="1.2" fill="#ffffff" opacity="0.5" />
       </g>
-    </svg>
+      </svg>
+    </div>
   );
 }

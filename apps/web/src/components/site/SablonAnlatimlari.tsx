@@ -14,10 +14,10 @@ export function KonutAnlatim() {
         </>
       }
       baslik="İlan fotoğrafları gezilen bir eve dönüşsün"
-      text="Elinizdeki fotoğraflar yeter. Her kare sinematik bir kamera hareketine dönüşür, boş odalar istediğiniz tarzda döşenir, isterseniz bir sunucu evi odası odası anlatır."
+      text="Elinizdeki fotoğraflar yeter. Her kare sinematik bir kamera hareketine dönüşür, boş odalara istediğiniz tarzda sanal eşya döşenir, isterseniz bir sunucu evi odası odası anlatır."
       adimlar={[
         { baslik: "Fotoğrafları yükleyin", text: "3–8 ilan fotoğrafı; her birine kısa bir başlık yazabilirsiniz: salon, mutfak, balkon." },
-        { baslik: "Boş odalar döşenir", text: "Yapay zekâ odayı seçtiğiniz tarzda döşer; alıcı evi yaşanmış haliyle görür." },
+        { baslik: "Boş odaya sanal eşya döşenir", text: "Yapay zekâ odaya seçtiğiniz tarzda mobilya ve eşya yerleştirir; alıcı evi yaşanmış haliyle görür." },
         { baslik: "Sunucu evi anlatır", text: "Seçtiğiniz emlakçı karakteri kamera karşısında ilanı Türkçe anlatır; fiyat ve telefon kartı sonda." },
       ]}
       birincil={{ href: createHref("ilan-videosu"), label: "Konut videosu oluşturun" }}

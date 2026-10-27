@@ -165,7 +165,8 @@ body:has(.admin) {
   50% { transform: translate(6px, -16px) rotate(2deg); }
 }
 .drone-suzul {
-  transform-origin: 320px 240px;
+  transform-origin: 50% 40%;
+  will-change: transform;
   animation: drone-suzul 5s ease-in-out infinite;
 }
 @keyframes drone-golge {
@@ -173,7 +174,8 @@ body:has(.admin) {
   50% { transform: scale(0.82); opacity: 0.7; }
 }
 .drone-golge {
-  transform-origin: 320px 452px;
+  transform-origin: center;
+  will-change: transform, opacity;
   animation: drone-golge 5s ease-in-out infinite;
 }
 @keyframes drone-isin {
@@ -244,6 +246,20 @@ body:has(.admin) {
 }
 .proje-kanca {
   animation: proje-kanca 5s ease-in-out infinite;
+}
+/* Telefon ve tabletlerde SVG içini her karede yeniden boyatan süsler kapalı; süzülme ve gölge GPU'da kalır */
+@media (max-width: 1023px), (pointer: coarse) {
+  .drone-pervane,
+  .drone-isik,
+  .drone-isin,
+  .drone-tarama,
+  .konut-ses,
+  .proje-kanca {
+    animation: none;
+  }
+  .drone-tarama {
+    opacity: 0;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .drone-pervane,

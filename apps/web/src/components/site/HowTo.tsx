@@ -72,6 +72,21 @@ export function HowTo({ tutorials }: { tutorials: Tutorial[] }) {
     if (!v) return;
     v.currentTime = s;
     v.play().catch(() => {});
+    // Mobilde adım listesi videonun altında kalır; dokunulan adım oynarken video görünür olsun.
+    const r = frame.current?.getBoundingClientRect();
+    if (r && (r.top < 80 || r.bottom > window.innerHeight)) frame.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  // Panel kaydı yatay masaüstü ekranı; telefonda okunabilsin diye tam ekran (mümkünse yatay) açılır.
+  function fullscreen() {
+    const v = video.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
+    if (!v) return;
+    v.play().catch(() => {});
+    if (v.requestFullscreen) {
+      v.requestFullscreen()
+        .then(() => (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.("landscape"))
+        .catch(() => {});
+    } else v.webkitEnterFullscreen?.();
   }
 
   function onTabKey(e: React.KeyboardEvent, i: number) {
@@ -88,7 +103,7 @@ export function HowTo({ tutorials }: { tutorials: Tutorial[] }) {
       <div
         role="tablist"
         aria-label="Şablon"
-        className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0"
+        className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 [mask-image:linear-gradient(90deg,#000_85%,transparent)] [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 sm:[mask-image:none]"
       >
         {tutorials.map((x, i) => (
           <button
@@ -117,7 +132,7 @@ export function HowTo({ tutorials }: { tutorials: Tutorial[] }) {
         id="nasil-panel"
         role="tabpanel"
         aria-labelledby={`nasil-tab-${t.id}`}
-        className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-10"
+        className="mt-6 grid gap-6 sm:mt-8 sm:gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-10"
       >
         <div ref={frame}>
           {/* Tarayıcı çerçevesi: kaydın panelde geçtiği belli olsun */}
@@ -150,6 +165,16 @@ export function HowTo({ tutorials }: { tutorials: Tutorial[] }) {
                 className="block aspect-video w-full cursor-pointer bg-lacivert object-cover"
                 aria-label={`${t.name}: panelde video hazırlama kaydı`}
               />
+              <button
+                type="button"
+                onClick={fullscreen}
+                className="absolute right-2 bottom-2 z-10 flex items-center gap-1.5 rounded-full bg-lacivert/80 px-3 py-1.5 text-xs font-bold text-white backdrop-blur lg:hidden"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+                  <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Tam ekran
+              </button>
               {paused && (
                 <button
                   type="button"
@@ -166,6 +191,8 @@ export function HowTo({ tutorials }: { tutorials: Tutorial[] }) {
               )}
             </div>
           </div>
+
+          <p className="mt-3 text-center text-xs text-gri lg:hidden">Ekranı okumak için telefonu yan çevirip tam ekran izleyin.</p>
 
           {/* Bölümlü ilerleme: her parça bir adım, tıklanınca o adıma gider */}
           <div className="mt-4 flex gap-1.5" aria-hidden>
@@ -194,7 +221,7 @@ export function HowTo({ tutorials }: { tutorials: Tutorial[] }) {
           <p className="text-sm font-semibold text-gri">
             {t.category} · video <span className="tabular-nums">{t.duration}</span>
           </p>
-          <h3 className="mt-1 text-[1.75rem] leading-tight font-extrabold tracking-[-0.03em]">{t.name}</h3>
+          <h3 className="mt-1 text-[1.5rem] leading-tight font-extrabold tracking-[-0.03em] sm:text-[1.75rem]">{t.name}</h3>
           <p className="mt-2 text-[1rem] leading-relaxed text-gri">{t.tagline}</p>
 
           <ol className="mt-6 space-y-1.5">
@@ -222,8 +249,8 @@ export function HowTo({ tutorials }: { tutorials: Tutorial[] }) {
             ))}
           </ol>
 
-          <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 lg:mt-auto lg:pt-8">
-            <Link href={createHref(t.id)} className="site-btn-primary">
+          <div className="mt-6 flex flex-col items-stretch gap-3 text-center sm:mt-8 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-5 sm:text-left lg:mt-auto lg:pt-8">
+            <Link href={createHref(t.id)} className="site-btn-primary h-12">
               Hemen oluşturun
             </Link>
             <Link href={`/sablonlar/${t.id}`} className="font-bold text-gok underline-offset-4 hover:underline">
