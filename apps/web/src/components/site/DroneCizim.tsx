@@ -1,91 +1,193 @@
-/** Elle çizilmiş drone: dört pervanesi döner, gövdesi havada süzülür. Zemin yok. */
-export function DroneCizim({ className = "" }: { className?: string }) {
-  const motorlar: [number, number][] = [
-    [110, 118],
-    [290, 118],
-    [110, 262],
-    [290, 262],
-  ];
+/**
+ * Çizim drone: 3/4 üstten bakış, katlanır kollu kamera drone'u. Pervaneler perspektifte döner, gövde süzülür.
+ * Katman sırası: arka pervaneler → arka kollar → gövde → ön kollar → ön pervaneler → gimbal.
+ */
+type Motor = { x: number; y: number; arka: boolean; isik: string };
+
+const MOTORLAR: Motor[] = [
+  { x: 214, y: 150, arka: true, isik: "#ff5a4a" },
+  { x: 426, y: 150, arka: true, isik: "#ff5a4a" },
+  { x: 164, y: 262, arka: false, isik: "#43d17a" },
+  { x: 476, y: 262, arka: false, isik: "#43d17a" },
+];
+
+function Pervane({ x, y, i }: { x: number; y: number; i: number }) {
+  const blade = "M0 0 C12 -9 62 -11 88 -3 L88 3 C62 9 12 7 0 0 Z";
   return (
-    <svg viewBox="0 0 400 400" className={className} aria-hidden>
+    <g transform={`translate(${x} ${y}) scale(1 0.34)`}>
+      <circle r="90" fill="url(#dr-disk)" />
+      <circle r="90" fill="none" stroke="#1f2638" strokeWidth="2" opacity="0.22" />
+      <g className="drone-pervane" style={{ animationDelay: `${i * -0.045}s` }}>
+        <path d={blade} fill="url(#dr-kanat)" />
+        <path d={blade} fill="url(#dr-kanat)" transform="rotate(180)" />
+      </g>
+    </g>
+  );
+}
+
+function Motorr({ x, y }: { x: number; y: number }) {
+  return (
+    <g>
+      <rect x={x - 13} y={y - 4} width="26" height="18" rx="4" fill="url(#dr-motor-yan)" />
+      <ellipse cx={x} cy={y + 14} rx="13" ry="5" fill="#1a2030" />
+      <ellipse cx={x} cy={y - 4} rx="13" ry="5" fill="url(#dr-motor-ust)" />
+      <ellipse cx={x} cy={y - 4} rx="5" ry="2" fill="#0f1420" />
+    </g>
+  );
+}
+
+function Kol({ d, ust }: { d: string; ust: string }) {
+  return (
+    <g>
+      <path d={d} stroke="#1f2638" strokeWidth="19" strokeLinecap="round" fill="none" />
+      <path d={d} stroke="url(#dr-kol)" strokeWidth="15" strokeLinecap="round" fill="none" />
+      <path d={ust} stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" fill="none" opacity="0.35" />
+    </g>
+  );
+}
+
+export function DroneCizim({ className = "" }: { className?: string }) {
+  const arka = MOTORLAR.filter((m) => m.arka);
+  const on = MOTORLAR.filter((m) => !m.arka);
+  return (
+    <svg viewBox="0 0 640 520" className={className} aria-hidden>
       <defs>
-        <linearGradient id="dr-govde" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#2a3a6b" />
-          <stop offset="1" stopColor="#0d1b3e" />
+        <linearGradient id="dr-ust" x1="0" y1="0" x2="0.3" y2="1">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="0.55" stopColor="#e3e7ef" />
+          <stop offset="1" stopColor="#c3c9d6" />
         </linearGradient>
-        <linearGradient id="dr-ust" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#4a7dff" />
-          <stop offset="1" stopColor="#2b6cff" />
+        <linearGradient id="dr-on" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#aab2c2" />
+          <stop offset="1" stopColor="#6b7488" />
         </linearGradient>
-        <radialGradient id="dr-cam" cx="0.4" cy="0.35" r="0.7">
-          <stop offset="0" stopColor="#9fc0ff" />
-          <stop offset="0.5" stopColor="#1e3a8a" />
-          <stop offset="1" stopColor="#0d1b3e" />
+        <linearGradient id="dr-alt" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#5a6378" />
+          <stop offset="1" stopColor="#3a4254" />
+        </linearGradient>
+        <linearGradient id="dr-kol" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#59627a" />
+          <stop offset="1" stopColor="#2a3040" />
+        </linearGradient>
+        <linearGradient id="dr-motor-yan" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#2b3242" />
+          <stop offset="0.5" stopColor="#4a5368" />
+          <stop offset="1" stopColor="#1f2534" />
+        </linearGradient>
+        <linearGradient id="dr-motor-ust" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#6b7488" />
+          <stop offset="1" stopColor="#2f3646" />
+        </linearGradient>
+        <linearGradient id="dr-kanat" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#2a3040" />
+          <stop offset="1" stopColor="#6d778d" />
+        </linearGradient>
+        <radialGradient id="dr-disk">
+          <stop offset="0.6" stopColor="#2b6cff" stopOpacity="0.05" />
+          <stop offset="1" stopColor="#2b6cff" stopOpacity="0.16" />
         </radialGradient>
-        <radialGradient id="dr-golge" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor="#0d1b3e" stopOpacity="0.28" />
+        <radialGradient id="dr-lens" cx="0.38" cy="0.32" r="0.75">
+          <stop offset="0" stopColor="#7aa6ff" />
+          <stop offset="0.35" stopColor="#1b3d8f" />
+          <stop offset="0.8" stopColor="#070c1a" />
+          <stop offset="1" stopColor="#000000" />
+        </radialGradient>
+        <radialGradient id="dr-golge">
+          <stop offset="0" stopColor="#0d1b3e" stopOpacity="0.3" />
+          <stop offset="0.7" stopColor="#0d1b3e" stopOpacity="0.08" />
           <stop offset="1" stopColor="#0d1b3e" stopOpacity="0" />
         </radialGradient>
+        <linearGradient id="dr-isin" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#2b6cff" stopOpacity="0.45" />
+          <stop offset="1" stopColor="#2b6cff" stopOpacity="0.04" />
+        </linearGradient>
+        <filter id="dr-isik-glow" x="-200%" y="-200%" width="500%" height="500%">
+          <feGaussianBlur stdDeviation="3" />
+        </filter>
       </defs>
 
-      {/* Yerdeki yumuşak gölge: drone yükselip alçaldıkça büyüyüp küçülür */}
-      <ellipse className="drone-golge" cx="200" cy="356" rx="118" ry="16" fill="url(#dr-golge)" />
+      {/* Zemin: çekilen parselin çizgi çerçevesi ve gölge; fotoğraf yok */}
+      <ellipse className="drone-golge" cx="320" cy="452" rx="160" ry="16" fill="url(#dr-golge)" />
+      <g stroke="#c3c9d6" strokeWidth="1.5" opacity="0.6" fill="none">
+        <path d="M120 470 L520 470" />
+        <path d="M150 440 L490 440" />
+        <path d="M185 412 L455 412" />
+      </g>
+      <g className="drone-parsel">
+        <path d="M232 428 L412 418 L444 466 L256 478 Z" fill="#ffd166" fillOpacity="0.14" stroke="#f2b705" strokeWidth="3" strokeLinejoin="round" />
+        {[
+          [232, 428],
+          [412, 418],
+          [444, 466],
+          [256, 478],
+        ].map(([x, y], i) => (
+          <circle key={i} cx={x} cy={y} r="4.5" fill="#ffffff" stroke="#f2b705" strokeWidth="2.5" />
+        ))}
+      </g>
 
       <g className="drone-suzul">
-        {/* Kollar */}
-        <g stroke="#1b2a52" strokeWidth="14" strokeLinecap="round">
-          <line x1="150" y1="162" x2="118" y2="126" />
-          <line x1="250" y1="162" x2="282" y2="126" />
-          <line x1="150" y1="218" x2="118" y2="254" />
-          <line x1="250" y1="218" x2="282" y2="254" />
+        {/* Arka pervaneler ve kollar (gövdenin arkasında kalır) */}
+        {arka.map((m, i) => (
+          <Pervane key={i} x={m.x} y={m.y} i={i} />
+        ))}
+        <Kol d="M262 204 L214 152" ust="M266 198 L222 150" />
+        <Kol d="M378 204 L426 152" ust="M374 198 L418 150" />
+        {arka.map((m, i) => (
+          <Motorr key={i} x={m.x} y={m.y} />
+        ))}
+
+        {/* Gövde: üst yüz, ön yüz, alt gölge */}
+        <path d="M244 266 Q320 292 396 266 L402 246 Q320 270 238 246 Z" fill="url(#dr-alt)" />
+        <path d="M236 240 Q320 262 404 240 L400 262 Q320 288 240 262 Z" fill="url(#dr-on)" />
+        <path d="M252 198 Q320 180 388 198 L404 240 Q320 262 236 240 Z" fill="url(#dr-ust)" />
+        {/* Üst yüz detayları: havalandırma, kapak çizgisi, marka şeridi */}
+        <path d="M268 214 Q320 204 372 214" stroke="#9aa3b5" strokeWidth="1.5" fill="none" opacity="0.7" />
+        <path d="M262 230 Q320 244 378 230" stroke="#ffffff" strokeWidth="2" fill="none" opacity="0.8" />
+        <path d="M236 240 Q320 262 404 240" stroke="#2b6cff" strokeWidth="3" fill="none" opacity="0.9" />
+        <g fill="#2f3646" opacity="0.55">
+          <rect x="286" y="202" width="18" height="3" rx="1.5" />
+          <rect x="310" y="200" width="18" height="3" rx="1.5" />
+          <rect x="334" y="202" width="18" height="3" rx="1.5" />
         </g>
-        <g stroke="#2b6cff" strokeWidth="4" strokeLinecap="round" opacity="0.9">
-          <line x1="150" y1="158" x2="122" y2="128" />
-          <line x1="250" y1="158" x2="278" y2="128" />
-        </g>
+        {/* Ön sensörler */}
+        <circle cx="282" cy="250" r="5" fill="#0f1420" />
+        <circle cx="358" cy="250" r="5" fill="#0f1420" />
+        <circle cx="280" cy="248" r="1.5" fill="#ffffff" opacity="0.7" />
+        <circle cx="356" cy="248" r="1.5" fill="#ffffff" opacity="0.7" />
 
-        {/* İniş ayakları */}
-        <g stroke="#1b2a52" strokeWidth="7" strokeLinecap="round" fill="none">
-          <path d="M165 228 L158 262 L138 262" />
-          <path d="M235 228 L242 262 L262 262" />
-        </g>
+        {/* Ön kollar */}
+        <Kol d="M246 248 L166 262" ust="M248 242 L172 256" />
+        <Kol d="M394 248 L474 262" ust="M392 242 L468 256" />
+        {on.map((m, i) => (
+          <Motorr key={i} x={m.x} y={m.y} />
+        ))}
 
-        {/* Gövde */}
-        <rect x="140" y="150" width="120" height="80" rx="30" fill="url(#dr-govde)" />
-        <rect x="150" y="156" width="100" height="36" rx="18" fill="url(#dr-ust)" />
-        <rect x="160" y="160" width="60" height="10" rx="5" fill="#ffffff" opacity="0.35" />
-        {/* Durum ışığı */}
-        <circle className="drone-isik" cx="200" cy="209" r="5" fill="#ff6b4a" />
-
-        {/* Kamera gimbal'ı */}
-        <rect x="186" y="226" width="28" height="12" rx="5" fill="#1b2a52" />
-        <circle cx="200" cy="252" r="18" fill="#0d1b3e" />
-        <circle cx="200" cy="252" r="12" fill="url(#dr-cam)" />
-        <circle cx="195" cy="247" r="3" fill="#ffffff" opacity="0.8" />
-
-        {/* Motorlar ve pervaneler */}
-        {motorlar.map(([x, y], i) => (
+        {/* Seyir ışıkları: arkada kırmızı, önde yeşil */}
+        {MOTORLAR.map((m, i) => (
           <g key={i}>
-            <circle cx={x} cy={y} r="13" fill="#1b2a52" />
-            <circle cx={x} cy={y} r="7" fill="#2b6cff" />
-            {/* Dönüş bulanıklığı */}
-            <circle cx={x} cy={y} r="48" fill="#2b6cff" opacity="0.06" />
-            <circle cx={x} cy={y} r="48" fill="none" stroke="#1b2a52" strokeWidth="1.5" opacity="0.18" />
-            <g className="drone-pervane" style={{ transformOrigin: `${x}px ${y}px`, animationDelay: `${i * -0.07}s` }}>
-              <path
-                d={`M${x} ${y} C${x + 10} ${y - 10} ${x + 42} ${y - 12} ${x + 46} ${y} C${x + 42} ${y + 5} ${x + 10} ${y + 6} ${x} ${y} Z`}
-                fill="#1b2a52"
-                opacity="0.85"
-              />
-              <path
-                d={`M${x} ${y} C${x - 10} ${y + 10} ${x - 42} ${y + 12} ${x - 46} ${y} C${x - 42} ${y - 5} ${x - 10} ${y - 6} ${x} ${y} Z`}
-                fill="#1b2a52"
-                opacity="0.85"
-              />
-            </g>
-            <circle cx={x} cy={y} r="3.5" fill="#ffd166" />
+            <circle cx={m.x} cy={m.y + 8} r="5" fill={m.isik} filter="url(#dr-isik-glow)" className="drone-isik" />
+            <circle cx={m.x} cy={m.y + 8} r="2.2" fill="#ffffff" opacity="0.9" />
           </g>
         ))}
+
+        {/* Ön pervaneler (gövdenin önünde) */}
+        {on.map((m, i) => (
+          <Pervane key={i} x={m.x} y={m.y} i={i + 2} />
+        ))}
+
+        {/* Kamera ışını: lensten parsele doğru açılan koni ve tarayan çizgi */}
+        <path className="drone-isin" d="M312 322 L236 446 L404 446 L328 322 Z" fill="url(#dr-isin)" />
+        <line className="drone-tarama" x1="262" y1="400" x2="378" y2="400" stroke="#ffffff" strokeWidth="2" opacity="0.8" />
+
+        {/* Gimbal kamera */}
+        <rect x="308" y="278" width="24" height="14" rx="4" fill="#1f2638" />
+        <path d="M300 288 L340 288 L336 300 L304 300 Z" fill="#2f3646" />
+        <circle cx="320" cy="312" r="21" fill="#1a2030" />
+        <circle cx="320" cy="312" r="18" fill="#2b3242" />
+        <circle cx="320" cy="312" r="13.5" fill="url(#dr-lens)" />
+        <circle cx="320" cy="312" r="13.5" fill="none" stroke="#5a6378" strokeWidth="1.5" />
+        <circle cx="314" cy="306" r="2.5" fill="#ffffff" opacity="0.85" />
+        <circle cx="325" cy="318" r="1.2" fill="#ffffff" opacity="0.5" />
       </g>
     </svg>
   );

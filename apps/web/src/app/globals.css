@@ -156,14 +156,16 @@ body:has(.admin) {
   to { transform: rotate(360deg); }
 }
 .drone-pervane {
-  animation: drone-pervane 0.18s linear infinite;
+  animation: drone-pervane 0.16s linear infinite;
+  transform-box: fill-box;
+  transform-origin: center;
 }
 @keyframes drone-suzul {
   0%, 100% { transform: translate(0, 0) rotate(-2deg); }
   50% { transform: translate(6px, -16px) rotate(2deg); }
 }
 .drone-suzul {
-  transform-origin: 200px 200px;
+  transform-origin: 320px 240px;
   animation: drone-suzul 5s ease-in-out infinite;
 }
 @keyframes drone-golge {
@@ -171,8 +173,26 @@ body:has(.admin) {
   50% { transform: scale(0.82); opacity: 0.7; }
 }
 .drone-golge {
-  transform-origin: 200px 356px;
+  transform-origin: 320px 452px;
   animation: drone-golge 5s ease-in-out infinite;
+}
+@keyframes drone-isin {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+.drone-isin {
+  animation: drone-isin 2.4s ease-in-out infinite;
+}
+@keyframes drone-tarama {
+  0% { transform: translateY(-66px) scaleX(0.52); opacity: 0; }
+  10% { opacity: 0.8; }
+  90% { opacity: 0.8; }
+  100% { transform: translateY(44px) scaleX(1.36); opacity: 0; }
+}
+.drone-tarama {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: drone-tarama 2.4s linear infinite;
 }
 @keyframes drone-isik {
   0%, 100% { opacity: 1; }
@@ -186,6 +206,8 @@ body:has(.admin) {
   .drone-suzul,
   .drone-golge,
   .drone-isik,
+  .drone-isin,
+  .drone-tarama,
   .suzul,
   .serit {
     animation: none;

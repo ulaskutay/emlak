@@ -13,7 +13,7 @@ export function DroneAnlatim() {
   return (
     <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-6">
       <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-        <div aria-hidden className="relative mx-auto w-full max-w-[440px]">
+        <div aria-hidden className="relative mx-auto w-full max-w-[540px]">
           <div className="absolute inset-6 rounded-full bg-gradient-to-br from-gok/20 via-gunes/25 to-cimen/15 blur-3xl" />
           <DroneCizim className="relative w-full drop-shadow-[0_30px_40px_-20px_rgba(13,27,62,.45)]" />
         </div>
