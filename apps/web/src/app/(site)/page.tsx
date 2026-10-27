@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { templateList } from "@arsa/shared";
 import { FilmSeridi } from "@/components/site/FilmSeridi";
-import { HeroUcus } from "@/components/site/HeroUcus";
+import { HeroVizor } from "@/components/site/HeroVizor";
 import { OnceSonra } from "@/components/site/OnceSonra";
 import { SonCagri } from "@/components/site/SonCagri";
 import { site } from "@/lib/site";
@@ -117,7 +117,7 @@ export default function Home() {
     <div className="bg-lacivert text-white">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      <HeroUcus />
+      <HeroVizor />
 
       {/* Film şeridi: gerçek çıktılar */}
       <section className="py-20 md:py-28">

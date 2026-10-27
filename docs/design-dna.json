@@ -77,7 +77,7 @@
     ],
     "created_at": "2026-10-18",
     "updated_at": "2026-10-27",
-    "history": "2026-10-18 'Pafta' → 2026-10 'Gökyüzü' (açık, gök mavisi) → 2026-10-27 öğleden sonra vizör köşeleri ve künye eklendi → 2026-10-27 akşam ana sayfa baştan: koyu sinematik 'Uçuş'. Gökyüzü paleti panelde ve alt sayfa gövdelerinde sürüyor. Bricolage Grotesque başlık denemesi aynı akşam geri alındı (kullanıcı beğenmedi); yazı tipi her yerde Plus Jakarta Sans."
+    "history": "2026-10-18 'Pafta' → 2026-10 'Gökyüzü' (açık, gök mavisi) → 2026-10-27 öğleden sonra vizör köşeleri ve künye eklendi → 2026-10-27 akşam ana sayfa baştan: koyu sinematik 'Uçuş'. Gökyüzü paleti panelde ve alt sayfa gövdelerinde sürüyor. Bricolage Grotesque başlık denemesi aynı akşam geri alındı (kullanıcı beğenmedi); yazı tipi her yerde Plus Jakarta Sans. 2026-10-28: tam ekran video hero (HeroUcus) kullanıcı isteğiyle geri alındı; ilk vizör hero'su (HeroVizor: sekmeli, künyeli) koyu sayfanın üstünde kaldı."
   },
   "design_system": {
     "color": {
@@ -253,7 +253,7 @@
       "navigation_pattern": "Koyu cam hap menü (lacivert %70 + blur), tüm sayfalarda tam ekran videonun ya da lacivert bandın üstünde süzülür. Sarı CTA. Mobilde açılır liste.",
       "modal_style": "Ortada, #F7F8F3, video önizleme için koyu tam ekran",
       "list_style": "Künye: küçük soluk etiket + kalın değer, beyaz %15 çizgilerle. Sıralı adımlarda solda sarı Bricolage rakam.",
-      "component_notes": "İmza anlar: (1) HeroUcus — ekranın kendisi vizör: tam ekran gerçek drone videosu, dört köşe işareti ekran köşelerinde (üsttekiler menünün altından başlar), sağ üstte videodan okunan künye, sol altta canlı süre ve dev başlık. (2) FilmSeridi — altı şablonun gerçek çıktıları ekran boyu dikey, snap kaydırmalı; görünen oynar. (3) OnceSonra — boş/döşenmiş oda sürgüsü, hareket yalnız kullanıcının elinde. (4) İnşaat dört kare. VizorCercevesi alt sayfalarda ve son çağrıda sürüyor."
+      "component_notes": "İmza anlar: (1) HeroVizor — lacivert bantta dikey vizör: şablon sekmeleri (Arsa, Sunuculu ev, Eşya döşeme, İnşaat) vizördeki gerçek çıktıyı değiştirir, yanında videodan okunan künye, canlı süre sayacı. (2) FilmSeridi — altı şablonun gerçek çıktıları ekran boyu dikey, snap kaydırmalı; görünen oynar. (3) OnceSonra — boş/döşenmiş oda sürgüsü, hareket yalnız kullanıcının elinde. (4) İnşaat dört kare. VizorCercevesi alt sayfalarda ve son çağrıda sürüyor."
     }
   },
   "design_style": {
@@ -326,7 +326,7 @@
     },
     "background_effects": {
       "type": "video-bg",
-      "description": "Hero: tam ekran gerçek drone render'ı (public/media/hero-drone.mp4, 1080×1920, assets/parcels/ezine-230-ada-3/drone.mp4'ten 3. saniyeden itibaren, sessiz). Geniş ekranda object-position 50% 35% ile üst ve alt bilgi kartları kadraj dışında kalır; üstünde alttan yukarı lacivert geçiş. Son çağrı: bulanık kapak karesi.",
+      "description": "Hero (HeroVizor): lacivert bant, zeminde seçili şablonun bulanık kapak karesi (blur-2xl, %55); vizörde şablon videosu sessiz döngüde, üstünde canlı süre sayacı. Son çağrı: bulanık kapak karesi.",
       "technology": "HTML video + CSS gradient",
       "params": {
         "color_palette": [

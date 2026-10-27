@@ -154,7 +154,7 @@ Higgsfield tarzı yapıya geçildi: kullanıcı şablonu seçer, şablon kendi f
 Bölüm 8'deki vizör rötuşu yetersiz bulundu; ana sayfa sıfırdan kuruldu. Ayrıntı: [design-dna.json](design-dna.json).
 
 - **Sayfa baştan sona koyu** (lacivert `#0D1B3E`, değişimli bantlar `#070E22`); tek vurgu parsel sarısı `#FFC93C`. Gök mavisi yalnız alt sayfa gövdelerinde ve panelde.
-- **Hero tam ekran vizör** (`HeroUcus.tsx`): zemin, Dalyan Köyü parselinin 1080×1920 gerçek drone render'ı (`public/media/hero-drone.mp4`); köşe işaretleri ekranın köşelerinde, sağ üstte videodan okunan künye, sol altta canlı süre ve dev başlık "Drone uçurmadan, arsanızın drone videosu." Geniş ekranda videonun yalnız orta şeridi görünür (gömülü kartlar dışarıda); telefonda video üstte, yazı alanı koyu geçişle örtülür.
+- **Hero** (`HeroVizor.tsx`, 2026-10-28'de geri getirildi): lacivert bant, zeminde seçili şablonun bulanık kapağı; sağda sarı köşeli vizörde gerçek çıktı oynar, sekmeler (Arsa, Sunuculu ev, Eşya döşeme, İnşaat) videoyu değiştirir, yanında videodan okunan künye. Tam ekran video denemesi (HeroUcus) kullanıcı isteğiyle geri alındı.
 - **Film şeridi** (`FilmSeridi.tsx`): altı şablonun gerçek çıktıları ekran boyu dikey, snap kaydırmalı; görünen video sessiz oynar.
 - **Üç anlatım, üçü de gerçek malzemeyle:** arsa (parsel sınırlı kare + künye), konut (`OnceSonra.tsx`: boş/döşenmiş oda sürgüsü), proje (dört inşaat karesi).
 - Karşılaştırma, üç adım ve son çağrı koyu dilde; **menü koyu cam hap**, tüm sayfalarda.
