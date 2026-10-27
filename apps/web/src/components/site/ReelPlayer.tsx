@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { VizorCercevesi } from "./VizorCercevesi";
 
-/** Telefon çerçevesinde örnek video: sessiz döngüde başlar, sesi kullanıcı açar. */
+/** Vizör çerçevesinde örnek video: sessiz döngüde başlar, sesi kullanıcı açar. */
 export function ReelPlayer({
   src,
   poster,
@@ -47,21 +48,23 @@ export function ReelPlayer({
 
   return (
     <div className={className}>
-      <div className="overflow-hidden rounded-[2.25rem] border-[8px] border-lacivert bg-lacivert shadow-[0_40px_80px_-30px_rgba(13,27,62,.55)]">
-      <video
-        ref={ref}
-        src={src}
-        poster={poster}
-        muted
-        loop
-        playsInline
-        preload="metadata"
-        onPlay={() => setPaused(false)}
-        onPause={() => setPaused(true)}
-        className="block aspect-[9/16] w-full object-cover"
-        aria-label={label}
-      />
-      </div>
+      <VizorCercevesi>
+        <div className="overflow-hidden rounded-xl bg-lacivert shadow-[0_40px_80px_-30px_rgba(13,27,62,.55)]">
+          <video
+            ref={ref}
+            src={src}
+            poster={poster}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            onPlay={() => setPaused(false)}
+            onPause={() => setPaused(true)}
+            className="block aspect-[9/16] w-full object-cover"
+            aria-label={label}
+          />
+        </div>
+      </VizorCercevesi>
       <div className="mt-3 flex justify-center gap-2">
         <button
           type="button"

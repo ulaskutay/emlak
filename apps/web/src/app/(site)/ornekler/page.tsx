@@ -30,7 +30,7 @@ export default function Page() {
             return (
               <div key={o.template} className="flex flex-col">
                 <VideoTile src={o.src} poster={o.poster} label={t.name} sub={`${t.category} · ${t.duration}`} />
-                <Link href={createHref(t.id)} className="site-btn-primary mt-4 h-10 px-3 text-sm">
+                <Link href={createHref(t.id)} className="site-btn-primary mx-2.5 mt-3 h-11 px-3 text-sm">
                   Hemen oluşturun
                 </Link>
               </div>

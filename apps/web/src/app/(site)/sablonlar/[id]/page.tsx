@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ReelPlayer } from "@/components/site/ReelPlayer";
+import { VizorCercevesi } from "@/components/site/VizorCercevesi";
 import { SonCagri } from "@/components/site/SonCagri";
 import { createHref, tutorials } from "@/lib/tutorials";
 import { TemplateCard } from "@/components/templates/TemplateCard";
@@ -31,36 +32,41 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             <ReelPlayer src={t.preview.video} poster={t.preview.poster} label={`${t.name} örnek videosu`} />
           ) : (
             <figure>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={t.preview.poster}
-                alt={`${t.name}: başlangıç karesi`}
-                className="aspect-[9/16] w-full rounded-[2.25rem] border-[8px] border-lacivert object-cover shadow-[0_40px_80px_-30px_rgba(13,27,62,.55)]"
-              />
-              <figcaption className="mt-3 text-center text-sm text-gri">
-                Başlangıç karesi. Örnek video yakında.
-              </figcaption>
+              <VizorCercevesi>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={t.preview.poster}
+                  alt={`${t.name}: başlangıç karesi`}
+                  className="aspect-[9/16] w-full rounded-xl object-cover shadow-[0_40px_80px_-30px_rgba(13,27,62,.55)]"
+                />
+              </VizorCercevesi>
+              <figcaption className="mt-3 text-center text-sm text-gri">Başlangıç karesi. Örnek video yakında.</figcaption>
             </figure>
           )}
         </div>
 
         <div className="max-w-xl">
-          <Link href="/sablonlar" className="site-etiket hover:bg-gok hover:text-white">
-            ← Tüm şablonlar
+          <Link href="/sablonlar" className="text-[0.9375rem] font-semibold text-gok underline-offset-4 hover:underline">
+            Tüm şablonlar
           </Link>
-          <h1 className="mt-5 text-[clamp(2.25rem,4.5vw,3.75rem)] leading-[1.03] font-extrabold tracking-[-0.04em] text-balance">
+          <h1 className="mt-3 text-[clamp(2.25rem,4.5vw,3.75rem)] leading-[1.03] font-extrabold tracking-[-0.04em] text-balance">
             {t.name}
           </h1>
           <p className="mt-5 text-[1.125rem] leading-relaxed text-gri">{t.description}</p>
 
-          <dl className="mt-8 grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-2xl bg-white px-4 py-3 shadow-[0_1px_2px_rgba(13,27,62,.05)]">
+          {/* Künye: hero'daki gibi ince çizgili satırlar */}
+          <dl className="mt-8 grid grid-cols-3 border-y border-ayrac text-sm">
+            <div className="py-3 pr-3">
               <dt className="text-gri">Tür</dt>
-              <dd className="mt-1 font-bold">{t.category}</dd>
+              <dd className="mt-0.5 font-bold">{t.category}</dd>
             </div>
-            <div className="rounded-2xl bg-white px-4 py-3 shadow-[0_1px_2px_rgba(13,27,62,.05)]">
+            <div className="border-l border-ayrac py-3 pl-4">
               <dt className="text-gri">Süre</dt>
-              <dd className="mt-1 font-bold tabular-nums">{t.duration} · dikey 9:16</dd>
+              <dd className="mt-0.5 font-bold tabular-nums">{t.duration}</dd>
+            </div>
+            <div className="border-l border-ayrac py-3 pl-4">
+              <dt className="text-gri">Biçim</dt>
+              <dd className="mt-0.5 font-bold tabular-nums">Dikey 9:16</dd>
             </div>
           </dl>
 
@@ -70,9 +76,16 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               <ul className="mt-3 space-y-2.5 text-[1rem] text-gri">
                 {t.needs.map((n) => (
                   <li key={n} className="flex gap-2.5">
-                    <span aria-hidden className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-cimen-acik text-xs text-cimen">
-                      ✓
-                    </span>
+                    <svg aria-hidden viewBox="0 0 16 16" className="mt-1 h-4 w-4 shrink-0 text-gok">
+                      <path
+                        d="M3 8.5l3 3 7-7"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
                     {n}
                   </li>
                 ))}
@@ -83,9 +96,16 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               <ul className="mt-3 space-y-2.5 text-[1rem] text-gri">
                 {t.includes.map((n) => (
                   <li key={n} className="flex gap-2.5">
-                    <span aria-hidden className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-cimen-acik text-xs text-cimen">
-                      ✓
-                    </span>
+                    <svg aria-hidden viewBox="0 0 16 16" className="mt-1 h-4 w-4 shrink-0 text-gok">
+                      <path
+                        d="M3 8.5l3 3 7-7"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
                     {n}
                   </li>
                 ))}

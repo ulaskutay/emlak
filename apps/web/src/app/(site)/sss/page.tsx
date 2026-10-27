@@ -20,30 +20,36 @@ export default function Page() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <PageHero etiket="SSS" title="Sık sorulanlar" text="Parsel dosyası, süre, kullanım yerleri ve ücret hakkında kısa cevaplar." />
-      <section className="mx-auto max-w-[860px] px-4 pb-16 sm:px-6">
-        <div className="space-y-3">
-          {sss.map((q, i) => (
-            <details key={q.s} open={i === 0} className="group site-kart px-6 open:pb-1">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-[1.125rem] font-bold [&::-webkit-details-marker]:hidden">
-                {q.s}
-                <span
-                  aria-hidden
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gok-acik text-xl leading-none text-gok transition-transform group-open:rotate-45"
-                >
-                  +
-                </span>
-              </summary>
-              <p className="max-w-[64ch] pb-5 text-[1.0625rem] leading-relaxed text-gri">{q.c}</p>
-            </details>
-          ))}
+      <PageHero
+        etiket="Yardım"
+        title="Sık sorulanlar"
+        text="Parsel dosyası, süre, kullanım yerleri ve ücret hakkında kısa cevaplar."
+      />
+      <section className="mx-auto max-w-[1240px] px-4 pb-16 sm:px-6">
+        <div className="max-w-[860px]">
+          <div className="border-b border-ayrac">
+            {sss.map((q, i) => (
+              <details key={q.s} open={i === 0} className="group border-t border-ayrac">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-[1.125rem] font-bold hover:text-gok [&::-webkit-details-marker]:hidden">
+                  {q.s}
+                  <span
+                    aria-hidden
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-ayrac text-xl leading-none text-gok transition-transform group-open:rotate-45"
+                  >
+                    +
+                  </span>
+                </summary>
+                <p className="max-w-[64ch] pb-5 text-[1.0625rem] leading-relaxed text-gri">{q.c}</p>
+              </details>
+            ))}
+          </div>
+          <p className="mt-10 text-gri">
+            Başka bir sorunuz mu var?{" "}
+            <Link href="/iletisim" className="font-bold text-gok underline-offset-4 hover:underline">
+              Bize yazın
+            </Link>
+          </p>
         </div>
-        <p className="mt-10 text-center text-gri">
-          Başka bir sorunuz mu var?{" "}
-          <Link href="/iletisim" className="font-bold text-gok underline-offset-4 hover:underline">
-            Bize yazın
-          </Link>
-        </p>
       </section>
       <SonCagri />
     </>
