@@ -3,11 +3,14 @@ import Link from "next/link";
 import { setPaymentStatus } from "@/app/admin/actions";
 import { PageTitle, Stat, Table } from "@/components/admin/ui";
 import { formatDate, formatInt, formatTry } from "@/lib/format";
+import { requireAdmin } from "@/lib/auth";
 
 const METHOD: Record<string, string> = { havale: "Havale/EFT", kart: "Kart", nakit: "Nakit", diger: "Diğer" };
 const STATUS: Record<string, string> = { paid: "Ödendi", pending: "Bekliyor", refunded: "İade edildi" };
 
 export default async function PaymentsPage() {
+  // Yerleşim de denetler; sayfa yerleşimle paralel çalıştığı için veri sorgusundan önce burada da.
+  await requireAdmin();
   const rows = await getDb()
     .select({ p: payments, email: user.email })
     .from(payments)

@@ -4,6 +4,7 @@ import { DailyBars, Filters, PageTitle, Stat, Table } from "@/components/admin/u
 import { overview } from "@/lib/admin";
 import { creditsEnforced } from "@/lib/credits";
 import { formatInt, formatTry } from "@/lib/format";
+import { requireAdmin } from "@/lib/auth";
 
 const PERIODS = [
   { value: "7", label: "7 gün" },
@@ -13,6 +14,8 @@ const PERIODS = [
 ];
 
 export default async function AdminHome({ searchParams }: { searchParams: Promise<{ gun?: string }> }) {
+  // Yerleşim de denetler; sayfa yerleşimle paralel çalıştığı için veri sorgusundan önce burada da.
+  await requireAdmin();
   const gun = (await searchParams).gun ?? "30";
   const days = PERIODS.some((p) => p.value === gun) ? Number(gun) : 30;
   const o = await overview(days);

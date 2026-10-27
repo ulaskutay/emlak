@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { PageTitle, Table } from "@/components/admin/ui";
 import { userList } from "@/lib/admin";
-import { isAdmin } from "@/lib/auth";
+import { isAdmin, requireAdmin } from "@/lib/auth";
 import { formatDate, formatInt, formatTry } from "@/lib/format";
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  // Yerleşim de denetler; sayfa yerleşimle paralel çalıştığı için veri sorgusundan önce burada da.
+  await requireAdmin();
   const q = (await searchParams).q ?? "";
   const rows = await userList(q);
   return (

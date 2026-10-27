@@ -9,8 +9,11 @@ import { overallProgress, statusLabel, videoTitle } from "@/components/status";
 import { getPricing } from "@/lib/credits";
 import { formatDate, formatTry } from "@/lib/format";
 import { r2 } from "@/lib/r2";
+import { requireAdmin } from "@/lib/auth";
 
 export default async function ProductionDetail({ params }: { params: Promise<{ id: string }> }) {
+  // Yerleşim de denetler; sayfa yerleşimle paralel çalıştığı için veri sorgusundan önce burada da.
+  await requireAdmin();
   const { id } = await params;
   const db = getDb();
   const [row] = await db.select({ v: videos, email: user.email }).from(videos).innerJoin(user, eq(user.id, videos.userId)).where(eq(videos.id, id));

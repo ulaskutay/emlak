@@ -6,6 +6,7 @@ import { overallProgress, videoTitle } from "@/components/status";
 import { adminVideoColumns, videoCost } from "@/lib/admin";
 import { getPricing } from "@/lib/credits";
 import { formatDate, formatTry } from "@/lib/format";
+import { requireAdmin } from "@/lib/auth";
 
 const STATUSES: { value: "" | ReelStatus; label: string }[] = [
   { value: "", label: "Tümü" },
@@ -18,6 +19,8 @@ const STATUSES: { value: "" | ReelStatus; label: string }[] = [
 const dur = (a: Date | null, b: Date | null) => (a && b ? `${Math.round((b.getTime() - a.getTime()) / 60000)} dk` : "—");
 
 export default async function ProductionsPage({ searchParams }: { searchParams: Promise<{ durum?: string; sablon?: string }> }) {
+  // Yerleşim de denetler; sayfa yerleşimle paralel çalıştığı için veri sorgusundan önce burada da.
+  await requireAdmin();
   const sp = await searchParams;
   const durum = STATUSES.find((s) => s.value === sp.durum)?.value ?? "";
   const sablon = (TEMPLATE_IDS as readonly string[]).includes(sp.sablon ?? "") ? (sp.sablon as TemplateId) : undefined;

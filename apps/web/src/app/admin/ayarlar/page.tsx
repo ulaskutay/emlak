@@ -2,6 +2,7 @@ import { TEMPLATES, TOUR_QUALITY, type TemplateId } from "@arsa/shared";
 import { savePricing } from "@/app/admin/actions";
 import { PageTitle } from "@/components/admin/ui";
 import { getPricing } from "@/lib/credits";
+import { requireAdmin } from "@/lib/auth";
 
 function Field({ name, label, value, unit }: { name: string; label: string; value: number; unit?: string }) {
   return (
@@ -18,6 +19,8 @@ function Field({ name, label, value, unit }: { name: string; label: string; valu
 const n = (id: TemplateId) => TEMPLATES[id].name;
 
 export default async function SettingsPage() {
+  // Yerleşim de denetler; sayfa yerleşimle paralel çalıştığı için veri sorgusundan önce burada da.
+  await requireAdmin();
   const p = await getPricing();
   const c = p.costUsd;
   return (
