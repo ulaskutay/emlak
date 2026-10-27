@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TEMPLATE_CATEGORIES, templateList, type TemplateCategory } from "@arsa/shared";
-import { ArsaDrone } from "@/components/site/ArsaDrone";
+import { DroneAnlatim } from "@/components/site/DroneAnlatim";
 import { HeroPhones } from "@/components/site/HeroPhones";
 import { SonCagri } from "@/components/site/SonCagri";
 import { VideoTile } from "@/components/site/VideoTile";
@@ -97,6 +97,8 @@ export default function Home() {
         </div>
       </section>
 
+      <DroneAnlatim />
+
       {/* Ne tanıtmak istiyorsunuz? */}
       <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-6">
         <div className="text-center">
@@ -110,13 +112,9 @@ export default function Home() {
             const c = KATEGORI[k];
             return (
               <div key={k} className="site-kart flex flex-col p-6 sm:p-7">
-                {k === "Arsa" ? (
-                  <ArsaDrone />
-                ) : (
-                  <span aria-hidden className={`grid h-14 w-14 place-items-center rounded-2xl text-2xl ${c.zemin}`}>
-                    {c.ikon}
-                  </span>
-                )}
+                <span aria-hidden className={`grid h-14 w-14 place-items-center rounded-2xl text-2xl ${c.zemin}`}>
+                  {c.ikon}
+                </span>
                 <h3 className="mt-5 text-2xl font-extrabold tracking-[-0.03em]">{k}</h3>
                 <p className="mt-2 leading-relaxed text-gri">{c.text}</p>
                 <ul className="mt-5 space-y-2">
