@@ -24,9 +24,9 @@ const jsonLd = {
 };
 
 const ADIMLAR = [
-  { ikon: "🧩", baslik: "Şablonu seçin", text: "Arsa, konut ya da proje: ilanınıza uyan video türünü seçin, örneğini önceden izleyin." },
-  { ikon: "✍️", baslik: "Bilgileri girin", text: "Parsel dosyası ya da fotoğraflar, fiyat ve telefon. Formu şablonun kendisi adım adım sorar." },
-  { ikon: "🎬", baslik: "Videoyu paylaşın", text: "Birkaç dakikada panelinizde. Reels, TikTok, Shorts ve ilan sitelerine hazır dikey video." },
+  { baslik: "Şablonu seçin", text: "Arsa, konut ya da proje: ilanınıza uyan video türünü seçin, örneğini önceden izleyin." },
+  { baslik: "Bilgileri girin", text: "Parsel dosyası ya da fotoğraflar, fiyat ve telefon. Formu şablonun kendisi adım adım sorar." },
+  { baslik: "Videoyu paylaşın", text: "Birkaç dakikada panelinizde. Reels, TikTok, Shorts ve ilan sitelerine hazır dikey video." },
 ];
 
 const KARSILASTIRMA = [
@@ -81,31 +81,24 @@ export default function Home() {
 
       <SablonKatalogu />
 
-      {/* Üç adım */}
-      <section className="mx-auto max-w-[1240px] px-4 py-24 sm:px-6">
-        <div className="text-center">
-          <span className="site-etiket">Nasıl çalışır</span>
-          <h2 className="mx-auto mt-4 max-w-2xl text-[clamp(2rem,4vw,3rem)] leading-[1.08] font-extrabold tracking-[-0.035em] text-balance">
-            Üç adımda hazır
-          </h2>
+      {/* Üç adım: başlık solda, adımlar künye çizgisi üstünde yan yana */}
+      <section className="mx-auto grid max-w-[1240px] gap-10 px-4 py-24 sm:px-6 lg:grid-cols-[1fr_2fr] lg:gap-16">
+        <div>
+          <h2 className="text-[clamp(2rem,4vw,3rem)] leading-[1.08] font-extrabold tracking-[-0.035em] text-balance">Üç adımda hazır</h2>
+          <p className="mt-4 max-w-sm text-[1.0625rem] leading-relaxed text-gri">Hangi şablonu seçerseniz seçin, video aynı sırayla hazırlanır.</p>
+          <Link href="/nasil-yapilir" className="mt-6 inline-block font-bold text-gok underline-offset-4 hover:underline">
+            Panelde nasıl hazırlandığını izleyin
+          </Link>
         </div>
-        <ol className="mt-12 grid gap-5 md:grid-cols-3">
+        <ol className="grid gap-x-8 sm:grid-cols-3">
           {ADIMLAR.map((a, i) => (
-            <li key={a.baslik} className="site-kart relative p-7">
-              <span className="absolute top-6 right-7 text-5xl font-extrabold text-gok/10 tabular-nums">{i + 1}</span>
-              <span aria-hidden className="grid h-14 w-14 place-items-center rounded-2xl bg-gok-acik text-2xl">
-                {a.ikon}
-              </span>
+            <li key={a.baslik} className="border-t border-ayrac pt-5 pb-8 sm:pb-0">
+              <span className="block text-[2.5rem] leading-none font-extrabold text-gok tabular-nums">{i + 1}</span>
               <h3 className="mt-5 text-xl font-extrabold tracking-[-0.02em]">{a.baslik}</h3>
               <p className="mt-2 leading-relaxed text-gri">{a.text}</p>
             </li>
           ))}
         </ol>
-        <div className="mt-10 text-center">
-          <Link href="/nasil-yapilir" className="font-bold text-gok underline-offset-4 hover:underline">
-            Her şablonun panelde nasıl hazırlandığını izleyin →
-          </Link>
-        </div>
       </section>
 
       {/* Çekim ekibi ile karşılaştırma: iki künye yan yana, Arsa Video tarafı vizörde */}

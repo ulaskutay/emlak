@@ -3,13 +3,14 @@ import Link from "next/link";
 import { useState } from "react";
 import { SOON_TEMPLATES, TEMPLATE_CATEGORIES, templateList, type TemplateCategory } from "@arsa/shared";
 import { createHref } from "@/lib/tutorials";
+import { VizorCercevesi } from "./VizorCercevesi";
 
-/** Kategori renkleri ve tek cümlelik açıklamaları. */
-const KATEGORI: Record<TemplateCategory, { ikon: string; text: string; renk: string; zemin: string }> = {
-  Arsa: { ikon: "🛰️", text: "Ada/parsel numarasından havadan tanıtım; arsaya gitmeden.", renk: "text-gok", zemin: "bg-gok-acik" },
-  Konut: { ikon: "🏡", text: "İlan fotoğraflarından sinematik tur, sanal eşya döşeme ve sunuculu anlatım.", renk: "text-mercan", zemin: "bg-mercan-acik" },
-  Proje: { ikon: "🏗️", text: "Boş arsadan yükselen binayı gösteren inşaat videoları.", renk: "text-[#b7860b]", zemin: "bg-gunes-acik" },
-  "Sosyal medya": { ikon: "📣", text: "Satıldı ve fiyat güncellemesi gibi kısa paylaşımlar.", renk: "text-cimen", zemin: "bg-cimen-acik" },
+/** Kategorilerin tek cümlelik açıklamaları. */
+const KATEGORI: Record<TemplateCategory, string> = {
+  Arsa: "Ada/parsel numarasından havadan tanıtım; arsaya gitmeden.",
+  Konut: "İlan fotoğraflarından sinematik tur, sanal eşya döşeme ve sunuculu anlatım.",
+  Proje: "Boş arsadan yükselen binayı gösteren inşaat videoları.",
+  "Sosyal medya": "Satıldı ve fiyat güncellemesi gibi kısa paylaşımlar.",
 };
 
 type Secim = "Tümü" | TemplateCategory;
@@ -18,7 +19,7 @@ const KATEGORILER = TEMPLATE_CATEGORIES.filter(
   (k) => templateList.some((t) => t.category === k) || SOON_TEMPLATES.some((t) => t.category === k),
 );
 
-/** Ana sayfa: tüm şablonlar tek ızgarada, üstte kategori sekmeleri; her kart önizleme, süre ve iki bağlantıyla. */
+/** Ana sayfa: tüm şablonlar tek ızgarada, üstte kategori sekmeleri; her kartta önizleme ve künye (süre, gerekenler). */
 export function SablonKatalogu() {
   const [secim, setSecim] = useState<Secim>("Tümü");
   const sablonlar = templateList.filter((t) => secim === "Tümü" || t.category === secim);
@@ -29,8 +30,7 @@ export function SablonKatalogu() {
   return (
     <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-6">
       <div className="text-center">
-        <span className="site-etiket">Gayrimenkul türünü seçin</span>
-        <h2 className="mx-auto mt-4 max-w-2xl text-[clamp(2rem,4vw,3rem)] leading-[1.08] font-extrabold tracking-[-0.035em] text-balance">
+        <h2 className="mx-auto max-w-2xl text-[clamp(2rem,4vw,3rem)] leading-[1.08] font-extrabold tracking-[-0.035em] text-balance">
           Ne tanıtmak istiyorsunuz?
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-[1.0625rem] text-gri">
@@ -53,7 +53,6 @@ export function SablonKatalogu() {
                   aktif ? "bg-lacivert text-white" : "text-gri hover:bg-zemin hover:text-lacivert"
                 }`}
               >
-                {k !== "Tümü" && <span aria-hidden>{KATEGORI[k].ikon}</span>}
                 {k}
                 <span className={`text-xs ${aktif ? "text-white/70" : "text-gri/70"}`}>{sayi(k) || "yakında"}</span>
               </button>
@@ -61,46 +60,50 @@ export function SablonKatalogu() {
           })}
         </div>
       </div>
-      {secim !== "Tümü" && <p className="mt-4 text-center text-gri">{KATEGORI[secim].text}</p>}
+      {secim !== "Tümü" && <p className="mt-4 text-center text-gri">{KATEGORI[secim]}</p>}
 
-      <ul className="mt-8 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3">
-        {sablonlar.map((t) => {
-          const c = KATEGORI[t.category];
-          return (
-            <li key={t.id} className="group flex flex-col overflow-hidden rounded-2xl border border-ayrac bg-white shadow-[0_12px_30px_-22px_rgba(13,27,62,.35)]">
-              <Link href={`/sablonlar/${t.id}`} className="relative block aspect-[4/5] overflow-hidden bg-lacivert">
-                <img
-                  src={t.preview.poster}
-                  alt={`${t.name} örneği`}
-                  loading="lazy"
-                  className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.04]"
-                />
-                <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[11px] font-bold ${c.zemin} ${c.renk}`}>
-                  <span aria-hidden>{c.ikon}</span> {t.category}
-                </span>
-                <span className="absolute top-2 right-2 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur">
-                  {t.duration}
-                </span>
-                <span className="absolute right-2 bottom-2 grid h-9 w-9 place-items-center rounded-full bg-white/95 text-gok shadow">
-                  <svg aria-hidden viewBox="0 0 24 24" className="ml-0.5 h-4 w-4">
-                    <path d="M7 4.5v15l12-7.5z" fill="currentColor" />
-                  </svg>
-                  <span className="sr-only">Örneği izleyin</span>
-                </span>
+      <ul className="mt-8 grid grid-cols-2 gap-x-2 gap-y-8 sm:gap-x-4 md:grid-cols-3">
+        {sablonlar.map((t) => (
+          <li key={t.id} className="group flex flex-col">
+            <Link href={`/sablonlar/${t.id}`} className="relative block">
+              <VizorCercevesi className="[&>span]:opacity-0 [&>span]:transition-opacity group-hover:[&>span]:opacity-100">
+                <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-lacivert">
+                  <img
+                    src={t.preview.poster}
+                    alt={`${t.name} örneği`}
+                    loading="lazy"
+                    className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.04]"
+                  />
+                  <span className="absolute top-2 left-2 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur">
+                    {t.category}
+                  </span>
+                  <span className="absolute right-2 bottom-2 grid h-9 w-9 place-items-center rounded-full bg-white/95 text-gok shadow">
+                    <svg aria-hidden viewBox="0 0 24 24" className="ml-0.5 h-4 w-4">
+                      <path d="M7 4.5v15l12-7.5z" fill="currentColor" />
+                    </svg>
+                    <span className="sr-only">Örneği izleyin</span>
+                  </span>
+                </div>
+              </VizorCercevesi>
+            </Link>
+            <div className="flex flex-1 flex-col px-2.5 pt-2">
+              <div className="leading-snug font-bold">{t.name}</div>
+              <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-gri sm:text-sm">{t.tagline}</p>
+              <dl className="mt-3 mb-4 border-t border-ayrac pt-2 text-[13px] sm:text-sm">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-gri">Süre</dt>
+                  <dd className="font-semibold tabular-nums">{t.duration}</dd>
+                </div>
+              </dl>
+              <Link
+                href={createHref(t.id)}
+                className="mt-auto inline-flex h-11 items-center justify-center rounded-full bg-gok px-4 text-sm font-bold text-white transition-colors hover:bg-gok-koyu"
+              >
+                Oluşturun
               </Link>
-              <div className="flex flex-1 flex-col p-3 sm:p-4">
-                <div className="leading-snug font-bold">{t.name}</div>
-                <p className="mt-1 mb-3 line-clamp-2 text-[13px] leading-snug text-gri sm:text-sm">{t.tagline}</p>
-                <Link
-                  href={createHref(t.id)}
-                  className="mt-auto flex items-center justify-between gap-2 rounded-xl bg-gok px-3 py-2.5 text-sm font-bold text-white transition-colors hover:bg-gok-koyu"
-                >
-                  Oluşturun <span aria-hidden>→</span>
-                </Link>
-              </div>
-            </li>
-          );
-        })}
+            </div>
+          </li>
+        ))}
       </ul>
 
       {sablonlar.length === 0 && <p className="mt-2 text-center font-semibold text-gri">Bu kategorideki şablonlar çok yakında.</p>}
@@ -109,12 +112,9 @@ export function SablonKatalogu() {
           <div className="text-sm font-bold text-gri">Yakında geliyor</div>
           <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {yakinda.map((t) => {
-              const c = KATEGORI[t.category];
               return (
                 <li key={t.slug} className="flex items-start gap-3">
-                  <span aria-hidden className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${c.zemin}`}>
-                    {c.ikon}
-                  </span>
+                  <span className="mt-0.5 shrink-0 rounded-full border border-ayrac px-2 py-0.5 text-[11px] font-bold text-gri">{t.category}</span>
                   <div>
                     <div className="leading-snug font-bold">{t.name}</div>
                     <p className="text-[13px] leading-snug text-gri sm:text-sm">{t.tagline}</p>
