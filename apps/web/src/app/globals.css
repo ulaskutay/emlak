@@ -151,26 +151,41 @@ body:has(.admin) {
 .serit:hover {
   animation-play-state: paused;
 }
-/* Drone anlatımı: drone parselin üstünde tur atar, gölgesi zeminde izler; uydu görüntüsü yavaşça kayar */
-@keyframes drone-tur {
-  0%, 100% { transform: translate(-28%, 8%) rotate(-5deg); }
-  25% { transform: translate(4%, -10%) rotate(3deg); }
-  50% { transform: translate(30%, 2%) rotate(5deg); }
-  75% { transform: translate(0%, 16%) rotate(-3deg); }
+/* Çizim drone: pervaneler döner, gövde süzülür, gölge yükseklikle birlikte nefes alır, ışık yanıp söner */
+@keyframes drone-pervane {
+  to { transform: rotate(360deg); }
 }
-.drone-tur {
-  animation: drone-tur 16s ease-in-out infinite;
+.drone-pervane {
+  animation: drone-pervane 0.18s linear infinite;
 }
-@keyframes uydu-kay {
-  from { transform: scale(1.1) translate(-2%, 1.5%); }
-  to { transform: scale(1.1) translate(2%, -1.5%); }
+@keyframes drone-suzul {
+  0%, 100% { transform: translate(0, 0) rotate(-2deg); }
+  50% { transform: translate(6px, -16px) rotate(2deg); }
 }
-.uydu-kay {
-  animation: uydu-kay 18s ease-in-out infinite alternate;
+.drone-suzul {
+  transform-origin: 200px 200px;
+  animation: drone-suzul 5s ease-in-out infinite;
+}
+@keyframes drone-golge {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.82); opacity: 0.7; }
+}
+.drone-golge {
+  transform-origin: 200px 356px;
+  animation: drone-golge 5s ease-in-out infinite;
+}
+@keyframes drone-isik {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+.drone-isik {
+  animation: drone-isik 1.2s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .drone-tur,
-  .uydu-kay,
+  .drone-pervane,
+  .drone-suzul,
+  .drone-golge,
+  .drone-isik,
   .suzul,
   .serit {
     animation: none;
