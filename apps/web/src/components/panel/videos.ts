@@ -11,6 +11,7 @@ export async function userVideos(userId: string, limit = 100) {
       input: videos.input,
       status: videos.status,
       stage: videos.stage,
+      progress: videos.progress,
       parcelSummary: videos.parcelSummary,
       keyframeKey: videos.keyframeKey,
       createdAt: videos.createdAt,

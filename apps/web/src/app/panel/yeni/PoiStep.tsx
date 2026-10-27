@@ -122,7 +122,7 @@ export function PoiStep({
         const el = document.createElement("div");
         el.textContent = `${p.emoji} ${p.name ?? p.label}`;
         el.style.cssText = `padding:4px 9px;border-radius:999px;font:600 12px system-ui;white-space:nowrap;cursor:pointer;
-          background:${on ? "#ffc24d" : "rgba(18,26,22,.85)"};color:${on ? "#121a16" : "#fff"};border:2px solid ${on ? "#fff" : "rgba(255,255,255,.35)"}`;
+          background:${on ? "#2b6cff" : "rgba(13,27,62,.85)"};color:#fff;border:2px solid ${on ? "#fff" : "rgba(255,255,255,.35)"}`;
         const m = new AdvancedMarkerElement({ map: map.current, position: p.position, content: el, zIndex: on ? 2 : 1, title: `${p.label} · ${formatDistance(p.distanceM)}` });
         m.addListener("click", () => toggle(p));
         return m;
@@ -185,89 +185,89 @@ export function PoiStep({
   const row = (p: PoiItem) => (
     <li key={poiKey(p)}>
       <button disabled={full} onClick={() => toggle(p)}
-        className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-white/5 disabled:opacity-40">
-        <span className="grid h-5 w-5 shrink-0 place-items-center rounded border border-line text-xs text-neon">+</span>
+        className="flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-zemin disabled:opacity-40">
+        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md border border-ayrac bg-white text-sm font-bold text-gok">+</span>
         <span>{p.emoji}</span>
         <span className="min-w-0 flex-1 truncate">{p.name ?? p.label}</span>
-        <span className="text-mute">{formatDistance(p.distanceM)}</span>
+        <span className="shrink-0 tabular-nums text-gri">{formatDistance(p.distanceM)}</span>
       </button>
     </li>
   );
 
   return (
     <div className="space-y-4">
-      <div className="card overflow-hidden p-0">
-        <div ref={mapEl} className="h-[380px] w-full bg-panel" />
-        {mapError && <p className="px-4 py-3 text-sm text-red-300">{mapError}</p>}
-        <p className="border-t border-line px-4 py-2.5 text-xs text-mute">
+      <div className="pnl-kart overflow-hidden p-0">
+        <div ref={mapEl} className="h-[380px] w-full bg-white" />
+        {mapError && <p className="px-4 py-3 text-sm text-mercan-koyu">{mapError}</p>}
+        <p className="border-t border-ayrac px-4 py-2.5 text-xs text-gri">
           Önerilere tıklayarak seçin; listede olmayan bir yer için haritada o noktaya tıklayın.
         </p>
       </div>
 
       {draft && (
-        <div className="card space-y-3 border-neon/50 p-4">
+        <div className="pnl-kart space-y-3 border-gok/50 p-4">
           <div className="text-sm font-semibold">
             Yeni nokta · parsele {formatDistance(distanceM(center, draft.position))}
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <select className="input" value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>
+            <select className="pnl-input" value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.emoji} {c.label}
                 </option>
               ))}
             </select>
-            <input className="input" maxLength={60} autoFocus placeholder={draft.category === "custom" ? "Adı (zorunlu), ör. Termal Otel" : "Adı (isteğe bağlı)"}
+            <input className="pnl-input" maxLength={60} autoFocus placeholder={draft.category === "custom" ? "Adı (zorunlu), ör. Termal Otel" : "Adı (isteğe bağlı)"}
               value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} onKeyDown={(e) => e.key === "Enter" && addDraft()} />
           </div>
           <div className="flex justify-end gap-2">
-            <button className="btn-ghost" onClick={() => setDraft(null)}>Vazgeç</button>
-            <button className="btn-primary" disabled={draft.category === "custom" && !draft.name.trim()} onClick={addDraft}>Ekle</button>
+            <button className="pnl-btn-ghost" onClick={() => setDraft(null)}>Vazgeç</button>
+            <button className="pnl-btn-primary" disabled={draft.category === "custom" && !draft.name.trim()} onClick={addDraft}>Ekle</button>
           </div>
         </div>
       )}
 
-      <div className="card p-5">
-        <div className="mb-3 flex items-baseline justify-between">
+      <div className="pnl-kart p-5">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <div className="font-semibold">Videoda anlatılacak noktalar</div>
-          <div className="text-xs text-mute">{chosen.length}/{MAX_POIS} · yakından uzağa sırayla</div>
+          <div className="text-xs text-gri">{chosen.length}/{MAX_POIS} · yakından uzağa sırayla</div>
         </div>
-        {!candidates && <div className="text-sm text-mute">Çevre taranıyor (Google yerler, denize uzaklık)…</div>}
+        {!candidates && <div className="text-sm text-gri">Çevre taranıyor (Google yerler, denize uzaklık)…</div>}
         {candidates && !chosen.length && (
-          <div className="text-sm text-mute">
+          <div className="text-sm text-gri">
             Aşağıdaki önerilerden ya da haritadan seçin (en fazla {MAX_POIS}). Seçmezseniz video yalnızca parseli anlatır.
           </div>
         )}
         <ul className="space-y-2">
           {chosen.map((p) => (
-            <li key={poiKey(p)} className="flex items-center gap-3 rounded-xl border border-amber/60 bg-amber/10 px-3 py-2">
+            <li key={poiKey(p)} className="flex items-center gap-3 rounded-xl border border-gok/30 bg-gok-acik py-1.5 pl-3 pr-1.5">
               <span className="text-xl">{p.emoji}</span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-semibold">{p.name ?? p.label}</span>
-                <span className="text-xs text-mute">{p.label} · {SOURCE[p.source ?? ""] ?? ""}</span>
+                <span className="text-xs text-gri">{p.label} · {SOURCE[p.source ?? ""] ?? ""}</span>
               </span>
-              <span className="font-bold text-amber">{formatDistance(p.distanceM)}</span>
-              <button className="text-mute hover:text-white" aria-label="Çıkar" onClick={() => toggle(p)}>✕</button>
+              <span className="shrink-0 font-bold tabular-nums text-gok-koyu">{formatDistance(p.distanceM)}</span>
+              <button className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-gri hover:bg-white hover:text-mercan-koyu" aria-label="Çıkar" onClick={() => toggle(p)}>✕</button>
             </li>
           ))}
         </ul>
       </div>
 
       {!!top.length && (
-        <div className="card p-5">
+        <div className="pnl-kart p-5">
           <div className="mb-1 font-semibold">Önerilen noktalar</div>
-          <p className="mb-3 text-xs text-mute">Her kategoriden parsele en uygun olan; videoya eklemek için tıklayın.</p>
-          <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">{top.map((p) => (
+          <p className="mb-3 text-xs text-gri">Her kategoriden parsele en uygun olan; videoya eklemek için tıklayın.</p>
+          <ul className="grid grid-cols-1 gap-x-6 gap-y-0.5 sm:grid-cols-2">{top.map((p) => (
             <li key={poiKey(p)}>
               <button disabled={full} onClick={() => toggle(p)}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-white/5 disabled:opacity-40">
-                <span className="grid h-5 w-5 shrink-0 place-items-center rounded border border-line text-xs text-neon">+</span>
+                className="flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-zemin disabled:opacity-40">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md border border-ayrac bg-white text-sm font-bold text-gok">+</span>
                 <span>{p.emoji}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate">{p.name ?? p.label}</span>
-                  <span className="text-xs text-mute">{p.label}</span>
+                  <span className="text-xs text-gri">{p.label}</span>
                 </span>
-                <span className="text-mute">{formatDistance(p.distanceM)}</span>
+                <span className="shrink-0 tabular-nums text-gri">{formatDistance(p.distanceM)}</span>
               </button>
             </li>
           ))}</ul>
@@ -275,12 +275,12 @@ export function PoiStep({
       )}
 
       {!!grouped.length && (
-        <div className="card p-5">
+        <div className="pnl-kart p-5">
           <div className="mb-3 font-semibold">Diğer yakın yerler</div>
-          <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
             {grouped.map(([label, list]) => (
               <div key={label}>
-                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-mute">{label}</div>
+                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gri">{label}</div>
                 <ul className="space-y-1">{list.map(row)}</ul>
               </div>
             ))}
@@ -289,16 +289,16 @@ export function PoiStep({
       )}
 
       {!!warnings.length && (
-        <ul className="space-y-1 rounded-lg bg-amber/10 px-3 py-2 text-xs text-amber">
+        <ul className="space-y-1 rounded-lg bg-gunes-acik px-3 py-2 text-xs text-[#8a5d00]">
           {warnings.map((w) => (
             <li key={w}>{w}</li>
           ))}
         </ul>
       )}
 
-      <div className="flex justify-between">
-        <button className="btn-ghost" onClick={onBack}>← Geri</button>
-        <button className="btn-primary" onClick={onNext}>Devam →</button>
+      <div className="flex justify-between gap-3">
+        <button className="pnl-btn-ghost" onClick={onBack}>← Geri</button>
+        <button className="pnl-btn-primary" onClick={onNext}>Devam →</button>
       </div>
     </div>
   );

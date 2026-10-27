@@ -56,8 +56,8 @@ export function BitmisForm({ template }: { template: keyof typeof INTRO }) {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-bold tracking-[-0.025em]">{TEMPLATES[template].name}</h1>
-        <p className="mt-2 text-mute">
+        <h1 className="text-[1.75rem] font-extrabold leading-tight tracking-[-0.03em] sm:text-[2rem]">{TEMPLATES[template].name}</h1>
+        <p className="mt-2 text-gri">
           {INTRO[template]}
         </p>
       </div>
@@ -66,23 +66,23 @@ export function BitmisForm({ template }: { template: keyof typeof INTRO }) {
 
       {step === 1 && parcel && (
         <>
-          <fieldset className="card p-6">
+          <fieldset className="pnl-kart p-5 sm:p-6">
             <legend className="sr-only">Yapı tipi</legend>
             <div className="mb-4 font-semibold">Arsaya ne yapılsın?</div>
             <div className="grid gap-3 sm:grid-cols-2">
               {TYPES.map((t) => (
                 <label key={t}
-                  className={`flex cursor-pointer flex-col rounded-xl border p-4 transition ${building === t ? "border-neon bg-neon/10" : "border-line hover:border-neon/50"}`}>
+                  className={`flex cursor-pointer flex-col rounded-xl border p-4 transition ${building === t ? "border-gok bg-gok-acik" : "border-ayrac hover:border-gok/50"}`}>
                   <input type="radio" name="building" value={t} className="sr-only" checked={building === t} onChange={() => setBuilding(t)} />
                   <span className="font-semibold">{BUILDING_LABELS[t]}</span>
-                  <span className="mt-1 text-sm text-mute">{HINTS[t]}</span>
+                  <span className="mt-1 text-sm text-gri">{HINTS[t]}</span>
                 </label>
               ))}
             </div>
             {(building === "konut" || building === "ticari") && (
               <div className="mt-5 max-w-xs">
-                <label className="label" htmlFor="floors">Kat sayısı</label>
-                <select id="floors" className="input" value={floors} onChange={(e) => setFloors(Number(e.target.value))}>
+                <label className="pnl-label" htmlFor="floors">Kat sayısı</label>
+                <select id="floors" className="pnl-input" value={floors} onChange={(e) => setFloors(Number(e.target.value))}>
                   {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
                     <option key={n} value={n}>{n} kat</option>
                   ))}
@@ -91,22 +91,22 @@ export function BitmisForm({ template }: { template: keyof typeof INTRO }) {
             )}
           </fieldset>
 
-          <div className="card space-y-4 p-6">
-            <p className="text-sm text-mute">Hepsi isteğe bağlı; videonun sonundaki kartta yazar. Fiyat girmezseniz arsanın alanı yazar.</p>
+          <div className="pnl-kart space-y-4 p-5 sm:p-6">
+            <p className="text-sm text-gri">Hepsi isteğe bağlı; videonun sonundaki kartta yazar. Fiyat girmezseniz arsanın alanı yazar.</p>
             <ListingFields value={listing} onChange={setListing} />
-            <label className="flex cursor-pointer items-center justify-between border-t border-line pt-4">
+            <label className="flex cursor-pointer items-center justify-between border-t border-ayrac pt-4">
               <span>
                 <span className="block font-semibold">Fon müziği</span>
-                <span className="text-sm text-mute">Sinematik, sözsüz müzik</span>
+                <span className="text-sm text-gri">Sinematik, sözsüz müzik</span>
               </span>
-              <input type="checkbox" className="h-5 w-5 accent-[#ffc24d]" checked={music} onChange={(e) => setMusic(e.target.checked)} />
+              <input type="checkbox" className="h-5 w-5 accent-[#2b6cff]" checked={music} onChange={(e) => setMusic(e.target.checked)} />
             </label>
           </div>
 
-          {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
-          <div className="flex justify-between">
-            <button className="btn-ghost" onClick={() => setStep(0)}>Geri</button>
-            <button className="btn-primary" disabled={busy} onClick={submit}>{busy ? "Gönderiliyor…" : "Videoyu oluştur"}</button>
+          {error && <p className="rounded-lg bg-mercan-acik px-3 py-2 text-sm text-mercan-koyu">{error}</p>}
+          <div className="flex justify-between gap-3">
+            <button className="pnl-btn-ghost" onClick={() => setStep(0)}>Geri</button>
+            <button className="pnl-btn-primary" disabled={busy} onClick={submit}>{busy ? "Gönderiliyor…" : "Videoyu oluştur"}</button>
           </div>
         </>
       )}

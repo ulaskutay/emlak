@@ -9,11 +9,12 @@ export function statusLabel(status: ReelStatus, stage: string | null | undefined
   return stagesOf(template).find((s) => s.id === stage)?.label ?? "Hazırlanıyor";
 }
 
-export const statusTone: Record<ReelStatus, string> = {
-  done: "bg-emerald-400/15 text-emerald-300",
-  failed: "bg-red-500/15 text-red-300",
-  queued: "bg-white/10 text-mute",
-  running: "bg-neon/15 text-neon",
+/** Kullanıcı panelindeki durum rozetinin renkleri (Gökyüzü paleti). */
+export const statusTone: Record<ReelStatus, { tone: string; dot: string }> = {
+  done: { tone: "bg-cimen-acik text-cimen-koyu", dot: "bg-cimen" },
+  failed: { tone: "bg-mercan-acik text-mercan-koyu", dot: "bg-mercan" },
+  queued: { tone: "bg-slate-100 text-slate-600", dot: "bg-slate-400" },
+  running: { tone: "bg-gok-acik text-gok-koyu", dot: "bg-gok animate-pulse" },
 };
 
 /** Aşamaların genel ilerlemedeki payı (0..1 aralıkları). Uzun süren GPU aşamalarının payı büyük. */

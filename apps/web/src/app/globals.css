@@ -52,11 +52,13 @@ body {
   color: #edefe8;
 }
 
-/* Site ve yönetim sayfaları açık zeminde (kullanıcı paneli koyu kalır). */
+/* Site, yönetim ve kullanıcı paneli açık zeminde. */
 html:has(.site),
 body:has(.site),
 html:has(.admin),
-body:has(.admin) {
+body:has(.admin),
+html:has(.panel),
+body:has(.panel) {
   background: var(--color-zemin);
   color: var(--color-lacivert);
 }
@@ -126,8 +128,29 @@ body:has(.admin) {
   @apply mb-1.5 block text-[0.8125rem] font-semibold text-gri;
 }
 
+/* ——— Kullanıcı paneli: yönetimle aynı dil, dokunmaya uygun (en az 44 px) denetimler ——— */
+@utility pnl-kart {
+  @apply rounded-2xl border border-ayrac bg-white shadow-[0_1px_2px_rgba(13,27,62,.04),0_8px_24px_-18px_rgba(13,27,62,.16)];
+}
+@utility pnl-btn {
+  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 text-[0.9375rem] font-bold transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility pnl-btn-primary {
+  @apply pnl-btn bg-gok text-white shadow-[0_8px_18px_-10px_rgba(43,108,255,.7)] hover:bg-gok-koyu disabled:shadow-none disabled:hover:bg-gok;
+}
+@utility pnl-btn-ghost {
+  @apply pnl-btn border border-ayrac bg-white text-lacivert hover:border-gok hover:text-gok;
+}
+@utility pnl-input {
+  @apply w-full rounded-xl border border-ayrac bg-white px-3.5 py-2.5 text-base text-lacivert outline-none placeholder:text-gri/60 focus:border-gok focus:ring-4 focus:ring-gok/15 disabled:cursor-not-allowed disabled:bg-zemin disabled:text-gri sm:text-[0.9375rem];
+}
+@utility pnl-label {
+  @apply mb-1.5 block text-sm font-semibold text-lacivert;
+}
+
 .site :focus-visible,
-.admin :focus-visible {
+.admin :focus-visible,
+.panel :focus-visible {
   outline: 2px solid var(--color-gok);
   outline-offset: 3px;
 }

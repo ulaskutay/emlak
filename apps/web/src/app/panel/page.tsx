@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { VideoGrid } from "@/components/panel/VideoGrid";
+import { PanelTitle } from "@/components/panel/ui";
 import { userVideos } from "@/components/panel/videos";
 import { TemplateGallery } from "@/components/templates/TemplateGallery";
 import { requireUser } from "@/lib/auth";
@@ -9,22 +10,17 @@ export const metadata = { title: "Şablonlar · Arsa Video" };
 
 export default async function PanelHome() {
   const user = await requireUser();
-  const recent = await userVideos(user.id, 4);
+  const recent = await userVideos(user.id, 5);
   return (
     <>
-      <h1 className="font-display text-[clamp(1.875rem,4vw,2.75rem)] leading-[1.05] font-bold tracking-[-0.03em]">
-        Hangi videoyu hazırlayalım?
-      </h1>
-      <p className="mt-2 text-mute">Şablonu seçin; gereken bilgileri o şablon soracak.</p>
-      <div className="mt-8">
-        <TemplateGallery tone="dark" hrefBase="/panel/yeni/" />
-      </div>
+      <PanelTitle sub="Şablonu seçin; gereken bilgileri o şablon soracak.">Hangi videoyu hazırlayalım?</PanelTitle>
+      <TemplateGallery tone="light" hrefBase="/panel/yeni/" />
 
       {recent.length > 0 && (
-        <section className="mt-16">
-          <div className="mb-5 flex items-baseline justify-between">
-            <h2 className="font-display text-2xl font-semibold tracking-[-0.02em]">Son videolarınız</h2>
-            <Link href="/panel/videolar" className="text-sm font-semibold text-neon hover:underline">
+        <section className="mt-14 border-t border-ayrac pt-8">
+          <div className="mb-5 flex items-baseline justify-between gap-4">
+            <h2 className="text-xl font-extrabold tracking-[-0.02em]">Son videolarınız</h2>
+            <Link href="/panel/videolar" className="inline-flex min-h-9 items-center text-sm font-bold text-gok hover:underline">
               Tümünü görün
             </Link>
           </div>

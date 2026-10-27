@@ -80,8 +80,8 @@ export function IlanForm() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-bold tracking-[-0.025em]">Fotoğraftan ilan videosu</h1>
-        <p className="mt-2 text-mute">
+        <h1 className="text-[1.75rem] font-extrabold leading-tight tracking-[-0.03em] sm:text-[2rem]">Fotoğraftan ilan videosu</h1>
+        <p className="mt-2 text-gri">
           {MIN}–{MAX} fotoğraf seçin. Sıralama videodaki sırayı belirler; her fotoğraf yaklaşık 3,5 saniyelik bir sahne olur.
         </p>
       </div>
@@ -89,7 +89,7 @@ export function IlanForm() {
       <div
         role="button"
         tabIndex={0}
-        className={`card grid cursor-pointer place-items-center border-dashed p-8 text-center transition ${drag ? "border-neon bg-neon/5" : "hover:border-neon/50"}`}
+        className={`pnl-kart grid cursor-pointer place-items-center border-dashed p-8 text-center transition ${drag ? "border-gok bg-gok-acik/60" : "hover:border-gok/50"}`}
         onClick={() => input.current?.click()}
         onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && input.current?.click()}
         onDragOver={(e) => (e.preventDefault(), setDrag(true))}
@@ -102,7 +102,7 @@ export function IlanForm() {
       >
         <input ref={input} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files && (add(e.target.files), (e.target.value = ""))} />
         <div className="font-semibold">Fotoğrafları sürükleyin ya da seçin</div>
-        <div className="mt-1 text-sm text-mute">
+        <div className="mt-1 text-sm text-gri">
           {photos.length}/{MAX} fotoğraf · yatay fotoğraflar dikey videoya ortadan kırpılır
         </div>
       </div>
@@ -110,30 +110,30 @@ export function IlanForm() {
       {photos.length > 0 && (
         <ol className="grid gap-3 sm:grid-cols-2">
           {photos.map((p, i) => (
-            <li key={p.id} className="card flex gap-3 p-3">
+            <li key={p.id} className="pnl-kart flex gap-3 p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={p.preview} alt={`Fotoğraf ${i + 1}`} className="h-28 w-20 shrink-0 rounded-lg object-cover" />
               <div className="min-w-0 flex-1 space-y-2">
-                <div className="flex items-center justify-between gap-2 text-xs text-mute">
+                <div className="flex items-center justify-between gap-2 text-xs text-gri">
                   <span>
-                    {i + 1}. sahne · {p.error ? <span className="text-red-300">{p.error}</span> : p.key ? "yüklendi" : "yükleniyor…"}
+                    {i + 1}. sahne · {p.error ? <span className="text-mercan-koyu">{p.error}</span> : p.key ? "yüklendi" : "yükleniyor…"}
                   </span>
                   <span className="flex gap-1">
-                    <button type="button" className="rounded px-1.5 hover:bg-white/10 disabled:opacity-30" disabled={i === 0} onClick={() => move(p.id, -1)} aria-label="Öne al">↑</button>
-                    <button type="button" className="rounded px-1.5 hover:bg-white/10 disabled:opacity-30" disabled={i === photos.length - 1} onClick={() => move(p.id, 1)} aria-label="Geriye al">↓</button>
-                    <button type="button" className="rounded px-1.5 hover:bg-white/10" onClick={() => setPhotos((ps) => ps.filter((x) => x.id !== p.id))} aria-label="Kaldır">✕</button>
+                    <button type="button" className="grid h-9 w-9 place-items-center rounded-lg text-base hover:bg-zemin hover:text-lacivert disabled:opacity-30" disabled={i === 0} onClick={() => move(p.id, -1)} aria-label="Öne al">↑</button>
+                    <button type="button" className="grid h-9 w-9 place-items-center rounded-lg text-base hover:bg-zemin hover:text-lacivert disabled:opacity-30" disabled={i === photos.length - 1} onClick={() => move(p.id, 1)} aria-label="Geriye al">↓</button>
+                    <button type="button" className="grid h-9 w-9 place-items-center rounded-lg text-base hover:bg-mercan-acik hover:text-mercan-koyu" onClick={() => setPhotos((ps) => ps.filter((x) => x.id !== p.id))} aria-label="Kaldır">✕</button>
                   </span>
                 </div>
-                <div className="flex rounded-lg border border-line p-0.5 text-xs" role="radiogroup" aria-label="Mekân">
+                <div className="flex rounded-lg border border-ayrac p-0.5 text-xs" role="radiogroup" aria-label="Mekân">
                   {(["exterior", "interior"] as const).map((s) => (
                     <button key={s} type="button" role="radio" aria-checked={p.setting === s}
-                      className={`flex-1 rounded-md px-2 py-1.5 font-semibold ${p.setting === s ? "bg-neon text-ink" : "text-mute hover:text-white"}`}
+                      className={`flex-1 rounded-md px-2 py-1.5 font-semibold ${p.setting === s ? "bg-gok text-white" : "text-gri hover:text-lacivert"}`}
                       onClick={() => update(p.id, { setting: s })}>
                       {s === "exterior" ? "Dış mekân" : "İç mekân"}
                     </button>
                   ))}
                 </div>
-                <input className="input py-2" maxLength={40} placeholder="Başlık (isteğe bağlı)" value={p.title}
+                <input className="pnl-input py-2" maxLength={40} placeholder="Başlık (isteğe bağlı)" value={p.title}
                   aria-label={`${i + 1}. sahne başlığı`} onChange={(e) => update(p.id, { title: e.target.value })} />
               </div>
             </li>
@@ -141,22 +141,22 @@ export function IlanForm() {
         </ol>
       )}
 
-      <div className="card space-y-4 p-6">
-        <p className="text-sm text-mute">Hepsi isteğe bağlı; girdikleriniz videonun sonundaki kartta yazar.</p>
+      <div className="pnl-kart space-y-4 p-5 sm:p-6">
+        <p className="text-sm text-gri">Hepsi isteğe bağlı; girdikleriniz videonun sonundaki kartta yazar.</p>
         <ListingFields value={listing} onChange={setListing} />
-        <label className="flex cursor-pointer items-center justify-between border-t border-line pt-4">
+        <label className="flex cursor-pointer items-center justify-between border-t border-ayrac pt-4">
           <span>
             <span className="block font-semibold">Fon müziği</span>
-            <span className="text-sm text-mute">Sinematik, sözsüz müzik</span>
+            <span className="text-sm text-gri">Sinematik, sözsüz müzik</span>
           </span>
-          <input type="checkbox" className="h-5 w-5 accent-[#ffc24d]" checked={music} onChange={(e) => setMusic(e.target.checked)} />
+          <input type="checkbox" className="h-5 w-5 accent-[#2b6cff]" checked={music} onChange={(e) => setMusic(e.target.checked)} />
         </label>
       </div>
 
-      {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
+      {error && <p className="rounded-lg bg-mercan-acik px-3 py-2 text-sm text-mercan-koyu">{error}</p>}
       <div className="flex items-center justify-end gap-4">
-        {ready.length < MIN && <span className="text-sm text-mute">En az {MIN} fotoğraf gerekli</span>}
-        <button className="btn-primary" disabled={busy || uploading || ready.length < MIN} onClick={submit}>
+        {ready.length < MIN && <span className="text-sm text-gri">En az {MIN} fotoğraf gerekli</span>}
+        <button className="pnl-btn-primary" disabled={busy || uploading || ready.length < MIN} onClick={submit}>
           {busy ? "Gönderiliyor…" : uploading ? "Fotoğraflar yükleniyor…" : "Videoyu oluştur"}
         </button>
       </div>

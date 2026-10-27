@@ -67,25 +67,25 @@ export function TkgmQuery({ onParsed }: { onParsed: (p: Parsed | null) => void }
   const digits = (v: string) => v.replace(/\D/g, "").slice(0, 7);
 
   return (
-    <form className="card space-y-4 p-5" onSubmit={search}>
+    <form className="pnl-kart space-y-4 p-5" onSubmit={search}>
       <div className="grid gap-4 sm:grid-cols-3">
         <div>
-          <label className="label" htmlFor="tkgm-il">İl</label>
-          <select id="tkgm-il" className="input" value={il} disabled={!iller.length} onChange={(e) => pickIl(Number(e.target.value))}>
+          <label className="pnl-label" htmlFor="tkgm-il">İl</label>
+          <select id="tkgm-il" className="pnl-input" value={il} disabled={!iller.length} onChange={(e) => pickIl(Number(e.target.value))}>
             <option value={0}>{loading === "il" ? "Yükleniyor…" : "İl seçin"}</option>
             {iller.map((o) => <option key={o.id} value={o.id}>{o.text}</option>)}
           </select>
         </div>
         <div>
-          <label className="label" htmlFor="tkgm-ilce">İlçe</label>
-          <select id="tkgm-ilce" className="input" value={ilce} disabled={!ilceler.length} onChange={(e) => pickIlce(Number(e.target.value))}>
+          <label className="pnl-label" htmlFor="tkgm-ilce">İlçe</label>
+          <select id="tkgm-ilce" className="pnl-input" value={ilce} disabled={!ilceler.length} onChange={(e) => pickIlce(Number(e.target.value))}>
             <option value={0}>{loading === "ilce" ? "Yükleniyor…" : "İlçe seçin"}</option>
             {ilceler.map((o) => <option key={o.id} value={o.id}>{o.text}</option>)}
           </select>
         </div>
         <div>
-          <label className="label" htmlFor="tkgm-mahalle">Mahalle / köy</label>
-          <select id="tkgm-mahalle" className="input" value={mahalle} disabled={!mahalleler.length}
+          <label className="pnl-label" htmlFor="tkgm-mahalle">Mahalle / köy</label>
+          <select id="tkgm-mahalle" className="pnl-input" value={mahalle} disabled={!mahalleler.length}
             onChange={(e) => (setMahalle(Number(e.target.value)), setError(null))}>
             <option value={0}>{loading === "mahalle" ? "Yükleniyor…" : "Mahalle seçin"}</option>
             {mahalleler.map((o) => <option key={o.id} value={o.id}>{o.text}</option>)}
@@ -94,16 +94,16 @@ export function TkgmQuery({ onParsed }: { onParsed: (p: Parsed | null) => void }
       </div>
       <div className="grid items-end gap-4 sm:grid-cols-3">
         <div>
-          <label className="label" htmlFor="tkgm-ada">Ada</label>
-          <input id="tkgm-ada" className="input" inputMode="numeric" placeholder="Örn. 230" value={ada} onChange={(e) => setAda(digits(e.target.value))} />
+          <label className="pnl-label" htmlFor="tkgm-ada">Ada</label>
+          <input id="tkgm-ada" className="pnl-input" inputMode="numeric" placeholder="Örn. 230" value={ada} onChange={(e) => setAda(digits(e.target.value))} />
         </div>
         <div>
-          <label className="label" htmlFor="tkgm-parsel">Parsel</label>
-          <input id="tkgm-parsel" className="input" inputMode="numeric" placeholder="Örn. 3" value={parsel} onChange={(e) => setParsel(digits(e.target.value))} />
+          <label className="pnl-label" htmlFor="tkgm-parsel">Parsel</label>
+          <input id="tkgm-parsel" className="pnl-input" inputMode="numeric" placeholder="Örn. 3" value={parsel} onChange={(e) => setParsel(digits(e.target.value))} />
         </div>
-        <button className="btn-primary" type="submit" disabled={busy || !mahalle || !ada || !parsel}>{busy ? "Sorgulanıyor…" : "Parseli bul"}</button>
+        <button className="pnl-btn-primary" type="submit" disabled={busy || !mahalle || !ada || !parsel}>{busy ? "Sorgulanıyor…" : "Parseli bul"}</button>
       </div>
-      {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
+      {error && <p className="rounded-lg bg-mercan-acik px-3 py-2 text-sm text-mercan-koyu">{error}</p>}
     </form>
   );
 }
@@ -141,5 +141,5 @@ export function ParcelMap({ ring }: { ring: { lat: number; lng: number }[] }) {
   }, [key, ring]);
 
   if (!key || failed) return null;
-  return <div ref={el} className="h-72 w-full overflow-hidden rounded-xl border border-line" aria-label="Parselin uydu görüntüsü" />;
+  return <div ref={el} className="h-72 w-full overflow-hidden rounded-xl border border-ayrac" aria-label="Parselin uydu görüntüsü" />;
 }

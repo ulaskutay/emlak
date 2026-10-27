@@ -16,21 +16,21 @@ export function ListingFields({ value, onChange }: { value: ListingValues; onCha
   return (
     <div className="grid gap-4 sm:grid-cols-3">
       <div>
-        <label className="label" htmlFor="price">Fiyat (TL)</label>
-        <input id="price" className="input" inputMode="numeric" placeholder="Örn. 12.500.000" value={value.price}
+        <label className="pnl-label" htmlFor="price">Fiyat (TL)</label>
+        <input id="price" className="pnl-input" inputMode="numeric" placeholder="Örn. 12.500.000" value={value.price}
           onChange={(e) => {
             const digits = e.target.value.replace(/\D/g, "").slice(0, 12);
             onChange({ ...value, price: digits ? Number(digits).toLocaleString("tr-TR") : "" });
           }} />
       </div>
       <div>
-        <label className="label" htmlFor="office">Ofis adı</label>
-        <input id="office" className="input" maxLength={60} placeholder="Örn. Etic Emlak" value={value.officeName}
+        <label className="pnl-label" htmlFor="office">Ofis adı</label>
+        <input id="office" className="pnl-input" maxLength={60} placeholder="Örn. Etic Emlak" value={value.officeName}
           onChange={(e) => onChange({ ...value, officeName: e.target.value })} />
       </div>
       <div>
-        <label className="label" htmlFor="phone">Telefon</label>
-        <input id="phone" className="input" maxLength={20} inputMode="tel" placeholder="0532 000 00 00" value={value.phone}
+        <label className="pnl-label" htmlFor="phone">Telefon</label>
+        <input id="phone" className="pnl-input" maxLength={20} inputMode="tel" placeholder="0532 000 00 00" value={value.phone}
           onChange={(e) => onChange({ ...value, phone: e.target.value.replace(/[^0-9+ ()-]/g, "") })} />
       </div>
     </div>

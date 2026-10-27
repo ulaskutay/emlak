@@ -17,9 +17,12 @@ export default async function Page({ params }: { params: Promise<{ sablon: strin
   if (!id.success || TEMPLATES[id.data].hidden) notFound();
   return (
     <>
-      <Link href="/panel" className="mx-auto mb-4 block max-w-3xl text-sm text-mute hover:text-white">
-        Şablonlar
-      </Link>
+      <div className="mx-auto mb-2 max-w-3xl">
+        <Link href="/panel" className="-ml-1 inline-flex min-h-9 items-center gap-1 rounded-lg px-1 text-sm font-semibold text-gri hover:text-gok">
+          <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden><path d="M12 5l-5 5 5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          Şablonlar
+        </Link>
+      </div>
       {id.data === "arsa-drone" && <Wizard />}
       {id.data === "ilan-videosu" && <IlanForm />}
       {id.data === "bitmis-hali" && <BitmisForm template={id.data} />}

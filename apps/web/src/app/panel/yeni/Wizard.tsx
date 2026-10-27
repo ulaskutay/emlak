@@ -76,12 +76,17 @@ export function Wizard() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="font-display text-3xl font-bold tracking-[-0.025em]">Arsa drone turu</h1>
-      <ol className="mt-5 mb-6 flex gap-2">
+      <h1 className="text-[1.75rem] font-extrabold leading-tight tracking-[-0.03em] sm:text-[2rem]">Arsa drone turu</h1>
+      <ol className="mt-5 mb-6 grid grid-cols-4 gap-2 sm:mt-6 sm:mb-8 sm:gap-3" aria-label="Adımlar">
         {STEPS.map((s, i) => (
-          <li key={s} className={`flex-1 rounded-xl border px-3 py-2 text-sm ${i === step ? "border-neon/60 bg-neon/10 text-white" : i < step ? "border-line text-neon" : "border-line text-mute"}`}>
-            <span className="mr-1.5 font-bold">{i < step ? "✓" : i + 1}</span>
-            {s}
+          <li key={s} aria-current={i === step ? "step" : undefined} className="min-w-0">
+            <div className={`h-1.5 rounded-full ${i <= step ? "bg-gok" : "bg-ayrac"}`} />
+            <div className={`mt-2 flex items-center gap-1.5 text-sm font-semibold ${i === step ? "text-lacivert" : i < step ? "text-gok" : "text-gri"}`}>
+              <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[0.6875rem] font-bold ${i < step ? "bg-gok text-white" : i === step ? "bg-lacivert text-white" : "bg-ayrac text-gri"}`}>
+                {i < step ? "✓" : i + 1}
+              </span>
+              <span className={`truncate ${i === step ? "" : "hidden sm:inline"}`}>{s}</span>
+            </div>
           </li>
         ))}
       </ol>
@@ -110,38 +115,38 @@ export function Wizard() {
       )}
 
       {step === 2 && (
-        <div className="card space-y-5 p-6">
-          <p className="text-sm text-mute">
+        <div className="pnl-kart space-y-5 p-5 sm:p-6">
+          <p className="text-sm text-gri">
             Hepsi isteğe bağlı. Fiyat videonun sonunda okunur ve kapanış kartında yazar; telefon yalnızca kartta görünür.
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="label" htmlFor="price">Fiyat (TL)</label>
-              <input id="price" className="input" inputMode="numeric" placeholder="Örn. 12.500.000" value={listing.price}
+              <label className="pnl-label" htmlFor="price">Fiyat (TL)</label>
+              <input id="price" className="pnl-input" inputMode="numeric" placeholder="Örn. 12.500.000" value={listing.price}
                 onChange={(e) => {
                   const digits = e.target.value.replace(/\D/g, "").slice(0, 12);
                   setListing({ ...listing, price: digits ? Number(digits).toLocaleString("tr-TR") : "" });
                 }} />
             </div>
             <div>
-              <label className="label" htmlFor="zoning">İmar durumu</label>
-              <input id="zoning" className="input" maxLength={80} placeholder="Örn. Konut imarlı" value={listing.zoning}
+              <label className="pnl-label" htmlFor="zoning">İmar durumu</label>
+              <input id="zoning" className="pnl-input" maxLength={80} placeholder="Örn. Konut imarlı" value={listing.zoning}
                 onChange={(e) => setListing({ ...listing, zoning: e.target.value })} />
             </div>
             <div>
-              <label className="label" htmlFor="office">Ofis adı</label>
-              <input id="office" className="input" maxLength={60} placeholder="Örn. Etic Emlak" value={listing.officeName}
+              <label className="pnl-label" htmlFor="office">Ofis adı</label>
+              <input id="office" className="pnl-input" maxLength={60} placeholder="Örn. Etic Emlak" value={listing.officeName}
                 onChange={(e) => setListing({ ...listing, officeName: e.target.value })} />
             </div>
             <div>
-              <label className="label" htmlFor="phone">Telefon</label>
-              <input id="phone" className="input" maxLength={20} inputMode="tel" placeholder="0532 000 00 00" value={listing.phone}
+              <label className="pnl-label" htmlFor="phone">Telefon</label>
+              <input id="phone" className="pnl-input" maxLength={20} inputMode="tel" placeholder="0532 000 00 00" value={listing.phone}
                 onChange={(e) => setListing({ ...listing, phone: e.target.value.replace(/[^0-9+ ()-]/g, "") })} />
             </div>
           </div>
-          <div className="flex justify-between">
-            <button className="btn-ghost" onClick={() => setStep(1)}>← Geri</button>
-            <button className="btn-primary" onClick={() => setStep(3)}>Devam →</button>
+          <div className="flex justify-between gap-3">
+            <button className="pnl-btn-ghost" onClick={() => setStep(1)}>← Geri</button>
+            <button className="pnl-btn-primary" onClick={() => setStep(3)}>Devam →</button>
           </div>
         </div>
       )}
@@ -149,17 +154,17 @@ export function Wizard() {
       {step === 3 && parcel && (
         <div className="space-y-4">
           <VoiceStep hook={parcel.hook} voiceId={voiceId} onSelect={setVoiceId} />
-          <label className="card flex cursor-pointer items-center justify-between p-5">
+          <label className="pnl-kart flex cursor-pointer items-center justify-between p-5">
             <span>
               <span className="block font-semibold">Fon müziği</span>
-              <span className="text-sm text-mute">Sinematik müzik; anlatım sırasında otomatik kısılır</span>
+              <span className="text-sm text-gri">Sinematik müzik; anlatım sırasında otomatik kısılır</span>
             </span>
-            <input type="checkbox" className="h-5 w-5 accent-[#ffc24d]" checked={music} onChange={(e) => setMusic(e.target.checked)} />
+            <input type="checkbox" className="h-5 w-5 accent-[#2b6cff]" checked={music} onChange={(e) => setMusic(e.target.checked)} />
           </label>
-          {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
-          <div className="flex justify-between">
-            <button className="btn-ghost" onClick={() => setStep(2)}>← Geri</button>
-            <button className="btn-primary" disabled={busy} onClick={submit}>{busy ? "Gönderiliyor…" : "Videoyu oluştur"}</button>
+          {error && <p className="rounded-lg bg-mercan-acik px-3 py-2 text-sm text-mercan-koyu">{error}</p>}
+          <div className="flex justify-between gap-3">
+            <button className="pnl-btn-ghost" onClick={() => setStep(2)}>← Geri</button>
+            <button className="pnl-btn-primary" disabled={busy} onClick={submit}>{busy ? "Gönderiliyor…" : "Videoyu oluştur"}</button>
           </div>
         </div>
       )}
@@ -189,10 +194,10 @@ export function ParcelStep({ parcel, onParsed, onNext }: { parcel: Parsed | null
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2" role="tablist">
+      <div className="inline-flex w-full rounded-xl border border-ayrac bg-white p-1 sm:w-auto" role="tablist">
         {([["tkgm", "TKGM'den sorgula"], ["dosya", "Dosya yükle"]] as const).map(([m, label]) => (
           <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => (setMode(m), setError(null))}
-            className={`rounded-xl border px-4 py-2 text-sm font-semibold ${mode === m ? "border-neon/60 bg-neon/10 text-white" : "border-line text-mute hover:text-white"}`}>
+            className={`min-h-10 flex-1 rounded-lg px-4 text-sm font-bold transition sm:flex-none ${mode === m ? "bg-lacivert text-white" : "text-gri hover:text-lacivert"}`}>
             {label}
           </button>
         ))}
@@ -200,7 +205,7 @@ export function ParcelStep({ parcel, onParsed, onNext }: { parcel: Parsed | null
       {mode === "tkgm" && <TkgmQuery onParsed={onParsed} />}
       {mode === "dosya" && (
         <div
-          className={`card grid cursor-pointer place-items-center border-dashed p-10 text-center transition ${drag ? "border-neon bg-neon/5" : "hover:border-neon/50"}`}
+          className={`pnl-kart grid cursor-pointer place-items-center border-dashed p-10 text-center transition ${drag ? "border-gok bg-gok-acik/60" : "hover:border-gok/50"}`}
           onClick={() => input.current?.click()}
           onDragOver={(e) => (e.preventDefault(), setDrag(true))}
           onDragLeave={() => setDrag(false)}
@@ -212,24 +217,24 @@ export function ParcelStep({ parcel, onParsed, onNext }: { parcel: Parsed | null
           }}
         >
           <input ref={input} type="file" accept=".geojson,.json,.kml" hidden onChange={(e) => e.target.files?.[0] && load(e.target.files[0])} />
-          <div className="text-4xl">📍</div>
+          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-gok-acik text-2xl">📍</span>
           <div className="mt-3 font-semibold">{busy ? "Okunuyor…" : "Parsel dosyasını sürükleyin ya da seçin"}</div>
-          <div className="mt-1 text-sm text-mute">TKGM Parsel Sorgu → Dışa aktar → GeoJSON veya KML</div>
+          <div className="mt-1 text-sm text-gri">TKGM Parsel Sorgu → Dışa aktar → GeoJSON veya KML</div>
         </div>
       )}
-      {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
+      {error && <p className="rounded-lg bg-mercan-acik px-3 py-2 text-sm text-mercan-koyu">{error}</p>}
       {parcel && (
-        <div className="card space-y-4 p-5">
+        <div className="pnl-kart space-y-4 p-5">
           <ParcelMap key={parcel.fileName} ring={parcel.ring} />
-          <div className="flex items-center gap-5">
-            <ParcelShape ring={parcel.ring} className="h-28 w-28 shrink-0" />
+          <div className="flex flex-wrap items-center gap-4 sm:flex-nowrap sm:gap-5">
+            <ParcelShape ring={parcel.ring} className="h-24 w-24 shrink-0 sm:h-28 sm:w-28" />
             <div className="min-w-0 flex-1">
               <div className="text-lg font-extrabold">{parcelTitle(parcel.summary)}</div>
-              <div className="text-sm text-mute">{parcelPlace(parcel.summary)}</div>
-              <div className="mt-2 text-2xl font-black text-neon">{formatArea(parcel.summary.areaM2)}</div>
-              <div className="mt-1 truncate text-xs text-mute">{parcel.fileName}</div>
+              <div className="text-sm text-gri">{parcelPlace(parcel.summary)}</div>
+              <div className="mt-2 text-2xl font-extrabold text-gok">{formatArea(parcel.summary.areaM2)}</div>
+              <div className="mt-1 truncate text-xs text-gri">{parcel.fileName}</div>
             </div>
-            <button className="btn-primary" onClick={onNext}>Devam →</button>
+            <button className="pnl-btn-primary w-full sm:w-auto" onClick={onNext}>Devam →</button>
           </div>
         </div>
       )}
@@ -271,27 +276,27 @@ export function VoiceStep({ hook, voiceId, onSelect }: { hook: string; voiceId: 
   }
 
   return (
-    <div className="card p-5">
+    <div className="pnl-kart p-5">
       <div className="mb-1 font-semibold">Seslendirme</div>
-      <p className="mb-4 text-sm text-mute">
-        Örnek cümle: <span className="text-white">“{hook}”</span>
+      <p className="mb-4 text-sm text-gri">
+        Örnek cümle: <span className="text-lacivert">“{hook}”</span>
       </p>
-      {!voices && <div className="text-sm text-mute">Sesler yükleniyor…</div>}
-      {voices && !voices.length && <div className="text-sm text-amber">Seslendirme ayarlı değil; video seslendirmesiz üretilecek.</div>}
+      {!voices && <div className="text-sm text-gri">Sesler yükleniyor…</div>}
+      {voices && !voices.length && <div className="text-sm text-[#8a5d00]">Seslendirme ayarlı değil; video seslendirmesiz üretilecek.</div>}
       <div className="grid gap-3 sm:grid-cols-2">
         {voices?.map((v) => (
           <div key={v.id} onClick={() => onSelect(v.id)}
-            className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition ${voiceId === v.id ? "border-neon bg-neon/10" : "border-line hover:border-neon/40"}`}>
+            className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition ${voiceId === v.id ? "border-gok bg-gok-acik" : "border-ayrac hover:border-gok/40"}`}>
             <button type="button" aria-label={`${v.name} örneğini dinle`}
               onClick={(e) => (e.stopPropagation(), play(v.id))}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/10 text-sm hover:bg-neon hover:text-ink">
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-zemin text-sm hover:bg-gok hover:text-white">
               {loading === v.id ? "…" : playing === v.id ? "■" : "▶"}
             </button>
             <div className="min-w-0">
               <div className="font-semibold">
-                {v.name} <span className="text-xs font-normal text-mute">{v.gender === "female" ? "Kadın" : v.gender === "male" ? "Erkek" : ""}</span>
+                {v.name} <span className="text-xs font-normal text-gri">{v.gender === "female" ? "Kadın" : v.gender === "male" ? "Erkek" : ""}</span>
               </div>
-              <div className="line-clamp-2 text-xs text-mute">{v.description}</div>
+              <div className="line-clamp-2 text-xs text-gri">{v.description}</div>
             </div>
           </div>
         ))}

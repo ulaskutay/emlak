@@ -333,45 +333,45 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-bold tracking-[-0.025em]">{sunucu ? "Sunuculu ev turu" : "Boş evi döşe"}</h1>
+        <h1 className="text-[1.75rem] font-extrabold leading-tight tracking-[-0.03em] sm:text-[2rem]">{sunucu ? "Sunuculu ev turu" : "Boş evi döşe"}</h1>
         {sunucu ? (
-          <p className="mt-2 text-mute">
+          <p className="mt-2 text-gri">
             İlandaki odaların fotoğraflarını yükleyin ({MIN}–{max} oda). Seçtiğiniz sanal sunucu her odada durup odayı kameraya Türkçe anlatır.
             Boş odaları isterseniz önce döşeriz. Sunucu ve döşeme temsilidir; videoda bu yazılır.
           </p>
         ) : (
-          <p className="mt-2 text-mute">
+          <p className="mt-2 text-gri">
             İlandaki boş odaların fotoğraflarını yükleyin ({MIN}–{max} oda). Yapay zekâ her odayı seçtiğiniz tarzda döşer; videoda oda gözünüzün önünde
             eşyalanır. Duvar, pencere ve zemin aynı kalır. Görüntü temsilidir; videoda bu yazılır.
           </p>
         )}
       </div>
 
-      <div className="card space-y-3 p-6">
+      <div className="pnl-kart space-y-3 p-5 sm:p-6">
         <div>
           <div className="font-semibold">sahibinden.com ilanından aktar</div>
-          <p className="mt-1 text-sm text-mute">
+          <p className="mt-1 text-sm text-gri">
             sahibinden ilan sayfalarını sunucumuzun okumasına izin vermiyor (bot doğrulaması); ilanı sizin tarayıcınızdan kopyalarız.
             Fotoğraflar, ilan bilgileri, fiyat ve emlakçı bu sayfaya gelir.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <input className="input flex-1" type="url" inputMode="url" placeholder="https://www.sahibinden.com/ilan/…" value={link}
+          <input className="pnl-input flex-1" type="url" inputMode="url" placeholder="https://www.sahibinden.com/ilan/…" value={link}
             aria-label="sahibinden ilan linki" onChange={(e) => setLink(e.target.value)} />
-          <button type="button" className="btn-ghost shrink-0" disabled={!linkOk} onClick={() => window.open(link.trim(), "_blank", "noopener")}>
+          <button type="button" className="pnl-btn-ghost shrink-0" disabled={!linkOk} onClick={() => window.open(link.trim(), "_blank", "noopener")}>
             İlanı aç
           </button>
         </div>
-        <ol className="list-decimal space-y-1 pl-5 text-sm text-mute">
+        <ol className="list-decimal space-y-1 pl-5 text-sm text-gri">
           <li>Linki yukarıya yapıştırıp &quot;İlanı aç&quot;a basın (ya da ilanı sahibinden&apos;de kendiniz açın).</li>
           <li>
-            İlan sayfasında <b className="text-white">Ctrl+A</b>, ardından <b className="text-white">Ctrl+C</b> yapın (Mac&apos;te Cmd+A, Cmd+C).
+            İlan sayfasında <b className="text-lacivert">Ctrl+A</b>, ardından <b className="text-lacivert">Ctrl+C</b> yapın (Mac&apos;te Cmd+A, Cmd+C).
           </li>
           <li>
-            Bu sayfaya dönüp <b className="text-white">Ctrl+V</b> yapın (Mac&apos;te Cmd+V). Bir kutuya tıklamanız gerekmez.
+            Bu sayfaya dönüp <b className="text-lacivert">Ctrl+V</b> yapın (Mac&apos;te Cmd+V). Bir kutuya tıklamanız gerekmez.
           </li>
         </ol>
-        <details className="text-sm text-mute">
+        <details className="text-sm text-gri">
           <summary className="cursor-pointer">Tek tıkla aktarma butonu (isteğe bağlı)</summary>
           <p className="mt-2">
             Bu butonu tarayıcınızın yer imleri çubuğuna sürükleyin; ilan sayfasındayken basınca bu panel ilanla birlikte yeni sekmede açılır:{" "}
@@ -379,23 +379,23 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
             {/* Panelde tıklanınca bir şey yapamaz (ilan sayfasında çalışır): sessiz kalmasın, ne yapılacağı yazılır. */}
             <a ref={bm}
               onClick={(e) => (e.preventDefault(), setImportMsg("Bu buton burada çalışmaz: önce yer imleri çubuğuna sürükleyin, sonra ilan sayfasındayken yer imlerinden basın. Ya da ilan sayfasında Cmd+A, Cmd+C yapıp burada Cmd+V yapın."))}
-              className="ml-1 inline-block rounded-lg bg-neon px-3 py-1 font-semibold text-ink">
+              className="ml-1 inline-block rounded-lg bg-gok px-3 py-1 font-semibold text-white">
               Arsa Video&apos;ya aktar
             </a>
             <span className="block text-xs">Yer imleri çubuğu görünmüyorsa: Ctrl+Shift+B (Mac&apos;te Cmd+Shift+B).</span>
           </p>
         </details>
-        {importMsg && <p className="text-sm text-neon">{importMsg}</p>}
+        {importMsg && <p className="text-sm text-gok">{importMsg}</p>}
         {imported.length > 0 && (
           <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
             {imported.map((img) => {
               const picked = photos.some((p) => p.key === img.key);
               return (
                 <button key={img.key} type="button" onClick={() => togglePick(img)} aria-pressed={picked}
-                  className={`relative overflow-hidden rounded-lg border-2 ${picked ? "border-neon" : "border-transparent opacity-80 hover:opacity-100"}`}>
+                  className={`relative overflow-hidden rounded-lg border-2 ${picked ? "border-gok" : "border-transparent opacity-80 hover:opacity-100"}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.url} alt="İlan fotoğrafı" className="aspect-[3/4] w-full object-cover" />
-                  {picked && <span className="absolute top-1 right-1 grid h-6 w-6 place-items-center rounded-full bg-neon text-xs font-bold text-ink">✓</span>}
+                  {picked && <span className="absolute top-1 right-1 grid h-6 w-6 place-items-center rounded-full bg-gok text-xs font-bold text-white">✓</span>}
                 </button>
               );
             })}
@@ -406,7 +406,7 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
       <div
         role="button"
         tabIndex={0}
-        className={`card grid cursor-pointer place-items-center border-dashed p-8 text-center transition ${drag ? "border-neon bg-neon/5" : "hover:border-neon/50"}`}
+        className={`pnl-kart grid cursor-pointer place-items-center border-dashed p-8 text-center transition ${drag ? "border-gok bg-gok-acik/60" : "hover:border-gok/50"}`}
         onClick={() => input.current?.click()}
         onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && input.current?.click()}
         onDragOver={(e) => (e.preventDefault(), setDrag(true))}
@@ -419,7 +419,7 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
       >
         <input ref={input} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files && (add(e.target.files), (e.target.value = ""))} />
         <div className="font-semibold">Oda fotoğraflarını sürükleyin ya da seçin</div>
-        <div className="mt-1 text-sm text-mute">
+        <div className="mt-1 text-sm text-gri">
           {photos.length}/{max} fotoğraf · video {sunucu ? "sahne başına ~10 saniye, 4 sahneyle ~40 saniye · odalar ve binanın dışı" : "21 saniye · yalnız iç mekân"}; odayı geniş açıdan gören fotoğraflar en iyi sonucu verir
         </div>
       </div>
@@ -427,7 +427,7 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
       {photos.length > 0 && (
         <ol className="grid gap-3 sm:grid-cols-2">
           {photos.map((p, i) => (
-            <li key={p.id} className="card flex gap-3 p-3">
+            <li key={p.id} className="pnl-kart flex gap-3 p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <div className="shrink-0 space-y-1">
                 {/* Önizleme videonun dikey kadrajını birebir gösterir (object-position = kırpma konumu). */}
@@ -435,38 +435,38 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
                 <img src={p.preview} alt={`Fotoğraf ${i + 1}`} className="aspect-[9/16] w-[72px] rounded-lg object-cover"
                   style={{ objectPosition: `${p.focusX * 100}% 50%` }} />
                 <input type="range" min={0} max={100} value={Math.round(p.focusX * 100)} aria-label={`${i + 1}. fotoğrafın kadrajı`}
-                  title="Kadrajı sola/sağa kaydırın" className="w-[72px] accent-[#ffc24d]"
+                  title="Kadrajı sola/sağa kaydırın" className="w-[72px] accent-[#2b6cff]"
                   onChange={(e) => update(p.id, { focusX: Number(e.target.value) / 100 })} />
               </div>
               <div className="min-w-0 flex-1 space-y-2">
-                <div className="flex items-center justify-between gap-2 text-xs text-mute">
+                <div className="flex items-center justify-between gap-2 text-xs text-gri">
                   <span>
-                    {i + 1}. oda · {p.error ? <span className="text-red-300">{p.error}</span> : p.key ? "yüklendi" : "yükleniyor…"}
+                    {i + 1}. oda · {p.error ? <span className="text-mercan-koyu">{p.error}</span> : p.key ? "yüklendi" : "yükleniyor…"}
                   </span>
                   <span className="flex gap-1">
-                    <button type="button" className="rounded px-1.5 hover:bg-white/10 disabled:opacity-30" disabled={i === 0} onClick={() => move(p.id, -1)} aria-label="Öne al">↑</button>
-                    <button type="button" className="rounded px-1.5 hover:bg-white/10 disabled:opacity-30" disabled={i === photos.length - 1} onClick={() => move(p.id, 1)} aria-label="Geriye al">↓</button>
-                    <button type="button" className="rounded px-1.5 hover:bg-white/10" onClick={() => setPhotos((ps) => ps.filter((x) => x.id !== p.id))} aria-label="Kaldır">✕</button>
+                    <button type="button" className="grid h-9 w-9 place-items-center rounded-lg text-base hover:bg-zemin hover:text-lacivert disabled:opacity-30" disabled={i === 0} onClick={() => move(p.id, -1)} aria-label="Öne al">↑</button>
+                    <button type="button" className="grid h-9 w-9 place-items-center rounded-lg text-base hover:bg-zemin hover:text-lacivert disabled:opacity-30" disabled={i === photos.length - 1} onClick={() => move(p.id, 1)} aria-label="Geriye al">↓</button>
+                    <button type="button" className="grid h-9 w-9 place-items-center rounded-lg text-base hover:bg-mercan-acik hover:text-mercan-koyu" onClick={() => setPhotos((ps) => ps.filter((x) => x.id !== p.id))} aria-label="Kaldır">✕</button>
                   </span>
                 </div>
-                <select className={`input py-2 ${p.room ? "" : "border-neon/60"}`} value={p.room ?? ""} aria-label={`${i + 1}. oda tipi`} onChange={(e) => update(p.id, { room: e.target.value as RoomType })}>
+                <select className={`pnl-input py-2 ${p.room ? "" : "border-gok/60"}`} value={p.room ?? ""} aria-label={`${i + 1}. oda tipi`} onChange={(e) => update(p.id, { room: e.target.value as RoomType })}>
                   <option value="" disabled>Oda tipini seçin</option>
                   {(sunucu ? ROOMS : STAGING_ROOMS).map((r) => (
                     <option key={r} value={r}>{ROOM_LABELS[r]}</option>
                   ))}
                 </select>
-                <input className="input py-2" maxLength={40} placeholder={p.room ? `Başlık (boşsa "${ROOM_LABELS[p.room]}")` : "Başlık (isteğe bağlı)"} value={p.title}
+                <input className="pnl-input py-2" maxLength={40} placeholder={p.room ? `Başlık (boşsa "${ROOM_LABELS[p.room]}")` : "Başlık (isteğe bağlı)"} value={p.title}
                   aria-label={`${i + 1}. oda başlığı`} onChange={(e) => update(p.id, { title: e.target.value })} />
                 {sunucu && p.room && (
                   <div>
-                    <textarea className="input min-h-20 py-2 text-sm" maxLength={220} value={sceneText(p)} aria-label={`${i + 1}. sahnede sunucunun söyleyeceği`}
+                    <textarea className="pnl-input min-h-20 py-2 text-sm" maxLength={220} value={sceneText(p)} aria-label={`${i + 1}. sahnede sunucunun söyleyeceği`}
                       onChange={(e) => update(p.id, { text: e.target.value })} />
-                    <div className="mt-1 flex items-center justify-between text-xs text-mute">
-                      <span className={words(sceneText(p)) > TOUR_MAX_WORDS ? "text-red-300" : ""}>
+                    <div className="mt-1 flex items-center justify-between text-xs text-gri">
+                      <span className={words(sceneText(p)) > TOUR_MAX_WORDS ? "text-mercan-koyu" : ""}>
                         {words(sceneText(p))}/{TOUR_MAX_WORDS} kelime
                       </span>
                       {p.text !== undefined && (
-                        <button type="button" className="hover:text-white" onClick={() => update(p.id, { text: undefined })}>Otomatik metne dön</button>
+                        <button type="button" className="hover:text-lacivert" onClick={() => update(p.id, { text: undefined })}>Otomatik metne dön</button>
                       )}
                     </div>
                   </div>
@@ -477,107 +477,107 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
         </ol>
       )}
 
-      <fieldset className="card p-6">
+      <fieldset className="pnl-kart p-5 sm:p-6">
         <legend className="sr-only">Döşeme tarzı</legend>
         <div className="mb-4 font-semibold">{sunucu ? "Odalar döşensin mi?" : "Hangi tarzda döşensin?"}</div>
         <div className="grid gap-3 sm:grid-cols-3">
           {sunucu && (
             <label
-              className={`flex cursor-pointer flex-col rounded-xl border p-4 transition ${style === null ? "border-neon bg-neon/10" : "border-line hover:border-neon/50"}`}>
+              className={`flex cursor-pointer flex-col rounded-xl border p-4 transition ${style === null ? "border-gok bg-gok-acik" : "border-ayrac hover:border-gok/50"}`}>
               <input type="radio" name="style" value="" className="sr-only" checked={style === null} onChange={() => setStyle(null)} />
               <span className="font-semibold">Olduğu gibi</span>
-              <span className="mt-1 text-sm text-mute">Fotoğraftaki oda, döşemeden</span>
+              <span className="mt-1 text-sm text-gri">Fotoğraftaki oda, döşemeden</span>
             </label>
           )}
           {STYLES.map((s) => (
             <label key={s}
-              className={`flex cursor-pointer flex-col rounded-xl border p-4 transition ${style === s ? "border-neon bg-neon/10" : "border-line hover:border-neon/50"}`}>
+              className={`flex cursor-pointer flex-col rounded-xl border p-4 transition ${style === s ? "border-gok bg-gok-acik" : "border-ayrac hover:border-gok/50"}`}>
               <input type="radio" name="style" value={s} className="sr-only" checked={style === s} onChange={() => setStyle(s)} />
               <span className="font-semibold">{STYLE_LABELS[s]}</span>
-              <span className="mt-1 text-sm text-mute">{STYLE_HINTS[s]}</span>
+              <span className="mt-1 text-sm text-gri">{STYLE_HINTS[s]}</span>
             </label>
           ))}
         </div>
       </fieldset>
 
-      <div className="card space-y-4 p-6">
+      <div className="pnl-kart space-y-4 p-5 sm:p-6">
         <div>
           <div className="font-semibold">İlan bilgileri</div>
-          <p className="mt-1 text-sm text-mute">
+          <p className="mt-1 text-sm text-gri">
             Seslendirme bunlardan kurulur. İlanı yukarıdan aktardıysanız dolu gelir; düzeltebilirsiniz.
           </p>
         </div>
-        <textarea className="input min-h-24 py-2 text-sm" placeholder="İlan sayfasının metnini yapıştırın" value={paste}
+        <textarea className="pnl-input min-h-24 py-2 text-sm" placeholder="İlan sayfasının metnini yapıştırın" value={paste}
           aria-label="İlan sayfası metni" onChange={(e) => setPaste(e.target.value)} />
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" className="btn-ghost" disabled={paste.trim().length < 20} onClick={() => readListing()}>Bilgileri ayıkla</button>
-          {parsed && <span className="text-sm text-mute">{parsed}</span>}
+          <button type="button" className="pnl-btn-ghost" disabled={paste.trim().length < 20} onClick={() => readListing()}>Bilgileri ayıkla</button>
+          {parsed && <span className="text-sm text-gri">{parsed}</span>}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label" htmlFor="kind">Emlak tipi</label>
-            <input id="kind" className="input" maxLength={40} placeholder="Örn. Satılık Daire" value={details.kind}
+            <label className="pnl-label" htmlFor="kind">Emlak tipi</label>
+            <input id="kind" className="pnl-input" maxLength={40} placeholder="Örn. Satılık Daire" value={details.kind}
               onChange={(e) => setDetails({ ...details, kind: e.target.value })} />
           </div>
           <div>
-            <label className="label" htmlFor="location">Konum</label>
-            <input id="location" className="input" maxLength={60} placeholder="Örn. Etimesgut Bağlıca" value={details.location}
+            <label className="pnl-label" htmlFor="location">Konum</label>
+            <input id="location" className="pnl-input" maxLength={60} placeholder="Örn. Etimesgut Bağlıca" value={details.location}
               onChange={(e) => setDetails({ ...details, location: e.target.value })} />
           </div>
           <div>
-            <label className="label" htmlFor="rooms">Oda sayısı</label>
-            <input id="rooms" className="input" maxLength={7} placeholder="Örn. 2+1" value={details.rooms}
+            <label className="pnl-label" htmlFor="rooms">Oda sayısı</label>
+            <input id="rooms" className="pnl-input" maxLength={7} placeholder="Örn. 2+1" value={details.rooms}
               onChange={(e) => setDetails({ ...details, rooms: e.target.value })} />
           </div>
           <div>
-            <label className="label" htmlFor="netm2">Net m²</label>
-            <input id="netm2" className="input" inputMode="numeric" maxLength={5} placeholder="Örn. 110" value={details.netM2}
+            <label className="pnl-label" htmlFor="netm2">Net m²</label>
+            <input id="netm2" className="pnl-input" inputMode="numeric" maxLength={5} placeholder="Örn. 110" value={details.netM2}
               onChange={(e) => setDetails({ ...details, netM2: e.target.value.replace(/\D/g, "") })} />
           </div>
         </div>
         <div>
-          <label className="label" htmlFor="highlights">Öne çıkanlar (her satıra bir cümle, en fazla 5)</label>
-          <textarea id="highlights" className="input min-h-20 py-2 text-sm" placeholder={"Örn. Metroya beş dakika yürüme mesafesinde.\nSite içinde, havuzlu."}
+          <label className="pnl-label" htmlFor="highlights">Öne çıkanlar (her satıra bir cümle, en fazla 5)</label>
+          <textarea id="highlights" className="pnl-input min-h-20 py-2 text-sm" placeholder={"Örn. Metroya beş dakika yürüme mesafesinde.\nSite içinde, havuzlu."}
             value={details.highlights} onChange={(e) => setDetails({ ...details, highlights: e.target.value })} />
         </div>
       </div>
 
       {sunucu && (
-        <fieldset className="card p-6">
+        <fieldset className="pnl-kart p-5 sm:p-6">
           <legend className="sr-only">Kalite</legend>
           <div className="mb-4 font-semibold">Video kalitesi</div>
           <div className="grid gap-3 sm:grid-cols-2">
             {TourQuality.options.map((q) => (
               <label key={q}
-                className={`flex cursor-pointer flex-col rounded-xl border p-4 transition ${quality === q ? "border-neon bg-neon/10" : "border-line hover:border-neon/50"}`}>
+                className={`flex cursor-pointer flex-col rounded-xl border p-4 transition ${quality === q ? "border-gok bg-gok-acik" : "border-ayrac hover:border-gok/50"}`}>
                 <input type="radio" name="quality" value={q} className="sr-only" checked={quality === q} onChange={() => setQuality(q)} />
                 <span className="flex items-baseline justify-between gap-2">
                   <span className="font-semibold">{TOUR_QUALITY[q].label}</span>
-                  <span className="text-sm text-neon">sahne başına {TOUR_QUALITY[q].credits} kredi</span>
+                  <span className="text-sm text-gok">sahne başına {TOUR_QUALITY[q].credits} kredi</span>
                 </span>
-                <span className="mt-1 text-sm text-mute">{TOUR_QUALITY[q].hint}</span>
+                <span className="mt-1 text-sm text-gri">{TOUR_QUALITY[q].hint}</span>
               </label>
             ))}
           </div>
-          <p className="mt-3 text-sm text-mute">
+          <p className="mt-3 text-sm text-gri">
             {typed.length ? `${typed.length} sahne · toplam ${typed.length * TOUR_QUALITY[quality].credits} kredi` : "Sahne seçince toplam kredi burada görünür"} · video 1080p 60 FPS teslim edilir.
           </p>
         </fieldset>
       )}
 
       {sunucu && (
-        <fieldset className="card p-6">
+        <fieldset className="pnl-kart p-5 sm:p-6">
           <legend className="sr-only">Sunucu</legend>
           <div className="mb-4 font-semibold">Evi kim anlatsın?</div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             {presenterList.map((pr) => (
               <label key={pr.id}
-                className={`flex cursor-pointer flex-col overflow-hidden rounded-xl border transition ${presenter === pr.id ? "border-neon bg-neon/10" : "border-line hover:border-neon/50"}`}>
+                className={`flex cursor-pointer flex-col overflow-hidden rounded-xl border transition ${presenter === pr.id ? "border-gok bg-gok-acik" : "border-ayrac hover:border-gok/50"}`}>
                 <input type="radio" name="presenter" value={pr.id} className="sr-only" checked={presenter === pr.id} onChange={() => setPresenter(pr.id)} />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={`/media/sunucular/${pr.id}.jpg`} alt={pr.name} className="aspect-[3/4] w-full object-cover object-top" />
                 <span className="px-3 pt-2 font-semibold">{pr.name}</span>
-                <span className="px-3 pb-3 text-xs text-mute">{pr.blurb}</span>
+                <span className="px-3 pb-3 text-xs text-gri">{pr.blurb}</span>
               </label>
             ))}
           </div>
@@ -585,34 +585,34 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
       )}
 
       {sunucu ? (
-        <div className="card space-y-3 p-6">
+        <div className="pnl-kart space-y-3 p-5 sm:p-6">
           <div>
             <div className="font-semibold">Anlatım ve altyazı</div>
-            <p className="mt-1 text-sm text-mute">
+            <p className="mt-1 text-sm text-gri">
               Sunucu her sahnede o sahnenin kutusundaki metni söyler; metin ilan bilgilerinden ve yakın yerlerden kurulur, kutuda değiştirebilirsiniz.
               Konuşma videoya kelime kelime altyazı olarak da yazılır. Sahne başına en fazla {TOUR_MAX_WORDS} kelime (10 saniye).
             </p>
           </div>
           {nearby.length > 0 && (
-            <p className="text-sm text-mute">
+            <p className="text-sm text-gri">
               Yakın yerler: {nearby.map((n) => `${n.name ?? n.category} (${n.distanceM < 1000 ? `${n.distanceM} m` : `${(n.distanceM / 1000).toFixed(1)} km`})`).join(" · ")}
             </p>
           )}
-          {ready.some((p) => !p.room) && <p className="text-xs text-mute">Tipi seçilmeyen fotoğraflar videoya girmez.</p>}
+          {ready.some((p) => !p.room) && <p className="text-xs text-gri">Tipi seçilmeyen fotoğraflar videoya girmez.</p>}
         </div>
       ) : (
       <>
-      <div className="card space-y-4 p-6">
+      <div className="pnl-kart space-y-4 p-5 sm:p-6">
         <label className="flex cursor-pointer items-center justify-between">
           <span>
             <span className="block font-semibold">Seslendirme</span>
-            <span className="text-sm text-mute">Türkçe anlatım; müzik anlatım sırasında kısılır</span>
+            <span className="text-sm text-gri">Türkçe anlatım; müzik anlatım sırasında kısılır</span>
           </span>
-          <input type="checkbox" className="h-5 w-5 accent-[#ffc24d]" checked={voice} onChange={(e) => setVoice(e.target.checked)} />
+          <input type="checkbox" className="h-5 w-5 accent-[#2b6cff]" checked={voice} onChange={(e) => setVoice(e.target.checked)} />
         </label>
         {voice && (
-          <div className="rounded-lg border border-line p-3 text-sm">
-            <div className="mb-1 text-xs text-mute">Anlatım metni{ready.some((p) => !p.room) ? " (oda tipi seçilmeyen fotoğraflar eklenmedi)" : ""}</div>
+          <div className="rounded-lg border border-ayrac p-3 text-sm">
+            <div className="mb-1 text-xs text-gri">Anlatım metni{ready.some((p) => !p.room) ? " (oda tipi seçilmeyen fotoğraflar eklenmedi)" : ""}</div>
             <ol className="list-decimal space-y-1 pl-5">
               {[...narration.rooms, narration.outro].map((l, i) => (
                 <li key={i}>{l}</li>
@@ -625,10 +625,10 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
       </>
       )}
 
-      <div className="card space-y-4 p-6">
+      <div className="pnl-kart space-y-4 p-5 sm:p-6">
         <div>
           <div className="font-semibold">Kapanış kartı</div>
-          <p className="mt-1 text-sm text-mute">Videonun son 3,5 saniyesi: fiyat, emlakçı, telefon ve ofis logosu. İlandan aktarınca kendiliğinden dolar.</p>
+          <p className="mt-1 text-sm text-gri">Videonun son 3,5 saniyesi: fiyat, emlakçı, telefon ve ofis logosu. İlandan aktarınca kendiliğinden dolar.</p>
         </div>
         {(agent.photo || agent.logo) && (
           <div className="flex flex-wrap items-center gap-4">
@@ -637,43 +637,43 @@ export function DosemeForm({ template = "dosenmis-ev" }: { template?: "dosenmis-
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={agent.photo.url} alt="Emlakçı" className="h-16 w-16 rounded-full object-cover" />
                 <button type="button" aria-label="Fotoğrafı kaldır" onClick={() => setAgent({ ...agent, photo: undefined })}
-                  className="absolute -top-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-white/20 text-xs hover:bg-red-500">✕</button>
+                  className="absolute -top-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-ayrac text-xs hover:bg-mercan hover:text-white">✕</button>
               </span>
             )}
             {agent.logo && (
-              <span className="relative rounded-lg bg-white p-2">
+              <span className="relative rounded-lg border border-ayrac bg-white p-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={agent.logo.url} alt="Ofis logosu" className="h-12 w-auto" />
                 <button type="button" aria-label="Logoyu kaldır" onClick={() => setAgent({ ...agent, logo: undefined })}
-                  className="absolute -top-2 -right-2 grid h-5 w-5 place-items-center rounded-full bg-black/60 text-xs text-white hover:bg-red-500">✕</button>
+                  className="absolute -top-2 -right-2 grid h-5 w-5 place-items-center rounded-full bg-black/60 text-xs text-white hover:bg-mercan hover:text-white">✕</button>
               </span>
             )}
           </div>
         )}
         <div className="max-w-xs">
-          <label className="label" htmlFor="agent">Emlakçı adı</label>
-          <input id="agent" className="input" maxLength={60} placeholder="Örn. Ümit G." value={agent.name}
+          <label className="pnl-label" htmlFor="agent">Emlakçı adı</label>
+          <input id="agent" className="pnl-input" maxLength={60} placeholder="Örn. Ümit G." value={agent.name}
             onChange={(e) => setAgent({ ...agent, name: e.target.value })} />
         </div>
         <ListingFields value={listing} onChange={setListing} />
-        <label className="flex cursor-pointer items-center justify-between border-t border-line pt-4">
+        <label className="flex cursor-pointer items-center justify-between border-t border-ayrac pt-4">
           <span>
             <span className="block font-semibold">Fon müziği</span>
-            <span className="text-sm text-mute">Sinematik, sözsüz müzik</span>
+            <span className="text-sm text-gri">Sinematik, sözsüz müzik</span>
           </span>
-          <input type="checkbox" className="h-5 w-5 accent-[#ffc24d]" checked={music} onChange={(e) => setMusic(e.target.checked)} />
+          <input type="checkbox" className="h-5 w-5 accent-[#2b6cff]" checked={music} onChange={(e) => setMusic(e.target.checked)} />
         </label>
       </div>
 
-      {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
+      {error && <p className="rounded-lg bg-mercan-acik px-3 py-2 text-sm text-mercan-koyu">{error}</p>}
       <div className="flex items-center justify-end gap-4">
         {ready.length < MIN ? (
-          <span className="text-sm text-mute">En az {MIN} fotoğraf gerekli</span>
+          <span className="text-sm text-gri">En az {MIN} fotoğraf gerekli</span>
         ) : (
-          (untyped > 0 && <span className="text-sm text-mute">{untyped} fotoğrafın oda tipini seçin</span>) ||
-          (tooLong > 0 && <span className="text-sm text-mute">{tooLong} sahnenin metni çok uzun</span>)
+          (untyped > 0 && <span className="text-sm text-gri">{untyped} fotoğrafın oda tipini seçin</span>) ||
+          (tooLong > 0 && <span className="text-sm text-gri">{tooLong} sahnenin metni çok uzun</span>)
         )}
-        <button className="btn-primary" disabled={busy || uploading || ready.length < MIN || untyped > 0 || tooLong > 0} onClick={submit}>
+        <button className="pnl-btn-primary" disabled={busy || uploading || ready.length < MIN || untyped > 0 || tooLong > 0} onClick={submit}>
           {busy ? "Gönderiliyor…" : uploading ? "Fotoğraflar yükleniyor…" : "Videoyu oluştur"}
         </button>
       </div>
