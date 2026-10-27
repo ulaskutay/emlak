@@ -127,3 +127,25 @@ Higgsfield tarzı yapıya geçildi: kullanıcı şablonu seçer, şablon kendi f
 - Site açık (Pafta); `/sablonlar` galerisi ve panel koyu (Gece).
 - Bekleme listesi kaldırıldı; butonlar doğrudan kayda gider.
 - Yeni şablon eklemek: tanım + sipariş şeması + worker hattı + panel formu.
+
+## 8. Güncelleme (2026-10-27): Gökyüzü paleti ve vizör dili
+"Pafta" yönü bırakıldı; site, panel ve yönetim açık **Gökyüzü** paletinde (tokenlar: `apps/web/src/app/globals.css`, ayrıntı: [design-dna.json](design-dna.json)).
+
+| Token | Hex | Rol |
+|---|---|---|
+| Zemin | `#F5F8FD` | Sayfa zemini |
+| Lacivert | `#0D1B3E` | Metin; hero ve son çağrı bantları |
+| Gök | `#2B6CFF` | Açık zeminde birincil buton ve bağlantı |
+| Güneş (parsel sarısı) | `#FFC93C` | Koyu zeminde CTA; vizör köşeleri |
+| Gri | `#56627A` | İkincil metin |
+| Ayraç | `#E2E8F3` | Künye çizgileri, kenarlıklar |
+
+**İmza dil — drone vizörü** (sanaldrone.com analizinden sonra, bkz. [design-dna-sanaldrone.json](design-dna-sanaldrone.json)):
+- **Hero** (`HeroVizor.tsx`): lacivert bant; sağda sarı köşeli vizörde şablonun gerçek çıktısı oynar, sekmeler (Arsa, Sunuculu ev, Eşya döşeme, İnşaat) videoyu değiştirir; yanında videodan okunan künye.
+- **Anlatım bölümleri** (`AnlatimBolumu.tsx`): çizim vizör köşeleri içinde; üstte düz mavi tek satır; adımlar künye satırları gibi.
+- **Karşılaştırma**: "Aynı ilan, iki yol" — aynı dört konu iki künyede yan yana; Arsa Video tarafı vizörde.
+- Ortak bileşen: `VizorCercevesi.tsx`.
+
+**Ana sayfa sırası:** hero → örnek video şeridi → arsa / konut / proje anlatımları → şablon kataloğu → üç adım → karşılaştırma → son çağrı.
+
+**Kaçınılanlar:** emojili hap etiketler, başlıkta tek kelimeyi renklendirme, bulanık renk lekeleri, uydurma müşteri yorumu ve logo.
