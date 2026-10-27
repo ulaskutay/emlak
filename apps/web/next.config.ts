@@ -7,6 +7,8 @@ try {
 } catch {}
 
 const config: NextConfig = {
+  // Sunucuda derleme, çalışan sürüme dokunmamak için boştaki klasöre yapılır (.next-a / .next-b; deploy/etic-vps.sh).
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // Tarayıcıdaki harita (yakın nokta seçimi): Maps JavaScript anahtarı zaten istemci anahtarıdır (alan adı kısıtlı).
   env: { NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY ?? "" },
   // Coolify/Docker: bağımsız çalışan sunucu çıktısı
