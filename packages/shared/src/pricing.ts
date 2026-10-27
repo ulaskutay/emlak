@@ -25,19 +25,32 @@ export interface PricingSettings {
   };
 }
 
+/**
+ * 2026-10-27 hesabı. Birim fiyatlar:
+ * - RunPod faturası: RTX PRO 6000 (Qwen, Wan, Hunyuan) $0,00097/sn, drone (RTX 4090) $0,00031/sn; işçi soğuk açılışı
+ *   (model yükleme) ~120 sn, tek tük siparişte her videoda ödenir. Qwen düzenleme ~40 sn, Wan 81 kare 4 adım ~90 sn.
+ * - ElevenLabs eleven_v3 ~$0,00022/karakter (Creator); müzik uzunluğa göre önbellekte. Google Places aylık ücretsiz kotada.
+ * - Higgsfield (hesap hareketleri): Seedream 5.0 Pro 2,5 kredi/kare, Gemini Omni Flash 1.1 360p 1, 720p 3 kredi/sn,
+ *   ByteDance büyütme 1080p 60 FPS ~0,4 kredi/sn. Plus aylık $49/1000 kredi; ek paketler biraz pahalı → $0,05.
+ */
 export const DEFAULT_PRICING: PricingSettings = {
   creditPriceTry: 100,
-  usdTry: 42,
+  usdTry: 49.79,
   higgsfieldCreditUsd: 0.05,
   credits: { "arsa-drone": 1, "ilan-videosu": 1, "bitmis-hali": 2, "insaat-videosu": 2, "dosenmis-ev": 1 },
   costUsd: {
-    "arsa-drone": 0.15,
-    "ilan-videosu": { perPhoto: 0.06 },
-    "bitmis-hali": 0.35,
-    "insaat-videosu": 0.9,
-    "dosenmis-ev": { perRoom: 0.12, base: 0.05 },
-    // 2026-10-26: 10 sn'lik sahne orta ~16,5, yüksek ~36,5 plan kredisi (apps/worker/src/templates/sunucu-ev.ts).
-    "sunucu-ev": { higgsfieldPerScene: { orta: 16.5, yuksek: 36.5 }, extraUsdPerScene: 0.02 },
+    // Drone render ~265 sn $0,08 + seslendirme ~450 karakter $0,10 + Google.
+    "arsa-drone": 0.2,
+    // Hunyuan sahnesi ~60 sn + soğuk açılış payı.
+    "ilan-videosu": { perPhoto: 0.1 },
+    // Drone render $0,08 + Qwen (soğuk) ~160 sn $0,16 + Wan (soğuk) ~270 sn $0,26.
+    "bitmis-hali": 0.5,
+    // Qwen 3 kare + Wan 5 klip ~930 sn $0,90 + yan kare $0,02 + seslendirme ve inşaat sesleri ~$0,16.
+    "insaat-videosu": 1.1,
+    // Oda başına Qwen + Wan ~130 sn; sabit: 3 soğuk açılış $0,35 + seslendirme $0,07.
+    "dosenmis-ev": { perRoom: 0.13, base: 0.42 },
+    // 10 sn'lik sahne: kare 2,5 + klip (orta 360p 10, yüksek 720p 30) + büyütme 4 kredi. Ek: Scribe, döşenirse Qwen payı.
+    "sunucu-ev": { higgsfieldPerScene: { orta: 16.5, yuksek: 36.5 }, extraUsdPerScene: 0.03 },
   },
 };
 

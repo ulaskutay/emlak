@@ -1,7 +1,8 @@
-import { TEMPLATES, TOUR_QUALITY, type TemplateId } from "@arsa/shared";
+import { estimateCostTry, TEMPLATES, TOUR_QUALITY, videoCredits, type PricingSettings, type TemplateId, type TemplateInput } from "@arsa/shared";
 import { savePricing } from "@/app/admin/actions";
 import { PageTitle } from "@/components/admin/ui";
 import { getPricing } from "@/lib/credits";
+import { formatTry } from "@/lib/format";
 import { requireAdmin } from "@/lib/auth";
 
 function Field({ name, label, value, unit }: { name: string; label: string; value: number; unit?: string }) {
@@ -17,6 +18,30 @@ function Field({ name, label, value, unit }: { name: string; label: string; valu
 }
 
 const n = (id: TemplateId) => TEMPLATES[id].name;
+
+/** Hesap özetindeki örnek siparişler: fotoğraf/oda/sahne sayısı maliyeti değiştiren şablonlar için tipik değer. */
+const SAMPLES: { id: TemplateId; label: string; photos?: number; quality?: "orta" | "yuksek" }[] = [
+  { id: "arsa-drone", label: n("arsa-drone") },
+  { id: "ilan-videosu", label: `${n("ilan-videosu")} · 5 fotoğraf`, photos: 5 },
+  { id: "bitmis-hali", label: n("bitmis-hali") },
+  { id: "insaat-videosu", label: n("insaat-videosu") },
+  { id: "dosenmis-ev", label: `${n("dosenmis-ev")} · 3 oda`, photos: 3 },
+  { id: "sunucu-ev", label: `${n("sunucu-ev")} · 4 sahne, orta`, photos: 4, quality: "orta" },
+  { id: "sunucu-ev", label: `${n("sunucu-ev")} · 4 sahne, yüksek`, photos: 4, quality: "yuksek" },
+];
+
+function sample(s: (typeof SAMPLES)[number], p: PricingSettings) {
+  const input = { photos: Array.from({ length: s.photos ?? 0 }, () => ({})), quality: s.quality } as unknown as TemplateInput;
+  const cost = estimateCostTry(s.id, input, p);
+  const revenue = videoCredits(s.id, input, p) * p.creditPriceTry;
+  return { cost, revenue, credits: videoCredits(s.id, input, p) };
+}
+
+/** Sunuculu turda bir sahnenin maliyet dökümü ($): Higgsfield kredisi × kredi değeri + ek. */
+function sceneUsd(q: "orta" | "yuksek", p: PricingSettings) {
+  const c = p.costUsd["sunucu-ev"];
+  return c.higgsfieldPerScene[q] * p.higgsfieldCreditUsd + c.extraUsdPerScene;
+}
 
 export default async function SettingsPage() {
   // Yerleşim de denetler; sayfa yerleşimle paralel çalıştığı için veri sorgusundan önce burada da.
@@ -55,6 +80,40 @@ export default async function SettingsPage() {
           <Field name="costUsd.sunucu-ev.higgsfieldPerScene.orta" label={`${n("sunucu-ev")} · orta, sahne başına`} value={c["sunucu-ev"].higgsfieldPerScene.orta} unit="kredi" />
           <Field name="costUsd.sunucu-ev.higgsfieldPerScene.yuksek" label={`${n("sunucu-ev")} · yüksek, sahne başına`} value={c["sunucu-ev"].higgsfieldPerScene.yuksek} unit="kredi" />
           <Field name="costUsd.sunucu-ev.extraUsdPerScene" label={`${n("sunucu-ev")} · ek maliyet, sahne başına`} value={c["sunucu-ev"].extraUsdPerScene} unit="$" />
+        </section>
+        <section className="adm-kart p-5">
+          <h2 className="font-extrabold">Hesap özeti</h2>
+          <p className="mt-1 text-sm text-gri">
+            Kayıtlı değerlerle örnek siparişler. Sunuculu tur sahnesi: orta {formatTry(sceneUsd("orta", p) * p.usdTry)} (${sceneUsd("orta", p).toFixed(2)}), yüksek{" "}
+            {formatTry(sceneUsd("yuksek", p) * p.usdTry)} (${sceneUsd("yuksek", p).toFixed(2)}); kare 2,5 + klip (360p 10 / 720p 30) + büyütme 4 kredi.
+          </p>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[30rem] text-sm">
+              <thead>
+                <tr className="text-left text-gri">
+                  <th className="py-2 font-semibold">Video</th>
+                  <th className="py-2 text-right font-semibold">Maliyet</th>
+                  <th className="py-2 text-right font-semibold">Kredi</th>
+                  <th className="py-2 text-right font-semibold">Gelir</th>
+                  <th className="py-2 text-right font-semibold">Kâr</th>
+                </tr>
+              </thead>
+              <tbody className="tabular-nums">
+                {SAMPLES.map((s) => {
+                  const r = sample(s, p);
+                  return (
+                    <tr key={s.label} className="border-t border-black/5">
+                      <td className="py-2">{s.label}</td>
+                      <td className="py-2 text-right">{formatTry(r.cost)}</td>
+                      <td className="py-2 text-right">{r.credits}</td>
+                      <td className="py-2 text-right">{formatTry(r.revenue)}</td>
+                      <td className={`py-2 text-right font-semibold ${r.revenue - r.cost < 0 ? "text-mercan-koyu" : "text-cimen-koyu"}`}>{formatTry(r.revenue - r.cost)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </section>
         <div className="pt-3">
           <button className="adm-btn-primary px-6">Kaydet</button>
