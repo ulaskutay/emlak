@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { TEMPLATE_CATEGORIES, templateList, type TemplateCategory } from "@arsa/shared";
 import { DroneAnlatim } from "@/components/site/DroneAnlatim";
+import { KonutAnlatim, ProjeAnlatim } from "@/components/site/SablonAnlatimlari";
 import { HeroPhones } from "@/components/site/HeroPhones";
 import { SonCagri } from "@/components/site/SonCagri";
 import { VideoTile } from "@/components/site/VideoTile";
@@ -98,6 +99,8 @@ export default function Home() {
       </section>
 
       <DroneAnlatim />
+      <KonutAnlatim />
+      <ProjeAnlatim />
 
       {/* Ne tanıtmak istiyorsunuz? */}
       <section className="mx-auto max-w-[1240px] px-4 pb-24 sm:px-6">
