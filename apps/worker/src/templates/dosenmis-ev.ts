@@ -1,16 +1,15 @@
 /**
- * Boş evi döşe: her oda fotoğrafı Qwen-Image-Edit ile döşenir, Wan 2.2 ilk/son kare (boş → döşenmiş)
+ * Boş evi döşe: her oda fotoğrafı Higgsfield (Nano Banana 2.1) ile döşenir, Wan 2.2 ilk/son kare (boş → döşenmiş)
  * eşyaların yerleştiği sahneyi üretir; sahneler oda başlıkları ve emlakçı kartıyla birleşir, ilan bilgisinden
  * kurulan Türkçe anlatım ve müzik eklenir. Video oda sayısından bağımsız TOTAL_SECONDS sürer: odalar süreyi
  * eşit paylaşır, geçiş sahnesi gerekirse yavaşlatılır/hızlandırılır, sonunda döşenmiş kare kısa bekletilir.
  */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { RunpodClient } from "@arsa/providers";
+import { HiggsfieldCli, RunpodClient } from "@arsa/providers";
 import {
   FORMAT_SPECS,
   ROOM_LABELS,
-  stagingEditPrompt,
   stagingNarration,
   stagingVideoPrompt,
   type ListingDetails,
@@ -22,6 +21,7 @@ import {
   download,
   drawText,
   ffmpeg,
+  furnishRoom,
   mixAudio,
   priceText,
   probeDuration,
@@ -45,7 +45,7 @@ const MAX_SPEED = 1.5;
 const VOICE_LEAD = 0.4;
 const VOICE_GAP = 0.25;
 const MAX_VOICE_TEMPO = 1.15;
-/** Qwen girdisi: dikey videoya kırpılmış kare; Wan aynı oranda (480x832) okur, iki kare hizalı kalır. */
+/** Döşeme girdisi/çıktısı: dikey videoya kırpılmış kare; Wan aynı oranda (480x832) okur, iki kare hizalı kalır. */
 const EDIT_W = 720;
 const EDIT_H = 1280;
 
@@ -63,10 +63,9 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
   if (!photos?.length || !style) throw new Error("Fotoğraf ya da döşeme tarzı yok");
 
   const apiKey = process.env.RUNPOD_API_KEY;
-  const qwenId = process.env.RUNPOD_QWEN_ENDPOINT_ID;
   const wanId = process.env.RUNPOD_WAN_ENDPOINT_ID;
-  if (!apiKey || !qwenId || !wanId) throw new Error("RUNPOD_QWEN_ENDPOINT_ID / RUNPOD_WAN_ENDPOINT_ID eksik");
-  const qwen = new RunpodClient(apiKey, qwenId);
+  if (!apiKey || !wanId) throw new Error("RUNPOD_WAN_ENDPOINT_ID eksik");
+  const hf = new HiggsfieldCli();
   const wan = new RunpodClient(apiKey, wanId);
   const { width: W, height: H } = FORMAT_SPECS.reels_9x16;
 
@@ -83,29 +82,30 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
   // 1) Boş oda fotoğrafları
   await ctx.stage("photos");
   // Dikey kadraj burada kırpılır (kullanıcının seçtiği yatay konumla); GPU tarafı yalnız ölçekler.
-  const empty = await Promise.all(
+  const emptyFiles = await Promise.all(
     photos.map(async (p, i) => {
       const raw = await download(await ctx.r2.url(p.key, 3600), join(ctx.workDir, `ham-${i + 1}.jpg`));
       const crop = join(ctx.workDir, `bos-${i + 1}.jpg`);
       const cw = "min(iw\\,ih*9/16)";
       const ch = "min(ih\\,iw*16/9)";
       await ffmpeg(["-i", raw, "-vf", `crop=${cw}:${ch}:(iw-${cw})*${p.focusX ?? 0.5}:(ih-${ch})/2`, "-q:v", "2", crop]);
-      return dataUrl(crop, "image/jpeg");
+      return crop;
     }),
   );
+  const empty = await Promise.all(emptyFiles.map((f) => dataUrl(f, "image/jpeg")));
 
   // 2) Döşeme: her oda paralel
   await ctx.stage("staging", 0);
   let done = 0;
   const furnished = await Promise.all(
     photos.map(async (p, i) => {
-      const out = await runpodJob(
-        qwen,
-        { image_url: empty[i], width: EDIT_W, height: EDIT_H, seed: 11 + i, prompt: stagingEditPrompt(p.room, style) },
-        `döşeme ${i + 1}`,
-        ctx.log,
-      );
-      const file = await saveOutput(out, "image", join(ctx.workDir, `dosenmis-${i + 1}.png`));
+      const file = await furnishRoom(hf, emptyFiles[i]!, p.room, style, join(ctx.workDir, `dosenmis-${i + 1}.png`), {
+        seed: 11 + i,
+        label: `döşeme ${i + 1}`,
+        log: ctx.log,
+        width: EDIT_W,
+        height: EDIT_H,
+      });
       await ctx.stage("staging", ++done / photos.length);
       return dataUrl(file, "image/png");
     }),

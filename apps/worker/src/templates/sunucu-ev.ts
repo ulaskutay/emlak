@@ -9,10 +9,9 @@
  * Maliyet (2026-10-26, plan kredisi), 10 sn'lik sahne: orta ~16,5 kredi (kare 2,5 + 360p klip 10 + büyütme 4),
  * yüksek ~36,5 (720p klip 30); 4 sahne orta ~66, yüksek ~146.
  */
-import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
-import { HiggsfieldCli, RunpodClient } from "@arsa/providers";
+import { HiggsfieldCli } from "@arsa/providers";
 import {
   FORMAT_SPECS,
   PRESENTERS,
@@ -20,7 +19,6 @@ import {
   TOUR_QUALITY,
   presenterPlacePrompt,
   presenterVideoPrompt,
-  stagingEditPrompt,
   speakable,
   tourScript,
   type ListingDetails,
@@ -37,11 +35,10 @@ import {
   download,
   drawText,
   ffmpeg,
+  furnishRoom,
   mixAudio,
   priceText,
   probeDuration,
-  runpodJob,
-  saveOutput,
   type JobContext,
   type JobResult,
 } from "./common.js";
@@ -132,21 +129,15 @@ export async function presenterTour(ctx: Pick<JobContext, "workDir" | "cacheDir"
   const lines = rooms.map((r, i) => speakable(r.text?.trim() || script[i]!));
   lines.forEach((l, i) => ctx.log(`metin ${i + 1}: ${l}`));
 
-  // 1) İsteğe bağlı döşeme (Qwen, RunPod); binanın dışı döşenmez.
+  // 1) İsteğe bağlı döşeme (Higgsfield); binanın dışı döşenmez.
   let scenes = rooms.map((r) => r.file);
   if (o.style) {
-    const apiKey = process.env.RUNPOD_API_KEY;
-    const qwenId = process.env.RUNPOD_QWEN_ENDPOINT_ID;
-    if (!apiKey || !qwenId) throw new Error("RUNPOD_QWEN_ENDPOINT_ID eksik");
-    const qwen = new RunpodClient(apiKey, qwenId);
     await ctx.stage("staging", 0);
     let done = 0;
     scenes = await Promise.all(
       rooms.map(async (r, i) => {
         if (r.room === "dis_cephe") return (await ctx.stage("staging", ++done / rooms.length), r.file);
-        const image_url = `data:image/jpeg;base64,${(await readFile(r.file)).toString("base64")}`;
-        const out = await runpodJob(qwen, { image_url, width: 720, height: 1280, seed: 11 + i, prompt: stagingEditPrompt(r.room, o.style!) }, `döşeme ${i + 1}`, ctx.log);
-        const file = await saveOutput(out, "image", join(ctx.workDir, `dosenmis-${i + 1}.png`));
+        const file = await furnishRoom(hf, r.file, r.room, o.style!, join(ctx.workDir, `dosenmis-${i + 1}.png`), { seed: 11 + i, label: `döşeme ${i + 1}`, log: ctx.log });
         await ctx.stage("staging", ++done / rooms.length);
         return file;
       }),

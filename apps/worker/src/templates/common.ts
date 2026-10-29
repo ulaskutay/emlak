@@ -6,7 +6,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Video } from "@arsa/db";
 import { MUSIC_PROMPT } from "@arsa/drone-studio/pipeline";
-import { ElevenLabsClient, type R2, type RunpodClient } from "@arsa/providers";
+import { ElevenLabsClient, type HiggsfieldCli, type R2, type RunpodClient } from "@arsa/providers";
+import { stagingEditPrompt, type RoomType, type StagingStyle } from "@arsa/shared";
 
 export interface JobContext {
   video: Video;
@@ -105,6 +106,33 @@ export async function download(url: string, path: string) {
   if (!res.ok) throw new Error(`İndirilemedi (${res.status}): ${url.split("?")[0]}`);
   await writeFile(path, Buffer.from(await res.arrayBuffer()));
   return path;
+}
+
+/** Boş odayı döşeyen model (Higgsfield). 2026-10-29 karşılaştırması: odayı Qwen'den daha birebir korur
+ * (eşyasız üst bölgede SSIM 0,89–0,92; Qwen 0,77–0,86), kare ~45 sn, 1k'de 1,5 kredi. GPU kuyruğu/soğuk açılış yok. */
+const STAGING_MODEL = "nano_banana_2_1";
+
+/**
+ * Boş oda karesini (dikey kırpılmış) döşer; çıktı girdinin boyutuna kırpılır ki Wan'ın ilk/son kareleri hizalı kalsın.
+ */
+export async function furnishRoom(
+  hf: HiggsfieldCli,
+  emptyFile: string,
+  room: RoomType,
+  style: StagingStyle,
+  out: string,
+  o: { seed: number; label: string; log: (m: string) => void; width?: number; height?: number },
+) {
+  const res = await hf.generate(
+    STAGING_MODEL,
+    { params: { prompt: stagingEditPrompt(room, style), aspect_ratio: "9:16", resolution: "1k", seed: o.seed }, media: [["image", emptyFile]] },
+    { label: o.label, log: o.log },
+  );
+  const raw = await download(res.url, `${out}.ham`);
+  const w = o.width ?? 720;
+  const h = o.height ?? 1280;
+  await ffmpeg(["-i", raw, "-vf", `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h}`, "-frames:v", "1", out]);
+  return out;
 }
 
 /** Fon müziği (ElevenLabs), süreye göre önbellekli. Anahtar yoksa ya da üretilemezse null. */
