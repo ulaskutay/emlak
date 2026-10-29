@@ -61,6 +61,9 @@ rm -rf "$WEB/$NEXT"
 # Çalışan site bunları kullanmaz.
 # .next artık aktif derlemeye bağlantı; yalnız gerçek klasörse (eski düzen) içinden silinir.
 [ -L "$WEB/.next" ] || rm -rf "$WEB/.next/types" "$WEB/.next/dev"
+# tsconfig'in **/*.ts deseni çalışan derlemenin klasörünü de kapsar: onun eski tipleri silinmiş bir rotayı arayıp
+# derlemeyi bozar (2026-10-30: /api/parcel/prepare). Tipler yalnız derlemede kullanılır, çalışan site etkilenmez.
+rm -rf "$WEB/$ACTIVE/types" "$WEB/$ACTIVE/dev/types"
 
 # İlan videosu Remotion ile render edilir: Chrome Headless Shell'in sistemde eksik kalan kütüphanesi (bir kez kurulur).
 dpkg -s libnss3 >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y -q libnss3
