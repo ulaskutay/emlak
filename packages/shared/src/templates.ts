@@ -473,19 +473,40 @@ const ROOM_LABELS_EN: Record<RoomType, string> = {
   dis_cephe: "the outside of the building and its grounds",
 };
 
+/** Geçiş klibinde eşyaların odaya nasıl girdiği: büyükten küçüğe, her biri hareketle yerine oturur. */
+const ROOM_MOTION: Record<RoomType, string> = {
+  salon:
+    "the rug rolls out across the floor, the sofa and armchairs slide in from the sides of the frame and stop on the rug, the coffee table and TV unit glide into place, cushions drop softly onto the sofa, the floor lamp and plants slide in from the corners, the chandelier lowers down from the ceiling",
+  yatak_odasi:
+    "the rug rolls out across the floor, the bed slides in from the side of the frame and stops on the rug, pillows and blanket drop softly onto the bed, the nightstands and lamps glide into place beside it, the plants slide in from the corners, the pendant light lowers down from the ceiling",
+  cocuk_odasi:
+    "the playful rug rolls out across the floor, the bed slides in from the side of the frame, colorful bedding and pillows drop softly onto it, the desk, chair and toy shelf glide into place, toys hop onto the shelf, the pendant lamp lowers down from the ceiling",
+  mutfak:
+    "the dining table slides in from the side of the frame, the chairs and bar stools glide up to the table and counter, the fruit bowl and plants drop softly into place, the pendant lights lower down from the ceiling",
+  yemek_odasi:
+    "the rug rolls out across the floor, the dining table slides in and stops on the rug, the chairs glide up around it one by one, the sideboard slides against the wall, the centerpiece drops softly onto the table, the chandelier lowers down from the ceiling",
+  calisma_odasi:
+    "the rug rolls out across the floor, the desk slides in from the side of the frame, the office chair rolls up to it, the bookshelf glides against the wall and books slide onto its shelves, the desk lamp and plants drop softly into place, the pendant lamp lowers down from the ceiling",
+  banyo: "the bath mat rolls out on the floor, folded towels slide onto the rails, toiletries and the small plant hop into place one after another",
+  balkon:
+    "the outdoor rug rolls out across the floor, the lounge chairs and small table slide in from the sides of the frame, potted plants slide in from the corners, string lights unroll along the railing",
+  dis_cephe: "outdoor seating slides into place, potted plants slide in from the sides and the landscaping grows neatly into shape",
+};
+
 /**
- * İlk/son kare (boş → döşenmiş) geçiş klibi prompt'u (Gemini Omni Flash). Model ses de üretir; ses kullanılmaz,
- * konuşma çıkmasın diye yalnız ortam sesi istenir.
+ * İlk/son kare (boş → döşenmiş) geçiş klibi prompt'u (Gemini Omni Flash). Eşyalar soluklaşarak belirmez, hareketle
+ * yerine girer (2026-10-29: "fade in" istemi akıcı bulunmadı, kayarak/yuvarlanarak giren hali beğenildi).
+ * Model ses de üretir; ses kullanılmaz, konuşma çıkmasın diye yalnız eşya ve ortam sesi istenir.
  */
 export function stagingVideoPrompt(room: RoomType) {
   return (
-    "Interior design reveal, locked-off static camera, no camera movement. " +
-    `In the empty room, furniture and decor for ${ROOM_LABELS_EN[room]} gradually fade in one piece at a time and settle in place, ceiling lights and lamps switch on softly. ` +
-    "Calm and smooth, nothing flies or falls. Windows, doors, walls, floor and ceiling stay exactly unchanged and windows stay clear. " +
-    "No people. Natural daylight, photorealistic, sharp, high detail. Audio: no speech, only quiet room ambience."
+    "Stop-motion style interior design reveal, locked-off static camera, no camera movement. " +
+    `Furniture and decor for ${ROOM_LABELS_EN[room]} move into the empty room one after another and settle into their final places with smooth, continuous motion: ${ROOM_MOTION[room]}. ` +
+    "Every object is solid and visible at all times while it moves, nothing fades, dissolves or appears out of thin air; lamps switch on softly at the end. " +
+    "Windows, doors, walls, floor and ceiling stay exactly unchanged and windows stay clear. No people, no hands. " +
+    "Natural daylight, photorealistic, sharp, high detail. Audio: no speech, only soft furniture movement sounds and quiet room ambience."
   );
 }
-
 
 /**
  * Sunucuyu sahne fotoğrafına yerleştiren talimat (Seedream 5.0 Pro; 1. referans sahne, 2. ve 3. referans sunucu).
