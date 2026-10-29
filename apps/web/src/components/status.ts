@@ -20,7 +20,7 @@ export const statusTone: Record<ReelStatus, { tone: string; dot: string }> = {
 /** Aşamaların genel ilerlemedeki payı (0..1 aralıkları). Uzun süren GPU aşamalarının payı büyük. */
 const WEIGHTS: Partial<Record<TemplateId, Record<string, [number, number]>>> = {
   "arsa-drone": { parcel: [0, 0.08], script: [0.08, 0.1], voice: [0.1, 0.2], render: [0.2, 0.9], mix: [0.9, 0.99], done: [1, 1] },
-  "ilan-videosu": { photos: [0, 0.03], clips: [0.03, 0.85], music: [0.85, 0.92], compose: [0.92, 0.99], done: [1, 1] },
+  "ilan-videosu": { photos: [0, 0.05], voice: [0.05, 0.25], render: [0.25, 0.99], done: [1, 1] },
   "bitmis-hali": { parcel: [0, 0.05], render: [0.05, 0.5], build: [0.5, 0.6], timelapse: [0.6, 0.93], compose: [0.93, 0.99], done: [1, 1] },
   "insaat-videosu": { parcel: [0, 0.02], side: [0.02, 0.12], build: [0.12, 0.3], timelapse: [0.3, 0.85], compose: [0.85, 0.93], sound: [0.93, 0.99], done: [1, 1] },
   "dosenmis-ev": { photos: [0, 0.03], staging: [0.03, 0.3], clips: [0.3, 0.93], compose: [0.93, 0.99], done: [1, 1] },

@@ -62,8 +62,12 @@ rm -rf "$WEB/$NEXT"
 # .next artık aktif derlemeye bağlantı; yalnız gerçek klasörse (eski düzen) içinden silinir.
 [ -L "$WEB/.next" ] || rm -rf "$WEB/.next/types" "$WEB/.next/dev"
 
+# İlan videosu Remotion ile render edilir: Chrome Headless Shell'in sistemde eksik kalan kütüphanesi (bir kez kurulur).
+dpkg -s libnss3 >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y -q libnss3
+
 su -s /bin/bash www -c "export PATH=/www/server/nodejs/v22.22.3/bin:/usr/bin:/bin HOME=/home/www NEXT_TELEMETRY_DISABLED=1 NEXT_DIST_DIR=$NEXT
-  cd $DIR && pnpm install --frozen-lockfile && pnpm --filter @arsa/web build && pnpm db:migrate"
+  cd $DIR && pnpm install --frozen-lockfile && pnpm --filter @arsa/web build && pnpm db:migrate &&
+  cd apps/worker && node --input-type=module -e \"import { ensureBrowser } from '@remotion/renderer'; await ensureBrowser();\""
 
 echo "NEXT_DIST_DIR=$NEXT" > "$ACTIVE_ENV" && chown www:www "$ACTIVE_ENV"
 # nginx /_next/static'i apps/web/.next/static'ten verir (2026-10-27: .next silinince CSS/JS 404, site stilsiz açıldı).

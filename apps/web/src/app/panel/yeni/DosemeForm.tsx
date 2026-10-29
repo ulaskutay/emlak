@@ -13,7 +13,10 @@ const MIN = 2;
 const MAX = 4;
 /** Sunuculu turda sahne başına ~10 sn klip: 4 sahne + kapanış ~40 sn. */
 const MAX_SUNUCU = 4;
-/** Binanın dışı yalnız sunuculu turda (döşenmez). */
+/** İlan videosunda fotoğraf başına ~3,5 sn sahne. */
+const MIN_ILAN = 3;
+const MAX_ILAN = 8;
+/** Binanın dışı sunuculu turda ve ilan videosunda (döşenmez). */
 const ROOMS = RoomType.options;
 const STAGING_ROOMS = ROOMS.filter((r) => r !== "dis_cephe");
 const words = (t: string) => t.split(/\s+/).filter(Boolean).length;
@@ -113,13 +116,16 @@ const STYLE_HINTS: Record<StagingStyle, string> = {
 };
 
 /** Boş evi döşe formu; "sunucu-ev" aynı formla sunuculu ev turunu sipariş eder (tarz isteğe bağlı, ses sunucudan). */
-export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template?: "dosenmis-ev" | "sunucu-ev"; tourCredits?: Record<TourQuality, number> }) {
+export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template?: "dosenmis-ev" | "sunucu-ev" | "ilan-videosu"; tourCredits?: Record<TourQuality, number> }) {
   const sunucu = template === "sunucu-ev";
-  const max = sunucu ? MAX_SUNUCU : MAX;
+  // İlan videosu: döşeme yok, fotoğraflar olduğu gibi kamera hareketiyle akar; binanın dışı da seçilir.
+  const ilan = template === "ilan-videosu";
+  const min = ilan ? MIN_ILAN : MIN;
+  const max = sunucu ? MAX_SUNUCU : ilan ? MAX_ILAN : MAX;
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [style, setStyle] = useState<StagingStyle | null>(sunucu ? null : "modern");
+  const [style, setStyle] = useState<StagingStyle | null>(sunucu || ilan ? null : "modern");
   const [presenter, setPresenter] = useState<PresenterId>("defne");
   const [quality, setQuality] = useState<TourQuality>("orta");
   const [nearby, setNearby] = useState<TourNearby[]>([]);
@@ -150,7 +156,9 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
   const priceTry = Number(listing.price.replace(/\D/g, "")) || undefined;
   const typed = ready.filter((p) => p.room);
   const typedRooms = typed.map((p) => p.room!);
-  const narration = stagingNarration(typedRooms.filter((r) => r !== "dis_cephe"), detailsPayload(details), priceTry);
+  const narration = ilan
+    ? stagingNarration(typedRooms, detailsPayload(details), priceTry, { tour: true })
+    : stagingNarration(typedRooms.filter((r) => r !== "dis_cephe"), detailsPayload(details), priceTry);
   // Sunuculu tur: sahne başına otomatik senaryo; kullanıcı bir sahnenin metnini değiştirdiyse o kullanılır.
   const script = sunucu ? tourScript(typedRooms, detailsPayload(details), nearby, priceTry) : [];
   const sceneText = (p: Photo) => p.text ?? script[typed.indexOf(p)] ?? "";
@@ -208,7 +216,7 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
     if (!res.ok) return setImportMsg(data.error ?? "Fotoğraflar aktarılamadı");
     setImported(data.photos);
     setAgent({ name: a.name?.slice(0, 60) ?? "", photo: data.agent?.photo, logo: data.agent?.logo });
-    setImportMsg(`İlandan ${data.photos.length} fotoğraf geldi. Kullanmak istediğiniz boş odalara tıklayın (en fazla ${max}).`);
+    setImportMsg(`İlandan ${data.photos.length} fotoğraf geldi. Kullanmak istediğiniz ${ilan ? "fotoğraflara" : "boş odalara"} tıklayın (en fazla ${max}).`);
   }
 
   // React javascript: linkini engeller; yer imi butonunun adresi elle verilir.
@@ -248,7 +256,7 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
       if (!h.startsWith("#aktar=")) localStorage.setItem("aktar-sablon", template);
     } catch {}
     if (!h.startsWith("#aktar=")) return;
-    if ((last === "sunucu-ev" || last === "dosenmis-ev") && last !== template) return window.location.replace(`/panel/yeni/${last}${h}`);
+    if ((last === "sunucu-ev" || last === "dosenmis-ev" || last === "ilan-videosu") && last !== template) return window.location.replace(`/panel/yeni/${last}${h}`);
     history.replaceState(null, "", window.location.pathname + window.location.search);
     try {
       const d = JSON.parse(decodeURIComponent(h.slice(7)));
@@ -334,8 +342,13 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="text-[1.75rem] font-extrabold leading-tight tracking-[-0.03em] sm:text-[2rem]">{sunucu ? "Sunuculu ev turu" : "Boş evi döşe"}</h1>
-        {sunucu ? (
+        <h1 className="text-[1.75rem] font-extrabold leading-tight tracking-[-0.03em] sm:text-[2rem]">{sunucu ? "Sunuculu ev turu" : ilan ? "Fotoğraftan ilan videosu" : "Boş evi döşe"}</h1>
+        {ilan ? (
+          <p className="mt-2 text-gri">
+            İlanın fotoğraflarını seçin ({min}–{max}). Sıralama videodaki sırayı belirler; her fotoğraf yavaş bir kamera hareketiyle akar, üzerine oda başlığı yazılır.
+            İlan bilgilerinden Türkçe seslendirme kurulur, sonda fiyat ve emlakçı kartı gelir.
+          </p>
+        ) : sunucu ? (
           <p className="mt-2 text-gri">
             İlandaki odaların fotoğraflarını yükleyin ({MIN}–{max} oda). Seçtiğiniz sanal sunucu her odada durup odayı kameraya Türkçe anlatır.
             Boş odaları isterseniz önce döşeriz. Sunucu ve döşeme temsilidir; videoda bu yazılır.
@@ -419,9 +432,11 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
         }}
       >
         <input ref={input} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files && (add(e.target.files), (e.target.value = ""))} />
-        <div className="font-semibold">Oda fotoğraflarını sürükleyin ya da seçin</div>
+        <div className="font-semibold">{ilan ? "Fotoğrafları" : "Oda fotoğraflarını"} sürükleyin ya da seçin</div>
         <div className="mt-1 text-sm text-gri">
-          {photos.length}/{max} fotoğraf · video {sunucu ? "sahne başına ~10 saniye, 4 sahneyle ~40 saniye · odalar ve binanın dışı" : "21 saniye · yalnız iç mekân"}; odayı geniş açıdan gören fotoğraflar en iyi sonucu verir
+          {photos.length}/{max} fotoğraf · video{" "}
+          {ilan ? "fotoğraf başına ~3,5 saniye · odalar ve binanın dışı; yatay fotoğraflarda kamera yana kayar" : sunucu ? "sahne başına ~10 saniye, 4 sahneyle ~40 saniye · odalar ve binanın dışı" : "21 saniye · yalnız iç mekân"}
+          {!ilan && "; odayı geniş açıdan gören fotoğraflar en iyi sonucu verir"}
         </div>
       </div>
 
@@ -442,7 +457,7 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
               <div className="min-w-0 flex-1 space-y-2">
                 <div className="flex items-center justify-between gap-2 text-xs text-gri">
                   <span>
-                    {i + 1}. oda · {p.error ? <span className="text-mercan-koyu">{p.error}</span> : p.key ? "yüklendi" : "yükleniyor…"}
+                    {i + 1}. {ilan ? "sahne" : "oda"} · {p.error ? <span className="text-mercan-koyu">{p.error}</span> : p.key ? "yüklendi" : "yükleniyor…"}
                   </span>
                   <span className="flex gap-1">
                     <button type="button" className="grid h-9 w-9 place-items-center rounded-lg text-base hover:bg-zemin hover:text-lacivert disabled:opacity-30" disabled={i === 0} onClick={() => move(p.id, -1)} aria-label="Öne al">↑</button>
@@ -452,7 +467,7 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
                 </div>
                 <select className={`pnl-input py-2 ${p.room ? "" : "border-gok/60"}`} value={p.room ?? ""} aria-label={`${i + 1}. oda tipi`} onChange={(e) => update(p.id, { room: e.target.value as RoomType })}>
                   <option value="" disabled>Oda tipini seçin</option>
-                  {(sunucu ? ROOMS : STAGING_ROOMS).map((r) => (
+                  {(sunucu || ilan ? ROOMS : STAGING_ROOMS).map((r) => (
                     <option key={r} value={r}>{ROOM_LABELS[r]}</option>
                   ))}
                 </select>
@@ -478,6 +493,7 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
         </ol>
       )}
 
+      {!ilan && (
       <fieldset className="pnl-kart p-5 sm:p-6">
         <legend className="sr-only">Döşeme tarzı</legend>
         <div className="mb-4 font-semibold">{sunucu ? "Odalar döşensin mi?" : "Hangi tarzda döşensin?"}</div>
@@ -500,6 +516,7 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
           ))}
         </div>
       </fieldset>
+      )}
 
       <div className="pnl-kart space-y-4 p-5 sm:p-6">
         <div>
@@ -625,7 +642,7 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
           </div>
         )}
       </div>
-      {voice && <VoiceStep hook={narration.rooms[0] ?? "Bu evi bir de eşyalı hayal edin."} voiceId={voiceId} onSelect={setVoiceId} />}
+      {voice && <VoiceStep hook={narration.rooms[0] ?? (ilan ? "Bu güzel evi birlikte gezelim." : "Bu evi bir de eşyalı hayal edin.")} voiceId={voiceId} onSelect={setVoiceId} />}
       </>
       )}
 
@@ -671,14 +688,14 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
 
       {error && <p className="rounded-lg bg-mercan-acik px-3 py-2 text-sm text-mercan-koyu">{error}</p>}
       <div className="flex items-center justify-end gap-4">
-        {ready.length < MIN ? (
-          <span className="text-sm text-gri">En az {MIN} fotoğraf gerekli</span>
+        {ready.length < min ? (
+          <span className="text-sm text-gri">En az {min} fotoğraf gerekli</span>
         ) : (
           (untyped > 0 && <span className="text-sm text-gri">{untyped} fotoğrafın oda tipini seçin</span>) ||
           (tooLong > 0 && <span className="text-sm text-gri">{tooLong} sahnenin metni çok uzun</span>) ||
           (longHighlights > 0 && <span className="text-sm text-gri">Öne çıkanlarda uzun satır var</span>)
         )}
-        <button className="pnl-btn-primary" disabled={busy || uploading || ready.length < MIN || untyped > 0 || tooLong > 0 || longHighlights > 0} onClick={submit}>
+        <button className="pnl-btn-primary" disabled={busy || uploading || ready.length < min || untyped > 0 || tooLong > 0 || longHighlights > 0} onClick={submit}>
           {busy ? "Gönderiliyor…" : uploading ? "Fotoğraflar yükleniyor…" : "Videoyu oluştur"}
         </button>
       </div>

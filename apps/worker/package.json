@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "tsx --env-file-if-exists=../../.env src/index.ts",
     "start": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p remotion/tsconfig.json",
     "sunucu-dene": "tsx --env-file-if-exists=../../.env scripts/sunucu-dene.ts",
-    "sunucu-portre": "tsx --env-file-if-exists=../../.env scripts/sunucu-portre.ts"
+    "sunucu-portre": "tsx --env-file-if-exists=../../.env scripts/sunucu-portre.ts",
+    "ilan-dene": "tsx --env-file-if-exists=../../.env scripts/ilan-dene.ts"
   },
   "dependencies": {
     "@arsa/db": "workspace:*",
@@ -16,13 +17,20 @@
     "@arsa/geo": "workspace:*",
     "@arsa/providers": "workspace:*",
     "@arsa/shared": "workspace:*",
+    "@remotion/bundler": "4.0.539",
+    "@remotion/renderer": "4.0.539",
     "bullmq": "^6.3.15",
     "ioredis": "^5.11.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.539",
     "sharp": "^0.34.5",
     "tsx": "^4.23.15"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "typescript": "^5.9.3"
   }
 }

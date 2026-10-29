@@ -51,20 +51,19 @@ export const TEMPLATES: Record<TemplateId, TemplateInfo> = {
   "ilan-videosu": {
     id: "ilan-videosu",
     name: "Fotoğraftan ilan videosu",
-    tagline: "İlan fotoğrafları sinematik kamera hareketiyle canlanır",
+    tagline: "İlan fotoğrafları seslendirme ve müzikle sinematik videoya dönüşür",
     description:
-      "Her fotoğraf yapay zekâyla birkaç saniyelik bir kamera hareketine dönüşür: dış cephede yükselen drone, salonda yavaş yaklaşma. Üzerine başlıklar, sonunda fiyat ve telefon kartı.",
+      "Her fotoğraf yavaş bir kamera hareketiyle akar, sahneler geçiş efektleriyle bağlanır. İlan bilgilerinden kurulan Türkçe seslendirme, oda başlıkları, fon müziği ve sonda fiyat ile emlakçı kartı. sahibinden.com ilanından tek seferde aktarılır.",
     category: "Konut",
-    needs: ["3–8 ilan fotoğrafı", "Her fotoğraf için kısa başlık (isteğe bağlı)", "Fiyat ve ofis telefonu (isteğe bağlı)"],
-    includes: ["Fotoğraf başına sinematik kamera hareketi", "Sahne başlıkları", "Fiyat ve iletişim kartı", "Müzik"],
-    duration: "15–30 sn",
+    needs: ["3–8 ilan fotoğrafı ve oda tipleri (sahibinden.com ilanından aktarılır)", "İlan bilgileri: tip, konum, oda sayısı, m² (seslendirme için)", "Fiyat ve ofis telefonu (isteğe bağlı)"],
+    includes: ["Fotoğraf başına sinematik kamera hareketi", "Geçiş efektleri", "Türkçe seslendirme", "Oda başlıkları", "Fiyat ve emlakçı kartı", "Müzik"],
+    duration: "20–40 sn",
     preview: { video: "/media/sablon-ilan.mp4", poster: "/media/sablon-ilan-poster.jpg" },
     badge: "Yeni",
     stages: [
       { id: "photos", label: "Fotoğraflar" },
-      { id: "clips", label: "Sahneler" },
-      { id: "music", label: "Müzik" },
-      { id: "compose", label: "Kurgu" },
+      { id: "voice", label: "Seslendirme" },
+      { id: "render", label: "Kurgu" },
       { id: "done", label: "Hazır" },
     ],
   },
@@ -186,6 +185,7 @@ export const SOON_TEMPLATES: SoonTemplate[] = [
 
 export const ArsaDroneOrder = ReelOrder.extend({ template: z.literal("arsa-drone") });
 
+/** Eski ilan siparişlerinin fotoğrafı (oda tipi yerine dış/iç mekân); yenileri RoomPhoto. */
 export const IlanPhoto = z.object({
   /** R2 anahtarı: kullanıcının yüklediği fotoğraf (uploads/<userId>/...). */
   key: z.string().regex(/^uploads\/[\w-]+\/[\w-]+\.jpg$/, "Geçersiz fotoğraf"),
@@ -193,14 +193,6 @@ export const IlanPhoto = z.object({
   title: z.string().trim().max(40).optional(),
 });
 export type IlanPhoto = z.infer<typeof IlanPhoto>;
-
-export const IlanOrder = z.object({
-  template: z.literal("ilan-videosu"),
-  photos: z.array(IlanPhoto).min(3, "En az 3 fotoğraf seçin").max(8, "En fazla 8 fotoğraf"),
-  listing: ReelListing.pick({ priceTry: true, officeName: true, phone: true }).default({}),
-  music: z.boolean().default(true),
-});
-export type IlanOrder = z.infer<typeof IlanOrder>;
 
 export const BuildingType = z.enum(["konut", "villa", "villa_sitesi", "ticari"]);
 export type BuildingType = z.infer<typeof BuildingType>;
@@ -310,6 +302,13 @@ export const DosemeOrder = z.object({
 });
 export type DosemeOrder = z.infer<typeof DosemeOrder>;
 
+/** Fotoğraftan ilan videosu: döşeme formunun alanları (tarz yok); her fotoğrafın oda tipi anlatımı ve başlığı belirler. */
+export const IlanOrder = DosemeOrder.omit({ template: true, photos: true, style: true }).extend({
+  template: z.literal("ilan-videosu"),
+  photos: z.array(RoomPhoto).min(3, "En az 3 fotoğraf seçin").max(8, "En fazla 8 fotoğraf"),
+});
+export type IlanOrder = z.infer<typeof IlanOrder>;
+
 /** Sunuculu ev turu: döşeme formunun alanları; tarz yoksa odalar olduğu gibi kalır. Ses video modelinden gelir (voiceId yok). */
 /** Sunuculu turun sahnesi: fotoğraf + sunucunun söyleyeceği metin (panelde düzenlenir; boşsa tourScript). */
 export const TourScene = RoomPhoto.extend({
@@ -379,6 +378,7 @@ export type TemplateOrder = z.infer<typeof TemplateOrder>;
 /** Şablona özgü, satırda saklanan girdi (parsel ve ilan bilgisi ayrı sütunlarda). */
 export type TemplateInput =
   | { photos: IlanPhoto[] }
+  | { photos: RoomPhoto[]; details?: ListingDetails; agent?: DosemeOrder["agent"]; voice?: boolean }
   | { photos: RoomPhoto[]; style: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; voice?: boolean }
   | { photos: TourScene[]; style?: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; presenter?: PresenterId; quality?: TourQuality }
   | { building: BuildingType; floors: number }

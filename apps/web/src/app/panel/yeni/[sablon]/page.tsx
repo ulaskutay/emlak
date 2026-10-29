@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BitmisForm } from "../BitmisForm";
 import { DosemeForm } from "../DosemeForm";
-import { IlanForm } from "../IlanForm";
 import { InsaatForm } from "../InsaatForm";
 import { getPricing } from "@/lib/credits";
 import { Wizard } from "../Wizard";
@@ -25,7 +24,7 @@ export default async function Page({ params }: { params: Promise<{ sablon: strin
         </Link>
       </div>
       {id.data === "arsa-drone" && <Wizard />}
-      {id.data === "ilan-videosu" && <IlanForm />}
+      {id.data === "ilan-videosu" && <DosemeForm template="ilan-videosu" />}
       {id.data === "bitmis-hali" && <BitmisForm template={id.data} />}
       {id.data === "insaat-videosu" && <InsaatForm />}
       {id.data === "dosenmis-ev" && <DosemeForm />}

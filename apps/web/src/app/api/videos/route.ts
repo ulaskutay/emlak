@@ -44,9 +44,10 @@ export async function POST(req: Request) {
   const base = { id, userId: user.id, template: order.template, listing: order.listing, music: order.music, credits };
 
   if (order.template === "ilan-videosu") {
-    // Fotoğraflar yalnızca kullanıcının kendi yüklemeleri olabilir.
-    if (order.photos.some((p) => !p.key.startsWith(`uploads/${user.id}/`))) return badRequest("Geçersiz fotoğraf");
-    await getDb().insert(videos).values({ ...base, input: { photos: order.photos } });
+    // Fotoğraflar ve emlakçı görselleri yalnızca kullanıcının kendi yüklemeleri olabilir.
+    const own = (k?: string) => !k || k.startsWith(`uploads/${user.id}/`);
+    if (order.photos.some((p) => !own(p.key)) || !own(order.agent.photoKey) || !own(order.agent.logoKey)) return badRequest("Geçersiz fotoğraf");
+    await getDb().insert(videos).values({ ...base, input: { photos: order.photos, details: order.details, agent: order.agent, voice: order.voice }, voiceId: order.voiceId ?? null });
   } else if (order.template === "dosenmis-ev") {
     const own = (k?: string) => !k || k.startsWith(`uploads/${user.id}/`);
     if (order.photos.some((p) => !own(p.key)) || !own(order.agent.photoKey) || !own(order.agent.logoKey)) return badRequest("Geçersiz fotoğraf");

@@ -1,114 +1,170 @@
 /**
- * Fotoğraftan ilan videosu: her fotoğraf Higgsfield'da (Gemini Omni Flash, 1080p 60 FPS büyütmeyle) kamera hareketli
- * bir sahneye dönüşür, sahneler paralel üretilir, başlıklar ve kapanış kartıyla birleştirilip müzik eklenir.
+ * Fotoğraftan ilan videosu (yapay zekâ videosu yok, sunucuda Remotion): her fotoğraf yavaş kamera hareketiyle akar,
+ * sahneler geçiş efektleriyle bağlanır; ilk sahnede ilanın kimliği, sonrakilerde oda başlığı, sonda fiyat ve emlakçı kartı.
+ * Ses: ilan bilgisinden kurulan Türkçe seslendirme (ElevenLabs), anlatımda kısılan müzik ve geçişlerde whoosh.
+ *
+ * Sahne süresi anlatıma uyar: cümle uzunsa sahne uzar (anlatım hızlandırılmaz, kesilmez).
  */
+import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { HiggsfieldCli } from "@arsa/providers";
-import { buildRealEstatePrompt, FORMAT_SPECS, type AiScene, type CameraMove, type IlanPhoto } from "@arsa/shared";
-import { addMusic, backgroundMusic, CLIP_FPS, download, drawText, ffmpeg, geminiClip, priceText, type JobContext, type JobResult } from "./common.js";
+import { ElevenLabsClient } from "@arsa/providers";
+import { ROOM_LABELS, stagingNarration, type DosemeOrder, type IlanPhoto, type ListingDetails, type RoomPhoto, type RoomType } from "@arsa/shared";
+import sharp from "sharp";
+import type { IlanVideoProps, Move, Transition } from "../../remotion/types.js";
+import { backgroundMusic, download, priceText, speakLines, type JobContext, type JobResult } from "./common.js";
+import { renderComposition } from "./remotion.js";
 
-const FORMAT = "reels_9x16" as const;
-/** Gemini 5 sn üretir; sahnenin en akıcı ilk 4 sn'si kullanılır. */
-const CLIP_SECONDS = 5;
-const SCENE_SECONDS = 4;
-const OUTRO_SECONDS = 3;
-const OUT_FPS = CLIP_FPS;
+const FPS = 30;
+/** Geçiş süresi (kare). */
+const T = 12;
+const SCENE_SECONDS = 3.4;
+/** İlk sahnede ilanın kimliği okunacak kadar. */
+const FIRST_SECONDS = 4;
+const OUTRO_SECONDS = 3.8;
+/** Anlatım sahne tam göründükten sonra başlar, bitince sahne biraz daha kalır. */
+const VOICE_LEAD = 0.15;
+const VOICE_TAIL = 0.45;
+const OUTRO_TAIL = 1.2;
 
-/** Fotoğraf sırasına göre kamera: dış mekânda havadan/yörünge, iç mekânda yaklaşma/kaydırma. */
-const EXTERIOR: CameraMove[] = ["drone_rise", "orbit_right", "slow_pull_out", "orbit_left"];
-const INTERIOR: CameraMove[] = ["slow_push_in", "pan_right", "slow_push_in", "pan_left"];
+const TRANSITIONS: Transition[] = ["slide", "zoom", "rise", "iris"];
+const WHOOSH_PROMPT = "Short soft cinematic whoosh transition, airy swoosh, clean, no music";
 
-/** Fotoğrafa özel tarif yerine sabit sahne tarifi; mimariyi sabit tutan kısım buildRealEstatePrompt'ta. */
-const SCENE_PROMPT = {
-  exterior: "A real estate property photographed outdoors in bright natural daylight, clear sky, crisp detail.",
-  interior: "A bright, clean real estate interior with natural daylight and a calm, airy atmosphere.",
-};
+const VIDEO_LABELS: Partial<Record<RoomType, string>> = { dis_cephe: "Dış cephe" };
+
+/** Eski siparişler oda tipi yerine dış/iç mekân taşır: dış cephe tanınır, iç mekânın tipi bilinmez (anlatım kapalı). */
+type Photo = Omit<RoomPhoto, "room"> & { room?: RoomType };
+const normalize = (p: RoomPhoto | IlanPhoto): Photo =>
+  "room" in p ? p : { key: p.key, title: p.title, focusX: 0.5, room: p.setting === "exterior" ? "dis_cephe" : undefined };
+
+/** Fotoğraf sırasına göre hareket: yaklaş, sağa kaydır, uzaklaş, sola kaydır; dar fotoğrafta kaydırma yerine yaklaş/uzaklaş. */
+function moveFor(i: number, w: number, h: number): Move {
+  const wide = w / h / (9 / 16) > 1.5;
+  const m = (["push", "panRight", "pull", "panLeft"] as const)[i % 4]!;
+  if (wide || m === "push" || m === "pull") return m;
+  return m === "panRight" ? "pull" : "push";
+}
+
+async function whoosh(ctx: JobContext): Promise<string | null> {
+  const key = process.env.ELEVENLABS_API_KEY;
+  if (!key) return null;
+  const file = join(ctx.cacheDir, `whoosh-${createHash("sha1").update(WHOOSH_PROMPT).digest("hex").slice(0, 12)}.mp3`);
+  if (existsSync(file)) return file;
+  try {
+    await writeFile(file, await new ElevenLabsClient({ apiKey: key }).soundEffect(WHOOSH_PROMPT, 1));
+    return file;
+  } catch (e) {
+    ctx.log(`! geçiş efekti üretilemedi: ${String(e).slice(0, 160)}`);
+    return null;
+  }
+}
 
 export async function ilanVideosu(ctx: JobContext): Promise<JobResult> {
   const v = ctx.video;
-  const photos = (v.input as { photos?: IlanPhoto[] }).photos;
-  if (!photos?.length) throw new Error("Fotoğraf yok");
+  const input = v.input as { photos?: (RoomPhoto | IlanPhoto)[]; details?: ListingDetails; agent?: DosemeOrder["agent"]; voice?: boolean };
+  const photos = (input.photos ?? []).map(normalize);
+  if (!photos.length) throw new Error("Fotoğraf yok");
+  const details: Partial<ListingDetails> = input.details ?? {};
+  const agent = input.agent ?? {};
 
-  const hf = new HiggsfieldCli();
-
-  // 1) Fotoğraflar dikey kadraja (ortadan) kırpılır; model kareyi olduğu gibi canlandırır.
+  // 1) Fotoğraflar: döndürme düzeltilir, render'ı yormasın diye kadrajın gerektirdiğinden büyüğü küçültülür.
   await ctx.stage("photos");
-  const frames = await Promise.all(
-    photos.map(async (p, i) => {
-      const raw = await download(await ctx.r2.url(p.key, 3600), join(ctx.workDir, `ham-${i + 1}.jpg`));
-      const out = join(ctx.workDir, `kare-${i + 1}.jpg`);
-      await ffmpeg(["-i", raw, "-vf", "crop=min(iw\\,ih*9/16):min(ih\\,iw*16/9),scale=720:1280", "-q:v", "2", out]);
-      return out;
-    }),
-  );
-
-  // 2) Sahneler paralel
-  await ctx.stage("clips", 0);
-  let done = 0;
-  let ext = 0;
-  let int = 0;
-  const clips = await Promise.all(
-    photos.map(async (p, i) => {
-      const camera = p.setting === "interior" ? INTERIOR[int++ % INTERIOR.length]! : EXTERIOR[ext++ % EXTERIOR.length]!;
-      const scene: AiScene = {
-        id: `sahne-${i + 1}`,
-        type: "ai_photo_motion",
-        durationSec: SCENE_SECONDS,
-        photoUrl: "",
-        camera,
-        setting: p.setting,
-        prompt: SCENE_PROMPT[p.setting],
-      };
-      const file = await geminiClip(hf, {
-        prompt: `${buildRealEstatePrompt(scene).prompt} No people. Audio: no speech, only quiet ambience.`,
-        start: frames[i]!,
-        seconds: CLIP_SECONDS,
-        out: join(ctx.workDir, `sahne-${i + 1}.mp4`),
-        label: `sahne ${i + 1}`,
-        log: ctx.log,
-      });
-      await ctx.stage("clips", ++done / photos.length);
-      return file;
-    }),
-  );
-
-  // 3) Müzik (sahneler beklenirken değil, süre kesinleştikten sonra)
-  const outro = [priceText(v.listing.priceTry), v.listing.officeName, v.listing.phone].filter(Boolean) as string[];
-  const duration = clips.length * SCENE_SECONDS + (outro.length ? OUTRO_SECONDS : 0);
-  await ctx.stage("music");
-  const music = v.music ? await backgroundMusic(duration, ctx) : null;
-
-  // 4) Kurgu: ölçekle, başlık yaz, kapanış kartı, uç uca ekle
-  await ctx.stage("compose");
-  const { width: W, height: H } = FORMAT_SPECS[FORMAT];
-  const titleSize = Math.round(W * 0.075);
-  const subSize = Math.round(W * 0.045);
-  const filters = clips.map((_, i) => {
-    const title = photos[i]!.title;
-    return (
-      `[${i}:v]trim=duration=${SCENE_SECONDS},setpts=PTS-STARTPTS,scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=${OUT_FPS},format=yuv420p` +
-      (title ? `,${drawText(title, titleSize, "h*0.72", "white", 0.15)}` : "") +
-      `[v${i}]`
-    );
-  });
-  let count = clips.length;
-  if (outro.length) {
-    const lineH = Math.round(titleSize * 1.5);
-    const top = Math.round(H / 2 - (outro.length * lineH) / 2);
-    filters.push(
-      `color=c=0x121a16:s=${W}x${H}:r=${OUT_FPS}:d=${OUTRO_SECONDS},format=yuv420p,` +
-        outro.map((l, j) => drawText(l, j === 0 ? titleSize : subSize, String(top + j * lineH), j === 0 ? "0xFFC24D" : "white", j * 0.2)).join(",") +
-        `[v${count}]`,
-    );
-    count += 1;
-  }
-  filters.push(`${Array.from({ length: count }, (_, i) => `[v${i}]`).join("")}concat=n=${count}:v=1:a=0[out]`);
-  const silent = join(ctx.workDir, "ilan-sessiz.mp4");
-  await ffmpeg([
-    ...clips.flatMap((c) => ["-i", c]),
-    "-filter_complex", filters.join(";"),
-    "-map", "[out]", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-movflags", "+faststart", silent,
+  const fetchAsset = (key: string | undefined, name: string) =>
+    key ? ctx.r2.url(key, 600).then((u) => download(u, join(ctx.workDir, name))).catch(() => undefined) : Promise.resolve(undefined);
+  const [frames, photo, logo] = await Promise.all([
+    Promise.all(
+      photos.map(async (p, i) => {
+        const raw = await download(await ctx.r2.url(p.key, 3600), join(ctx.workDir, `ham-${i + 1}.jpg`));
+        const file = join(ctx.workDir, `kare-${i + 1}.jpg`);
+        const info = await sharp(raw).rotate().resize({ width: 4200, height: 2400, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toFile(file);
+        return { file, width: info.width, height: info.height };
+      }),
+    ),
+    fetchAsset(agent.photoKey, "emlakci.jpg"),
+    fetchAsset(agent.logoKey, "logo.png"),
   ]);
-  const final = await addMusic(silent, music, duration, join(ctx.workDir, "ilan.mp4"));
-  return { videoPath: final, durationSec: duration, posterAt: 1.2, stats: { scenes: clips.length, model: "gemini_omni_flash_1_1" } };
+
+  // 2) Seslendirme: ilk sahne ilanın kimliği, sonrakiler öne çıkanlar ve oda cümleleri, kapanışta fiyat ve çağrı.
+  await ctx.stage("voice");
+  const typed = photos.every((p) => p.room);
+  const narration = typed ? stagingNarration(photos.map((p) => p.room!), details, v.listing.priceTry, { tour: true }) : null;
+  const lines = narration ? [...narration.rooms, narration.outro] : [];
+  const [voices, sfx] = await Promise.all([
+    input.voice === true && lines.length
+      ? speakLines(lines, v.voiceId, ctx).catch((e) => (ctx.log(`! seslendirme üretilemedi: ${String(e).slice(0, 160)}`), null))
+      : null,
+    whoosh(ctx),
+  ]);
+
+  // 3) Zaman çizelgesi (kare): sahne anlatımına göre uzar.
+  const sec = (s: number) => Math.round(s * FPS);
+  const n = photos.length;
+  let at = 0;
+  const scenes = photos.map((p, i) => {
+    const voice = voices?.[i]?.duration ?? 0;
+    const frames = sec(Math.max(i === 0 ? FIRST_SECONDS : SCENE_SECONDS, voice ? VOICE_LEAD + voice + VOICE_TAIL : 0));
+    const s = { from: at, frames };
+    at += frames;
+    return s;
+  });
+  const outroVoice = voices?.[n]?.duration ?? 0;
+  const outro = { from: at, frames: sec(Math.max(OUTRO_SECONDS, outroVoice ? VOICE_LEAD + outroVoice + OUTRO_TAIL : 0)) };
+  const total = outro.from + outro.frames;
+  const music = v.music ? await backgroundMusic(total / FPS, ctx) : null;
+
+  // 4) Render
+  await ctx.stage("render", 0);
+  const rent = /kiralık/i.test(details.kind ?? "");
+  const facts = [details.rooms, details.netM2 && `${details.netM2} m²`].filter(Boolean) as string[];
+  const out = join(ctx.workDir, "ilan.mp4");
+  await renderComposition(
+    "IlanVideo",
+    [ctx.workDir, ctx.cacheDir],
+    (url, fontBase): IlanVideoProps => ({
+      fps: FPS,
+      durationInFrames: total,
+      transition: T,
+      fontBase,
+      scenes: photos.map((p, i) => ({
+        src: url(frames[i]!.file),
+        width: frames[i]!.width,
+        height: frames[i]!.height,
+        focusX: p.focusX,
+        title: p.title?.trim() || (p.room ? (VIDEO_LABELS[p.room] ?? ROOM_LABELS[p.room]) : undefined),
+        move: moveFor(i, frames[i]!.width, frames[i]!.height),
+        transition: TRANSITIONS[(i - 1 + TRANSITIONS.length) % TRANSITIONS.length]!,
+        ...scenes[i]!,
+      })),
+      intro: details.kind || details.location ? { kind: details.kind, location: details.location, facts } : undefined,
+      outro: {
+        ...outro,
+        transition: "zoom",
+        background: url(frames[n - 1]!.file),
+        price: priceText(v.listing.priceTry),
+        priceLabel: rent ? "Aylık kira" : "Fiyat",
+        name: agent.name,
+        office: v.listing.officeName,
+        phone: v.listing.phone,
+        photo: photo && url(photo),
+        logo: logo && url(logo),
+      },
+      audio: {
+        music: music ? url(music) : undefined,
+        voice: voices
+          ? voices.map((vc, k) => ({ src: url(vc.file), from: (k < n ? scenes[k]!.from : outro.from) + sec(VOICE_LEAD), frames: sec(vc.duration) }))
+          : [],
+        whoosh: sfx ? url(sfx) : undefined,
+        whooshAt: [...scenes.slice(1).map((s) => s.from - T / 2), outro.from - T / 2],
+      },
+    }),
+    out,
+    { log: ctx.log, onProgress: (p) => void ctx.stage("render", p) },
+  );
+  return {
+    videoPath: out,
+    durationSec: total / FPS,
+    posterAt: 1.5,
+    stats: { scenes: n, renderer: "remotion", narration: lines, voiced: !!voices, music: !!music },
+  };
 }

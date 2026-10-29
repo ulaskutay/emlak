@@ -155,18 +155,23 @@ const words = (t: string) => t.split(/\s+/).filter(Boolean).length;
  * özelliğin ardına odanın cümlesi de eklenir.
  * Kapanış: fiyat ve çağrı.
  */
-export function stagingNarration(rooms: (keyof typeof ROOM_LINES)[], d: Partial<ListingDetails> = {}, priceTry?: number) {
+export function stagingNarration(rooms: (keyof typeof ROOM_LINES)[], d: Partial<ListingDetails> = {}, priceTry?: number, o: { tour?: boolean } = {}) {
   // "Satılık Villa" → "satılık, dört artı bir, iki yüz yirmi metrekare villa"
   const [deal, ...noun] = (d.kind ?? "").toLocaleLowerCase("tr").split(/\s+/).filter(Boolean);
   const isDeal = deal === "satılık" || deal === "kiralık";
   const attrs = [isDeal && deal, d.rooms && spokenRooms(d.rooms), d.netM2 && `${numberWords(d.netM2)} metrekare`].filter(Boolean).join(", ");
   const name = (isDeal ? noun.join(" ") : [deal, ...noun].join(" ")) || "daire";
   const where = d.location ? `${locative(d.location)} ` : "";
-  const opener = d.location || d.rooms || d.netM2 ? `${where}${attrs} ${name}. Eşyalı halini görün!` : "Bu evi bir de eşyalı hayal edin.";
+  // Döşemede eşyalı hal, ilan videosunda (tour) ev gezisi vaat edilir.
+  const opener =
+    d.location || d.rooms || d.netM2
+      ? `${where}${attrs} ${name}. ${o.tour ? "Gelin birlikte gezelim!" : "Eşyalı halini görün!"}`
+      : o.tour ? "Bu güzel evi birlikte gezelim." : "Bu evi bir de eşyalı hayal edin.";
   const price = priceTry ? `${deal === "kiralık" ? "Aylık kirası" : "Fiyatı"} ${spokenPrice(priceTry)} lira.` : "";
   const outro = price ? `${price} Hemen arayın!` : "Detaylar için hemen arayın!";
 
-  let left = NARRATION_WORDS - words(opener) - words(outro);
+  // İlan videosunda fotoğraf sayısı 8'e çıkar: bütçe sahne başına ~8 kelime (her sahne ~3,5 sn).
+  let left = (o.tour ? Math.max(NARRATION_WORDS, rooms.length * 8) : NARRATION_WORDS) - words(opener) - words(outro);
   const highlights = [...(d.highlights ?? [])];
   const take = (t: string) => (words(t) <= left ? ((left -= words(t)), t) : "");
   // Odanın cümlesi: tipin ilk cümlesi, o kullanıldıysa yedekleri (aynı cümle iki kez söylenmez).
