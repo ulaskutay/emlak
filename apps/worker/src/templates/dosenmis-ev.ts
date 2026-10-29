@@ -1,12 +1,11 @@
 /**
- * Boş evi döşe: her oda fotoğrafı Higgsfield (Nano Banana 2.1) ile döşenir, Wan 2.2 ilk/son kare (boş → döşenmiş)
- * eşyaların yerleştiği sahneyi üretir; sahneler oda başlıkları ve emlakçı kartıyla birleşir, ilan bilgisinden
+ * Boş evi döşe: her oda fotoğrafı Higgsfield (Nano Banana 2.1) ile döşenir, Gemini Omni Flash ilk/son kare
+ * (boş → döşenmiş) eşyaların yerleştiği sahneyi üretir, ByteDance büyütücü 1080p'ye çıkarır; sahneler oda başlıkları ve emlakçı kartıyla birleşir, ilan bilgisinden
  * kurulan Türkçe anlatım ve müzik eklenir. Video oda sayısından bağımsız TOTAL_SECONDS sürer: odalar süreyi
  * eşit paylaşır, geçiş sahnesi gerekirse yavaşlatılır/hızlandırılır, sonunda döşenmiş kare kısa bekletilir.
  */
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { HiggsfieldCli, RunpodClient } from "@arsa/providers";
+import { HiggsfieldCli } from "@arsa/providers";
 import {
   FORMAT_SPECS,
   ROOM_LABELS,
@@ -25,8 +24,6 @@ import {
   mixAudio,
   priceText,
   probeDuration,
-  runpodJob,
-  saveOutput,
   speakLines,
   type JobContext,
   type JobResult,
@@ -38,18 +35,20 @@ const TOTAL_SECONDS = 21;
 const OUTRO_SECONDS = 3.5;
 /** Döşenmiş son kare her sahnenin sonunda bu kadar bekletilir (izleyici sonucu görsün). */
 const HOLD_SECONDS = 0.7;
-/** Geçiş sahnesinin hız sınırları (Wan klibi ~5 sn; 2 odada yavaşlar, 4 odada hızlanır). */
+/** Geçiş sahnesinin hız sınırları (klip ~5 sn; 2 odada yavaşlar, 4 odada hızlanır). */
 const MIN_SPEED = 0.6;
 const MAX_SPEED = 1.5;
 /** Anlatım: ilk cümle bu saniyede başlar, cümleler arası boşluk; sığmazsa ses en fazla bu kadar hızlandırılır. */
 const VOICE_LEAD = 0.4;
 const VOICE_GAP = 0.25;
 const MAX_VOICE_TEMPO = 1.15;
-/** Döşeme girdisi/çıktısı: dikey videoya kırpılmış kare; Wan aynı oranda (480x832) okur, iki kare hizalı kalır. */
+/** Boş ve döşenmiş kare aynı boyutta: geçiş klibinin ilk/son kareleri hizalı kalır. */
 const EDIT_W = 720;
 const EDIT_H = 1280;
-
-const dataUrl = async (path: string, mime: string) => `data:${mime};base64,${(await readFile(path)).toString("base64")}`;
+/** Geçiş klibi: Gemini 360p (720p'nin üçte biri fiyatına, içerik aynı; 2026-10-29), büyütücü 1080p'ye çıkarır. */
+const CLIP_MODEL = "gemini_omni_flash_1_1";
+const CLIP_SECONDS = 5;
+const UPSCALE_MODEL = "bytedance_video_upscale";
 
 export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
   const v = ctx.video;
@@ -62,11 +61,7 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
   };
   if (!photos?.length || !style) throw new Error("Fotoğraf ya da döşeme tarzı yok");
 
-  const apiKey = process.env.RUNPOD_API_KEY;
-  const wanId = process.env.RUNPOD_WAN_ENDPOINT_ID;
-  if (!apiKey || !wanId) throw new Error("RUNPOD_WAN_ENDPOINT_ID eksik");
   const hf = new HiggsfieldCli();
-  const wan = new RunpodClient(apiKey, wanId);
   const { width: W, height: H } = FORMAT_SPECS.reels_9x16;
 
   // Seslendirme GPU işleriyle paralel; üretilemezse video anlatımsız çıkar.
@@ -82,24 +77,23 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
   // 1) Boş oda fotoğrafları
   await ctx.stage("photos");
   // Dikey kadraj burada kırpılır (kullanıcının seçtiği yatay konumla); GPU tarafı yalnız ölçekler.
-  const emptyFiles = await Promise.all(
+  const empty = await Promise.all(
     photos.map(async (p, i) => {
       const raw = await download(await ctx.r2.url(p.key, 3600), join(ctx.workDir, `ham-${i + 1}.jpg`));
       const crop = join(ctx.workDir, `bos-${i + 1}.jpg`);
       const cw = "min(iw\\,ih*9/16)";
       const ch = "min(ih\\,iw*16/9)";
-      await ffmpeg(["-i", raw, "-vf", `crop=${cw}:${ch}:(iw-${cw})*${p.focusX ?? 0.5}:(ih-${ch})/2`, "-q:v", "2", crop]);
+      await ffmpeg(["-i", raw, "-vf", `crop=${cw}:${ch}:(iw-${cw})*${p.focusX ?? 0.5}:(ih-${ch})/2,scale=${EDIT_W}:${EDIT_H}`, "-q:v", "2", crop]);
       return crop;
     }),
   );
-  const empty = await Promise.all(emptyFiles.map((f) => dataUrl(f, "image/jpeg")));
 
   // 2) Döşeme: her oda paralel
   await ctx.stage("staging", 0);
   let done = 0;
   const furnished = await Promise.all(
     photos.map(async (p, i) => {
-      const file = await furnishRoom(hf, emptyFiles[i]!, p.room, style, join(ctx.workDir, `dosenmis-${i + 1}.png`), {
+      const file = await furnishRoom(hf, empty[i]!, p.room, style, join(ctx.workDir, `dosenmis-${i + 1}.png`), {
         seed: 11 + i,
         label: `döşeme ${i + 1}`,
         log: ctx.log,
@@ -107,7 +101,7 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
         height: EDIT_H,
       });
       await ctx.stage("staging", ++done / photos.length);
-      return dataUrl(file, "image/png");
+      return file;
     }),
   );
 
@@ -116,26 +110,20 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
   done = 0;
   const clips = await Promise.all(
     photos.map(async (p, i) => {
-      const out = await runpodJob(
-        wan,
+      const raw = await hf.generate(
+        CLIP_MODEL,
         {
-          image_url: empty[i],
-          last_image_url: furnished[i],
-          width: 480,
-          height: 832,
-          num_frames: 81, // Wan 16 fps → ~5 sn
-          frame_rate: 16,
-          num_steps: 4,
-          output_width: W,
-          output_height: H,
-          output_key: `reels/${v.id}/oda-${i + 1}.mp4`,
-          seed: 7 + i,
-          prompt: stagingVideoPrompt(p.room),
+          params: { prompt: stagingVideoPrompt(p.room), mode: "image-to-video", duration: CLIP_SECONDS, resolution: "360p", aspect_ratio: "9:16" },
+          media: [["start-image", empty[i]!], ["end-image", furnished[i]!]],
         },
-        `sahne ${i + 1}`,
-        ctx.log,
+        { label: `sahne ${i + 1}`, log: ctx.log },
       );
-      const file = await saveOutput(out, "video", join(ctx.workDir, `oda-${i + 1}.mp4`));
+      const clip = await hf.generate(
+        UPSCALE_MODEL,
+        { params: { model_version: "standard", resolution: "1080p", fps: OUT_FPS, preset: "aigc" }, media: [["video-references", raw.id]] },
+        { label: `büyütme ${i + 1}`, log: ctx.log },
+      );
+      const file = await download(clip.url, join(ctx.workDir, `oda-${i + 1}.mp4`));
       await ctx.stage("clips", ++done / photos.length);
       return file;
     }),

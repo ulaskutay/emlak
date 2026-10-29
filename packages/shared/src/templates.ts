@@ -474,14 +474,15 @@ const ROOM_LABELS_EN: Record<RoomType, string> = {
 };
 
 /**
- * Wan 2.2 ilk/son kare (boş → döşenmiş) prompt'u. Lightning modeli CFG'siz: kaçınılacaklar da buraya yazılır.
+ * İlk/son kare (boş → döşenmiş) geçiş klibi prompt'u (Gemini Omni Flash). Model ses de üretir; ses kullanılmaz,
+ * konuşma çıkmasın diye yalnız ortam sesi istenir.
  */
 export function stagingVideoPrompt(room: RoomType) {
   return (
     "Interior design reveal, locked-off static camera, no camera movement. " +
     `In the empty room, furniture and decor for ${ROOM_LABELS_EN[room]} gradually fade in one piece at a time and settle in place, ceiling lights and lamps switch on softly. ` +
     "Calm and smooth, nothing flies or falls. Windows, doors, walls, floor and ceiling stay exactly unchanged and windows stay clear. " +
-    "No people. Natural daylight, photorealistic, sharp, high detail."
+    "No people. Natural daylight, photorealistic, sharp, high detail. Audio: no speech, only quiet room ambience."
   );
 }
 
