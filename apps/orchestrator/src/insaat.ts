@@ -8,6 +8,8 @@
  *     --pick <seed>       seçilen adayla videoyu üretir
  *     --emsal 1.20 [--taks 0.30] [--imar Konut] [--price 12500000]
  *                         inşaat efektleri + imar bilgisini okuyan seslendirme + veri kartları + fon müziği (…-sesli.mp4)
+ *     --approach yaklasma.mp4
+ *                         başa drone yaklaşma çekimi (panelde tarayıcıda çizilen; drone stüdyosu önizlemesinde de alınır)
  *     --name "Ad Soyad" --office "Ofis" --phone "0532 …" [--photo foto.jpg] [--logo logo.png]
  *                         sonuna emlakçı kapanış kartı (4 sn; fiyat kartta yazar, seslendirmede okunur)
  *
@@ -20,7 +22,7 @@ import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { HiggsfieldCli } from "@arsa/providers";
 import { BuildingType } from "@arsa/shared";
-import { appendOutro, buildConstruction, editImage, endPrompt, SEGMENT_SECONDS, type Gen } from "../../worker/src/templates/insaat-hat.js";
+import { appendOutro, buildConstruction, editImage, endPrompt, prependApproach, SEGMENT_SECONDS, type Gen } from "../../worker/src/templates/insaat-hat.js";
 import { addConstructionAudio, readParcelInfo } from "../../worker/src/templates/insaat-ses.js";
 
 const { values: args } = parseArgs({
@@ -33,6 +35,7 @@ const { values: args } = parseArgs({
     clips: { type: "string", default: "4" }, // 4 × ~5 sn = 20 sn
     seed: { type: "string", default: "7" },
     candidates: { type: "string" },
+    approach: { type: "string" },
     pick: { type: "string" },
     // Ses: imar bilgisi (imar durumu belgesinden). --emsal verilmezse video sessiz kalır.
     imar: { type: "string", default: "Konut" },
@@ -89,12 +92,17 @@ const final = await buildConstruction({
 console.log(`Video hazır: ${final} (toplam ${((Date.now() - t0) / 1000).toFixed(0)} sn)`);
 
 // Kapanış kartı
-let video = final;
+// Drone yaklaşma çekimi: başa eklenir, inşaat ve ses o kadar kayar.
+let construction = final;
+let offset = 0;
+if (args.approach) ({ video: construction, offset } = await prependApproach(gen, resolve(ROOT, args.approach), final, final.replace(/\.mp4$/, "-yaklasmali.mp4")));
+
+let video = construction;
 let outroAt: number | undefined;
 if (args.name || args.office || args.phone) {
   const work = name("kapanis");
   await mkdir(work, { recursive: true });
-  ({ video, outroAt } = await appendOutro(final, final.replace(/\.mp4$/, "-kapanis.mp4"), work, {
+  ({ video, outroAt } = await appendOutro(construction, construction.replace(/\.mp4$/, "-kapanis.mp4"), work, {
     price: args.price ? `${Number(args.price).toLocaleString("tr-TR")} TL` : undefined,
     rent: args.rent!,
     name: args.name,
@@ -120,6 +128,7 @@ if (args.emsal) {
       areaM2: info.areaM2,
       priceTry: args.price ? Number(args.price) : undefined,
       outroAt,
+      offset,
       zoning: { use: args.imar!, emsal: Number(args.emsal), taks: args.taks ? Number(args.taks) : undefined, floors },
     },
   });

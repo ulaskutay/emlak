@@ -247,6 +247,28 @@ export async function buildConstruction(o: {
   return joinClips(parts, name(`${o.clips * SEGMENT_SECONDS}sn.mp4`));
 }
 
+/** Yaklaşma çekiminden inşaata geçiş (sn): yaklaşmanın son karesi (3D harita) netleştirilmiş ilk kareye erir. */
+export const APPROACH_FADE = 0.7;
+
+/**
+ * Drone yaklaşma çekimini (kullanıcının tarayıcısında çizilmiş, 720p 30 FPS) 1080p 60 FPS büyütüp inşaat videosunun
+ * başına ekler. Yaklaşma inşaatın başlangıç karesinin kamerasında bittiği için geçiş yalnız görüntü dokusunu değiştirir.
+ * Döndürdüğü offset: inşaatın (ve seslendirmenin) videoda başladığı saniye.
+ */
+export async function prependApproach(gen: Gen, approach: string, video: string, out: string) {
+  const big = await upscale(gen.hf, approach, approach.replace(/\.mp4$/, "-buyuk.mp4"), "büyütme: yaklaşma", gen.log);
+  const dur = Number((await run("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", big])).stdout.trim());
+  const offset = Math.max(0, dur - APPROACH_FADE);
+  await run("ffmpeg", [
+    "-v", "error", "-y", "-i", big, "-i", video,
+    "-filter_complex",
+    `[0:v]fps=${OUT_FPS},scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,format=yuv420p[a];` +
+      `[1:v]fps=${OUT_FPS},scale=${W}:${H},setsar=1,format=yuv420p[b];[a][b]xfade=transition=fade:duration=${APPROACH_FADE}:offset=${offset.toFixed(3)}[out]`,
+    "-map", "[out]", "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-movflags", "+faststart", out,
+  ]);
+  return { video: out, offset };
+}
+
 /** Kapanış kartı süresi (sn). */
 export const OUTRO_SECONDS = 4;
 

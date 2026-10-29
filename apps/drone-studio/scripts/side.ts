@@ -6,47 +6,13 @@
 import { join, resolve } from "node:path";
 import { chromium } from "playwright-core";
 import { createServer } from "vite";
-import type { FrameState, ParcelInfo } from "../src/types.js";
+import type { ParcelInfo } from "../src/types.js";
 import { chromeArgs, pickGlMode, withTimeout } from "./render.js";
 
 const APP = resolve(import.meta.dirname, "..");
 
-export interface SideShot {
-  /** Parselin en uzun kenarına göre bakış yönü (derece). */
-  heading: number;
-  /** Yatay uzaklık: parsel yarıçapının katı. */
-  dist: number;
-  /** Kameranın yerden yüksekliği (m). */
-  height: number;
-}
-
-/**
- * Varsayılan açı (Ezine denemesinde seçilen): en uzun kenara dik, 1,6 yarıçap uzaktan; yükseklik uzaklığın ~%30'u
- * (yaklaşık 17° aşağı bakış). Arsa karenin alt üçte ikisini doldurur, üstte ufuk ve biraz gökyüzü kalır.
- */
-export function defaultSideShot(p: ParcelInfo): SideShot {
-  const D = Math.max(25, p.radiusM) * 1.6;
-  return { heading: 90, dist: 1.6, height: Math.round(Math.min(80, Math.max(20, D * 0.3))) };
-}
-
-/** Yandan alçak kamera: yatay uzaklık D, yükseklik H → Cesium range/tilt (tilt = 90 + pitch). */
-export function sideState(p: ParcelInfo, s: SideShot): FrameState {
-  const D = Math.max(25, p.radiusM) * s.dist;
-  return {
-    camera: {
-      lat: p.centroid.lat,
-      lng: p.centroid.lng,
-      altitude: 0,
-      range: Math.hypot(D, s.height),
-      tilt: 90 - (Math.atan2(s.height, D) * 180) / Math.PI,
-      heading: p.longestEdgeHeading + s.heading,
-    },
-    mode: "SATELLITE",
-    neon: 0,
-    fill: 0,
-    fence: 0,
-  };
-}
+export { defaultSideShot, sideState, type SideShot } from "../src/side-shot.js";
+import { sideState, type SideShot } from "../src/side-shot.js";
 
 /** Kareleri çizer: her açı için side-<yön>-<uzaklık>.png (neon: true ise …-neon.png da). Yazılan dosyaları döndürür. */
 export async function renderSideShots(o: {

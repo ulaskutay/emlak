@@ -1,6 +1,27 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "web", "runtimeExecutable": "pnpm", "runtimeArgs": ["--filter", "@arsa/web", "dev"], "port": 3100 }
+    {
+      "name": "web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@arsa/web",
+        "dev"
+      ],
+      "port": 3100
+    },
+    {
+      "name": "drone-studio",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "apps/drone-studio",
+        "exec",
+        "tsx",
+        "node_modules/vite/bin/vite.js"
+      ],
+      "port": 5178
+    }
   ]
 }

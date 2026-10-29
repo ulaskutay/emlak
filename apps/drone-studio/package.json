@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "build:web": "tsx node_modules/vite/bin/vite.js build --mode web --base /studio/ --outDir ../web/public/studio --emptyOutDir",
     "record": "tsx scripts/record.ts",
     "still": "tsx scripts/still.ts",
     "typecheck": "tsc --noEmit",

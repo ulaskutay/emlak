@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { HiggsfieldCli, RunpodClient } from "@arsa/providers";
 import type { BuildingType, DosemeOrder, Zoning } from "@arsa/shared";
 import { download, priceText, type JobContext, type JobResult } from "./common.js";
-import { appendOutro, buildConstruction, editImage, ENHANCE_PROMPT, OUTRO_SECONDS, runJob, SEGMENT_SECONDS, stripAttribution, type Gen } from "./insaat-hat.js";
+import { appendOutro, buildConstruction, editImage, ENHANCE_PROMPT, OUTRO_SECONDS, prependApproach, runJob, SEGMENT_SECONDS, stripAttribution, type Gen } from "./insaat-hat.js";
 import { addConstructionAudio } from "./insaat-ses.js";
 
 /** Dilim sayısı: 4 × 5 sn = 20 sn inşaat. */
@@ -18,7 +18,14 @@ const SEED = 10;
 export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
   const v = ctx.video;
   if (!v.parcelText || !v.parcelSummary) throw new Error("Parsel dosyası eksik");
-  const { building, floors = 4, zoning, agent } = v.input as { building?: BuildingType; floors?: number; zoning?: Zoning; agent?: DosemeOrder["agent"] };
+  const { building, floors = 4, zoning, agent, approachKey } = v.input as {
+    building?: BuildingType;
+    floors?: number;
+    zoning?: Zoning;
+    agent?: DosemeOrder["agent"];
+    /** Kullanıcının tarayıcısında çizilen drone yaklaşma çekimi (panel, ApproachRecorder). */
+    approachKey?: string;
+  };
   if (!building) throw new Error("Yapı tipi eksik");
   if (!zoning) throw new Error("İmar bilgisi eksik");
 
@@ -52,10 +59,22 @@ export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
     onStage: (s, p) => ctx.stage(s, p),
   });
 
+  // Drone yaklaşma çekimi varsa başa eklenir; inşaat, ses ve kartlar o kadar kayar. Çekim bozuksa video yaklaşmasız çıkar.
+  let construction = final;
+  let offset = 0;
+  if (approachKey) {
+    const raw = await download(await ctx.r2.url(approachKey, 3600), name("yaklasma.mp4"));
+    const r = await prependApproach(gen, raw, final, name("yaklasmali.mp4")).catch((e) => {
+      ctx.log(`! yaklaşma çekimi eklenemedi: ${String(e).slice(0, 200)}`);
+      return null;
+    });
+    if (r) ({ video: construction, offset } = r);
+  }
+
   // 3) Emlakçı kapanış kartı (döşeme şablonundaki kart; fotoğraf ve logo kullanıcının yüklemeleri)
   const fetchAsset = (key: string | undefined, file: string) =>
     key ? ctx.r2.url(key, 600).then((u) => download(u, join(ctx.workDir, file))).catch(() => null) : Promise.resolve(null);
-  const { video, outroAt } = await appendOutro(final, name("kapanis.mp4"), ctx.workDir, {
+  const { video, outroAt } = await appendOutro(construction, name("kapanis.mp4"), ctx.workDir, {
     price: priceText(v.listing.priceTry),
     rent: false,
     name: agent?.name,
@@ -82,6 +101,7 @@ export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
       areaM2: s.areaM2,
       priceTry: v.listing.priceTry,
       outroAt,
+      offset,
       zoning: { use: zoning.use, emsal: zoning.emsal, taks: zoning.taks, floors },
     },
   });

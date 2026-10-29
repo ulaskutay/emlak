@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, extname, join, resolve, relative } from "node:path";
 import { prepareParcel, type ParcelContext } from "@arsa/geo";
@@ -43,13 +44,33 @@ function parcelApi(key: string): Plugin {
   };
 }
 
+/**
+ * POST /api/save-approach: tarayıcı önizlemesinde kaydedilen yaklaşma çekimini diske yazar (APPROACH_OUT ya da
+ * geçici klasör). Yalnız geliştirme sunucusunda; panelde kayıt R2'ye yüklenir.
+ */
+function saveApproachApi(): Plugin {
+  return {
+    name: "save-approach",
+    configureServer(server) {
+      server.middlewares.use("/api/save-approach", async (req, res) => {
+        const chunks: Buffer[] = [];
+        for await (const c of req) chunks.push(c as Buffer);
+        const out = process.env.APPROACH_OUT ?? join(tmpdir(), "yaklasma.mp4");
+        await writeFile(out, Buffer.concat(chunks));
+        res.end(JSON.stringify({ out, bytes: Buffer.concat(chunks).length }));
+      });
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, ROOT, "GOOGLE_MAPS_");
   return {
     envDir: ROOT,
     // Tarayıcıya yalnızca GOOGLE_MAPS_ ile başlayan değişkenler açılır (Maps JS anahtarı zaten istemci tarafı).
-    envPrefix: "GOOGLE_MAPS_",
-    plugins: [parcelApi(env.GOOGLE_MAPS_API_KEY ?? "")],
+    // Panel derlemesinde (--mode web, /studio/) hiçbiri: dosya herkese açık; anahtar girişli kullanıcıya API'den gelir.
+    envPrefix: mode === "web" ? "STUDIO_PUBLIC_" : "GOOGLE_MAPS_",
+    plugins: [parcelApi(env.GOOGLE_MAPS_API_KEY ?? ""), saveApproachApi()],
     server: { port: 5178, strictPort: true },
   };
 });

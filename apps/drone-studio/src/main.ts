@@ -8,6 +8,7 @@
  * Ekran katmanı (yazılar, kutucuklar) her iki motorda aynı: src/overlay.ts.
  * Tarayıcı önizlemesi: http://localhost:5178/?parcel=assets/parcels/<dosya>.geojson[&engine=google]
  */
+import { recordApproach, type ApproachOptions } from "./approach.js";
 import { cesiumEngine } from "./engine-cesium.js";
 import { googleEngine } from "./engine-google.js";
 import { hideOverlay, renderOverlay } from "./overlay.js";
@@ -27,8 +28,15 @@ fitStage();
 
 const q = new URLSearchParams(location.search);
 const engineName = q.get("engine") === "google" ? "google" : "cesium";
-const engine =
-  engineName === "google" ? googleEngine() : cesiumEngine({ sse: Number(q.get("sse") ?? 4), fov: Number(q.get("fov") ?? 42), msaa: Number(q.get("msaa") ?? 4) });
+// ?record=1: panelde kullanıcının tarayıcısında yaklaşma kaydı (approach.ts): 720×1280 çizim, MSAA hafif.
+const recording = q.has("record");
+const cesium = cesiumEngine({
+  sse: Number(q.get("sse") ?? 4),
+  fov: Number(q.get("fov") ?? 42),
+  msaa: Number(q.get("msaa") ?? (recording ? 2 : 4)),
+  scale: recording ? 720 / 1080 : undefined,
+});
+const engine = engineName === "google" ? googleEngine() : cesium;
 let parcel: ParcelInfo;
 
 const studio = {
@@ -66,6 +74,14 @@ const studio = {
     return engine.clean(keepNeon);
   },
 
+  /** Yaklaşma çekimi (yalnız Cesium): parsel yüklendikten sonra; MP4 döndürür. */
+  async recordApproach(o: ApproachOptions = {}): Promise<Blob> {
+    if (engineName !== "cesium") throw new Error("Yaklaşma kaydı yalnız Cesium motoruyla");
+    this.setChrome(false);
+    hideOverlay();
+    return recordApproach({ render: (s, t) => engine.render(s, t), canvas: () => cesium.canvas(), project: (p, dh) => cesium.project(p, dh) }, parcel, o);
+  },
+
   setChrome(visible: boolean) {
     (document.getElementById("status") as HTMLElement).style.display = visible ? "" : "none";
   },
@@ -87,6 +103,6 @@ if (file) {
       }),
     )
     .catch((e) => status(`HATA: ${e.message}`));
-} else if (!(window as any).__RECORDER__) {
+} else if (!(window as any).__RECORDER__ && !recording) {
   status("?parcel=assets/parcels/<dosya>.geojson parametresi verin");
 }

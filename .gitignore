@@ -11,3 +11,6 @@ bench/compare
 *.tsbuildinfo
 next-env.d.ts
 !apps/web/public/media/**/*.mp4
+
+# Drone stüdyosunun panel derlemesi (pnpm --filter @arsa/drone-studio build:web)
+apps/web/public/studio/

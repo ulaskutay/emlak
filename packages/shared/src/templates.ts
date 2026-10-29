@@ -365,6 +365,8 @@ export const InsaatOrder = z.object({
   listing: ReelListing.pick({ priceTry: true, officeName: true, phone: true }).default({}),
   voiceId: ReelOrder.shape.voiceId,
   music: z.boolean().default(true),
+  /** Kullanıcının tarayıcısında çizilen drone yaklaşma çekimi (MP4, R2); yoksa video doğrudan arsadan başlar. */
+  approachKey: z.string().regex(/^uploads\/[\w-]+\/[\w-]+\.mp4$/, "Geçersiz yaklaşma çekimi").optional(),
 });
 export type InsaatOrder = z.infer<typeof InsaatOrder>;
 
@@ -382,7 +384,7 @@ export type TemplateInput =
   | { photos: RoomPhoto[]; style: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; voice?: boolean }
   | { photos: TourScene[]; style?: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; presenter?: PresenterId; quality?: TourQuality }
   | { building: BuildingType; floors: number }
-  | { building: BuildingType; floors: number; zoning: Zoning; agent?: DosemeOrder["agent"] }
+  | { building: BuildingType; floors: number; zoning: Zoning; agent?: DosemeOrder["agent"]; approachKey?: string }
   | Record<string, never>;
 
 /** Yapı tipine göre görüntü düzenleme tarifi ve videodaki proje adı. */

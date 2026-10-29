@@ -5,10 +5,13 @@ import { autoFocus } from "@/lib/focus";
 import { r2 } from "@/lib/r2";
 
 const MAX_BYTES = 6_000_000;
+/** Drone yaklaşma çekimi (tarayıcıda kodlanmış ~6 sn MP4). */
+const MAX_VIDEO_BYTES = 40_000_000;
 
 /**
  * Görsel yükleme: tarayıcı küçültüp gönderir, R2'ye kullanıcının klasörüne yazılır.
  * JPEG (ilan fotoğrafı, emlakçı fotoğrafı) ya da PNG (ofis logosu: saydam arka plan JPEG'de kararıyordu).
+ * MP4: inşaat videosunun tarayıcıda çizilen drone yaklaşma çekimi.
  */
 export async function POST(req: Request) {
   const user = await apiUser();
@@ -16,6 +19,15 @@ export async function POST(req: Request) {
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
   if (!(file instanceof File)) return badRequest("Fotoğraf yok");
+  if (file.type === "video/mp4") {
+    if (file.size > MAX_VIDEO_BYTES) return badRequest("Video çok büyük (en fazla 40 MB)");
+    const buf = Buffer.from(await file.arrayBuffer());
+    // MP4 imzası: 4. bayttan "ftyp"
+    if (buf.toString("latin1", 4, 8) !== "ftyp") return badRequest("Geçersiz MP4 dosyası");
+    const key = `uploads/${user.id}/${randomUUID()}.mp4`;
+    await r2().put(key, buf, "video/mp4");
+    return NextResponse.json({ key }, { status: 201 });
+  }
   const png = file.type === "image/png";
   if (file.type !== "image/jpeg" && !png) return badRequest("Görsel JPEG ya da PNG olmalı");
   if (file.size > MAX_BYTES) return badRequest("Fotoğraf çok büyük (en fazla 6 MB)");

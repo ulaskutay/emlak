@@ -47,6 +47,11 @@ export interface ScriptInput {
   priceTry?: number;
   /** Emlakçı kapanış kartının başladığı saniye: fiyat ve çağrı oraya taşınır (fiyat kartta yazar). */
   outroAt?: number;
+  /**
+   * İnşaatın videoda başladığı saniye (başta drone yaklaşma çekimi varsa). Arsayı tanıtan ilk cümle ve kartı
+   * yaklaşma sırasında söylenir; inşaat aşamalarına bağlı cümleler ve efektler bu kadar kayar.
+   */
+  offset?: number;
 }
 
 /** 1.2 → "bir virgül yirmi", 0.3 → "sıfır virgül otuz" (iki basamak: emsal böyle söylenir). */
@@ -69,6 +74,9 @@ const fmt = (n: number, digits = 0) => n.toLocaleString("tr-TR", { minimumFracti
  */
 export function constructionScript(i: ScriptInput): { at: number; text: string; card?: Card }[] {
   const z = i.zoning;
+  // Yaklaşma varsa ilk cümle onun sırasında söylenir; ikinci cümle inşaatın başında (offset + 0,4), sonrakiler
+  // aynı aralıkla: yoksa kazı aşaması sessiz kalıyordu.
+  const o = i.offset ? i.offset - 4.8 : 0;
   const area = numberWords(Math.round(i.areaM2));
   const buildableM2 = Math.round((i.areaM2 * z.emsal) / 10) * 10;
   const use = z.use.toLocaleLowerCase("tr");
@@ -79,7 +87,7 @@ export function constructionScript(i: ScriptInput): { at: number; text: string; 
       card: { big: `${fmt(i.areaM2)} m²`, small: [`${z.use} imarlı`, i.place].filter(Boolean).join(" · ") },
     },
     {
-      at: 5.2,
+      at: o + 5.2,
       text: `Emsal ${spokenRatio(z.emsal)}. Tam ${numberWords(buildableM2)} metrekare inşaat alanı.`,
       card: { big: `Emsal ${fmt(z.emsal, 2)}`, small: `${fmt(buildableM2)} m² inşaat alanı` },
     },
@@ -90,7 +98,7 @@ export function constructionScript(i: ScriptInput): { at: number; text: string; 
   ].filter(Boolean);
   if (third.length)
     lines.push({
-      at: 10.4,
+      at: o + 10.4,
       text: `${third.join(", ")}.`,
       card: z.taks
         ? { big: `TAKS ${fmt(z.taks, 2)}`, small: z.floors ? `${z.floors} kata kadar yapılaşma` : `${fmt(i.areaM2 * z.taks)} m² taban alanı` }
@@ -98,11 +106,11 @@ export function constructionScript(i: ScriptInput): { at: number; text: string; 
     });
   const price = i.priceTry ? `Fiyatı ${spokenPrice(i.priceTry)} lira.` : "";
   if (i.outroAt !== undefined) {
-    lines.push({ at: 15.4, text: "Projeniz bu arsada yükselsin." });
+    lines.push({ at: o + 15.4, text: "Projeniz bu arsada yükselsin." });
     lines.push({ at: i.outroAt + 0.3, text: [price, "Detaylı bilgi için hemen arayın."].filter(Boolean).join(" ") });
   } else
     lines.push({
-      at: 15.4,
+      at: o + 15.4,
       text: [price, "Projeniz bu arsada yükselsin."].filter(Boolean).join(" "),
       card: i.priceTry ? { big: `${fmt(i.priceTry)} TL`, small: "Satılık arsa" } : undefined,
     });
@@ -120,6 +128,9 @@ const SFX = [
   "Construction site recorded from a distance: hammering on scaffolding, short power drill bursts, a brick saw, a crane reversing beep far away. Realistic field recording, no music, no voices.",
   "A quiet, newly finished residential neighbourhood on a sunny day: birds chirping, a soft breeze in the trees, a car arriving slowly in the distance. Realistic field recording, no music, no voices.",
 ];
+/** Yaklaşma çekiminin sesi (inşaattan önce, yukarıdan iniş). */
+const AERIAL_SFX =
+  "Gentle wind high above the countryside, soft air rushing past, faint birds far below. Realistic field recording, no music, no voices.";
 /** Efektler arası çapraz geçiş (sn). */
 const SFX_FADE = 1.5;
 const MUSIC =
@@ -171,10 +182,14 @@ export async function addConstructionAudio(o: {
 
   // Şantiye sesi: aşama başına bir efekt; son efekt (bitmiş site) kapanışa kadar sürer. Komşularla çapraz geçiş payı.
   const hf = new HiggsfieldCli();
-  const starts = SFX.map((_, k) => k * o.segment);
-  const lens = SFX.map((_, k) => (k < SFX.length - 1 ? o.segment + SFX_FADE : Math.max(o.segment, D - starts[k]!) + 0.5));
+  const offset = o.script.offset ?? 0;
+  const prompts = offset > 0 ? [AERIAL_SFX, ...SFX] : SFX;
+  const starts = offset > 0 ? [0, ...SFX.map((_, k) => offset + k * o.segment)] : SFX.map((_, k) => k * o.segment);
+  const lens = prompts.map((_, k) =>
+    k < prompts.length - 1 ? starts[k + 1]! - starts[k]! + SFX_FADE : Math.max(o.segment, D - starts[k]!) + 0.5,
+  );
   const sfx = await Promise.all(
-    SFX.map(async (prompt, k) => {
+    prompts.map(async (prompt, k) => {
       const seconds = Math.ceil(lens[k]!);
       const file = join(o.cacheDir, `efekt-${hash(`${SFX_MODEL}|${prompt}|${seconds}`)}.audio`);
       if (!existsSync(file)) {
@@ -227,8 +242,9 @@ export async function addConstructionAudio(o: {
   // Temsili görsel uyarısı (yapay zekâ üretimi bina gerçek proje değil).
   const W = 1080;
   const esc = (t: string) => t.replace(/\\/g, "\\\\").replace(/'/g, "\u2019").replace(/:/g, "\\:").replace(/%/g, "\\%");
+  // Yaklaşma çekimi gerçek harita görüntüsü: uyarı inşaatla başlar.
   const noteUntil = o.script.outroAt ?? D;
-  const note = `drawtext=fontfile='${SANS_SEMI}':text='Görüntü temsilidir':fontsize=${Math.round(W * 0.028)}:fontcolor=white@0.85:borderw=3:bordercolor=black@0.6:x=(w-text_w)/2:y=h*0.955:enable='lt(t,${noteUntil.toFixed(2)})'`;
+  const note = `drawtext=fontfile='${SANS_SEMI}':text='Görüntü temsilidir':fontsize=${Math.round(W * 0.028)}:fontcolor=white@0.85:borderw=3:bordercolor=black@0.6:x=(w-text_w)/2:y=h*0.955:enable='between(t,${offset.toFixed(2)},${noteUntil.toFixed(2)})'`;
   f.push(`[0:v]${note}[v0]`);
   // Veri kartları: üstte gökyüzü bölgesinde; cümleyle girer, sonraki cümleye kadar kalır (son kart videonun sonuna kadar).
   const CW = 900, CH = 230, CX = 90, CY = 190, FADE = 0.35;

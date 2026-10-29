@@ -52,7 +52,7 @@ function fenceTexture() {
   return c;
 }
 
-export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number } = {}) {
+export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number; scale?: number } = {}) {
   let C: any;
   let viewer: any;
   let tileset: any;
@@ -143,6 +143,8 @@ export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number }
         contextOptions: { webgl: { preserveDrawingBuffer: true } },
       });
       viewer.useDefaultRenderLoop = false;
+      // Kayıt çözünürlüğü (tarayıcıda yaklaşma kaydı: 1080×1920 sahne 720×1280 çizilir, telefon GPU'su yorulmasın).
+      if (opts.scale) viewer.resolutionScale = opts.scale;
       const scene = viewer.scene;
       scene.canvas.addEventListener("webglcontextlost", () => {
         (window as any).__contextLost = true;
@@ -352,6 +354,17 @@ export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number }
     async clean(keepNeon: boolean) {
       for (const e of viewer.entities.values) e.show = keepNeon && (e === ents.outline || e === ents.fill);
       return settle();
+    },
+
+    /** Son çizilen kare (preserveDrawingBuffer açık): tarayıcıda kayıt bu tuvalden okur. */
+    canvas(): HTMLCanvasElement {
+      return viewer.scene.canvas;
+    },
+
+    /** Noktanın sahnedeki konumu (1080×1920 CSS pikseli); kameranın arkasındaysa null. Yükseklik zemine göre. */
+    project(q: LL, dh = 0): { x: number; y: number } | null {
+      const w = C.SceneTransforms.worldToWindowCoordinates(viewer.scene, C.Cartesian3.fromDegrees(q.lng, q.lat, groundH + dh));
+      return w ? { x: w.x, y: w.y } : null;
     },
   };
 }
