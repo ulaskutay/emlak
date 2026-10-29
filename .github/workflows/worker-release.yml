@@ -1,5 +1,5 @@
 # RunPod, GitHub entegrasyonunda yeni build'i push ile değil, GitHub release ile başlatır.
-# Bu workflow, GPU worker kodu değiştiğinde main'e yapılan her push için otomatik release açar.
+# Bu workflow, GPU worker kodu (drone worker için stüdyo dahil) değiştiğinde main'e yapılan her push için otomatik release açar.
 name: Worker release
 
 on:
@@ -7,6 +7,8 @@ on:
     branches: [main]
     paths:
       - "gpu/video-worker/**"
+      - "gpu/drone-worker/**"
+      - "apps/drone-studio/**"
       - ".github/workflows/worker-release.yml"
   workflow_dispatch:
 
