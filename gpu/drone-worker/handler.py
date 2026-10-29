@@ -230,6 +230,22 @@ def handler(job):
             "timings": {"still": result["seconds"], "handler_total": round(time.time() - t0, 1)},
         }
 
+    # Yaklaşma çekimi (inşaat videosunun açılışı): mahallenin yukarısından yan kareye inen ~6 sn'lik MP4.
+    if inp.get("approach"):
+        ap = inp["approach"] if isinstance(inp["approach"], dict) else {}
+        cmd = [*TSX, "scripts/worker-approach.ts", "--in", src, "--out", work]
+        if inp.get("context"):
+            cmd += ["--context", os.path.join(work, "context.json")]
+        if ap.get("seconds"):
+            cmd += ["--seconds", str(ap["seconds"])]
+        t0 = time.time()
+        result = json.loads(run_streaming(cmd, env, 600, job))
+        prefix = inp.get("output_prefix", f"drone/{job['id']}")
+        return {
+            "video": publish(result["video"], f"{prefix}/approach.mp4", "video/mp4"),
+            "timings": {"approach": result["seconds"], "handler_total": round(time.time() - t0, 1)},
+        }
+
     parallel = int(inp.get("parallel") or max(2, min(8, container_cpus() // 2)))
     cmd = [*TSX, "scripts/worker-render.ts", "--in", src, "--out", work, *ctx_args,
            "--fps", str(inp.get("fps", 30)), "--parallel", str(parallel), "--crf", str(inp.get("crf", 22))]

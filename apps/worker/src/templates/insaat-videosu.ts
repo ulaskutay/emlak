@@ -1,41 +1,15 @@
 /**
  * Arsadan inşaat videosu: arsanın yandan yakın çekimi (RunPod drone worker, Cesium) → Higgsfield ile netleştirme →
- * kazıdan bitmiş yapıya ~20 sn timelapse (insaat-hat.ts, Higgsfield) → emlakçı kapanış kartı → inşaat sesleri, imar bilgisini
- * okuyan seslendirme, veri kartları ve müzik (insaat-ses.ts). Toplam ~24 sn.
+ * kazıdan bitmiş yapıya ~20 sn timelapse (insaat-hat.ts, Higgsfield); başta drone yaklaşma çekimi (aynı worker, paralel)
+ * → emlakçı kapanış kartı → inşaat sesleri, imar bilgisini okuyan seslendirme, veri kartları ve müzik (insaat-ses.ts).
  */
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { eq, getDb, videos } from "@arsa/db";
 import { HiggsfieldCli, RunpodClient } from "@arsa/providers";
 import type { BuildingType, DosemeOrder, Zoning } from "@arsa/shared";
 import { download, priceText, type JobContext, type JobResult } from "./common.js";
 import { appendOutro, buildConstruction, editImage, ENHANCE_PROMPT, OUTRO_SECONDS, prependApproach, runJob, SEGMENT_SECONDS, stripAttribution, type Gen } from "./insaat-hat.js";
 import { addConstructionAudio } from "./insaat-ses.js";
-
-/** Sayfadan bu kadar süre haber gelmezse (kapandı ya da hiç açılmadı) çekim beklenmez. */
-const APPROACH_SILENCE_MS = 45_000;
-/** Çekim sürüyor olsa da en fazla bu kadar beklenir. */
-const APPROACH_MAX_WAIT_MS = 8 * 60_000;
-
-/**
- * Video sayfasındaki çekimi bekler (ApproachRecorder → /api/videos/[id]/approach → input.approach / approachKey).
- * Çekim bağlandıysa anahtarını, başarısız olduysa, sayfa sessizse ya da süre dolduysa null döner.
- */
-async function waitApproach(id: string, progress: (p: number) => unknown, log: (m: string) => void): Promise<string | null> {
-  const db = getDb();
-  const t0 = Date.now();
-  for (;;) {
-    const [row] = await db.select({ input: videos.input }).from(videos).where(eq(videos.id, id));
-    const input = (row?.input ?? {}) as { approachKey?: string; approach?: { progress?: number; failed?: string; at?: number } };
-    if (input.approachKey) return input.approachKey;
-    const a = input.approach;
-    if (a?.failed) return (log(`yaklaşma çekimi yok (tarayıcı: ${a.failed})`), null);
-    if (!a?.at || Date.now() - a.at > APPROACH_SILENCE_MS) return (log("yaklaşma çekimi yok (video sayfası açık değil)"), null);
-    if (Date.now() - t0 > APPROACH_MAX_WAIT_MS) return (log(`yaklaşma çekimi beklenmedi (%${Math.round((a.progress ?? 0) * 100)})`), null);
-    await progress(a.progress ?? 0);
-    await new Promise((r) => setTimeout(r, 4000));
-  }
-}
 
 /** Dilim sayısı: 4 × 5 sn = 20 sn inşaat. */
 const CLIPS = 4;
@@ -60,6 +34,19 @@ export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
   const out = await runJob(drone, { parcel: v.parcelText, still: {}, output_prefix: `reels/${v.id}/side` }, "yan kare", ctx.log);
   const still = out.still as { url?: string; key?: string; base64?: string } | undefined;
   if (!still) throw new Error("Drone worker yan kare döndürmedi (worker sürümü güncel değil olabilir)");
+  // Drone yaklaşma çekimi ayrı bir RunPod işinde, inşaat üretilirken paralel çizilir. Yan kareden sonra gönderilir ki
+  // uç noktada tek GPU varsa inşaatı geciktirmesin. Gelmezse video yaklaşmasız çıkar.
+  // limit_frames: approach'u tanımayan eski worker sürümü tam drone turu yerine tek kare çizsin (yeni sürüm yok sayar).
+  const approach = runJob(drone, { parcel: v.parcelText, approach: {}, limit_frames: 1, output_prefix: `reels/${v.id}/approach` }, "yaklaşma", ctx.log)
+    .then(async (o) => {
+      const r = o.video as { url?: string; key?: string; base64?: string } | undefined;
+      if (!r || o.timings?.approach === undefined) throw new Error("Drone worker yaklaşma çekimi döndürmedi (worker sürümü güncel değil olabilir)");
+      const file = name("yaklasma.mp4");
+      if (r.base64) await writeFile(file, Buffer.from(r.base64, "base64"));
+      else await download(r.url ?? (await ctx.r2.url(r.key!, 3600)), file);
+      return file;
+    })
+    .catch((e) => (ctx.log(`! yaklaşma çekimi yok: ${String(e).slice(0, 200)}`), null));
   const side = name("yan.png");
   if (still.base64) await writeFile(side, Buffer.from(still.base64, "base64"));
   else await download(still.url ?? (await ctx.r2.url(still.key!, 3600)), side);
@@ -78,14 +65,12 @@ export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
     onStage: (s, p) => ctx.stage(s, p),
   });
 
-  // Drone yaklaşma çekimi (video sayfasında, kullanıcının tarayıcısında çizilir) başa eklenir; inşaat, ses ve kartlar
-  // o kadar kayar. Gelmezse ya da bozuksa video yaklaşmasız çıkar.
+  // Drone yaklaşma çekimi başa eklenir; inşaat, ses ve kartlar o kadar kayar. Gelmezse ya da bozuksa video yaklaşmasız çıkar.
   await ctx.stage("approach");
-  const approachKey = await waitApproach(v.id, (p) => ctx.stage("approach", p), ctx.log);
+  const raw = await approach;
   let construction = final;
   let offset = 0;
-  if (approachKey) {
-    const raw = await download(await ctx.r2.url(approachKey, 3600), name("yaklasma.mp4"));
+  if (raw) {
     const r = await prependApproach(gen, raw, final, name("yaklasmali.mp4")).catch((e) => {
       ctx.log(`! yaklaşma çekimi eklenemedi: ${String(e).slice(0, 200)}`);
       return null;

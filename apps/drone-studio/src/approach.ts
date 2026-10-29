@@ -1,10 +1,10 @@
 /**
- * Yaklaşma çekimi (inşaat videosunun açılışı), kullanıcının tarayıcısında: kamera mahallenin yukarısından parsele
+ * Yaklaşma çekimi (inşaat videosunun açılışı), RunPod drone worker'ında (scripts/worker-approach.ts): kamera mahallenin yukarısından parsele
  * alçalır ve inşaatın başlangıç karesinin kamerasında (side-shot.ts) durur; video oradan inşaata geçer.
  *
  * Kareler tek tek çizilir (her karede karolar yüklenene kadar beklenir, render.ts'deki gibi), yakın yerlerin
- * etiketleri ve Google atfı tuvale işlenir (konum ve m² worker'ın veri kartında yazar; üst bölge ona bırakılır), WebCodecs ile H.264 MP4'e kodlanır. 6 sn'lik çekim için
- * GPU sunucusu (RunPod) gerekmesin diye kullanıcının GPU'su kullanılır (2026-10-29); sunucuda GPU yok.
+ * etiketleri ve Google atfı tuvale işlenir (konum ve m² worker'ın veri kartında yazar; üst bölge ona bırakılır), WebCodecs ile H.264 MP4'e kodlanır.
+ * 2026-10-30'a dek kullanıcının tarayıcısında çiziliyordu; sayfa kapanınca çekim yapılmadığı için RunPod'a taşındı.
  */
 import { defaultSideShot, sideState } from "./side-shot.js";
 import { sleep } from "./timer.js";

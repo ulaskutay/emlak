@@ -64,13 +64,14 @@ rm -rf "$WEB/$NEXT"
 # tsconfig'in **/*.ts deseni çalışan derlemenin klasörünü de kapsar: onun eski tipleri silinmiş bir rotayı arayıp
 # derlemeyi bozar (2026-10-30: /api/parcel/prepare). Tipler yalnız derlemede kullanılır, çalışan site etkilenmez.
 rm -rf "$WEB/$ACTIVE/types" "$WEB/$ACTIVE/dev/types"
+# Yaklaşma çekimi artık RunPod drone worker'ında: panelden kalan stüdyo derlemesi.
+rm -rf "$WEB/public/studio"
 
 # İlan videosu Remotion ile render edilir: Chrome Headless Shell'in sistemde eksik kalan kütüphanesi (bir kez kurulur).
 dpkg -s libnss3 >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y -q libnss3
 
-# Drone stüdyosu panel derlemesi (apps/web/public/studio): inşaat videosunun yaklaşma çekimi kullanıcının tarayıcısında çizilir.
 su -s /bin/bash www -c "export PATH=/www/server/nodejs/v22.22.3/bin:/usr/bin:/bin HOME=/home/www NEXT_TELEMETRY_DISABLED=1 NEXT_DIST_DIR=$NEXT
-  cd $DIR && pnpm install --frozen-lockfile && pnpm --filter @arsa/drone-studio build:web && pnpm --filter @arsa/web build && pnpm db:migrate &&
+  cd $DIR && pnpm install --frozen-lockfile && pnpm --filter @arsa/web build && pnpm db:migrate &&
   cd apps/worker && node --input-type=module -e \"import { ensureBrowser } from '@remotion/renderer'; await ensureBrowser();\""
 
 echo "NEXT_DIST_DIR=$NEXT" > "$ACTIVE_ENV" && chown www:www "$ACTIVE_ENV"

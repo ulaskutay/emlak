@@ -383,7 +383,7 @@ export type TemplateInput =
   | { photos: RoomPhoto[]; style: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; voice?: boolean }
   | { photos: TourScene[]; style?: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; presenter?: PresenterId; quality?: TourQuality }
   | { building: BuildingType; floors: number }
-  | { building: BuildingType; floors: number; zoning: Zoning; agent?: DosemeOrder["agent"]; approachKey?: string; approach?: { progress?: number; failed?: string; at: number } }
+  | { building: BuildingType; floors: number; zoning: Zoning; agent?: DosemeOrder["agent"] }
   | Record<string, never>;
 
 /** Yapı tipine göre görüntü düzenleme tarifi ve videodaki proje adı. */

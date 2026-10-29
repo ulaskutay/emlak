@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from "react";
 import { ProgressBar, StatusBadge } from "@/components/panel/ui";
 import { overallProgress, statusLabel, videoTitle } from "@/components/status";
 import { formatArea, formatDate, parcelPlace } from "@/lib/format";
-import { ApproachRecorder } from "./ApproachRecorder";
 
 type Video = {
   id: string;
@@ -58,9 +57,6 @@ export function VideoStatus({ id }: { id: string }) {
   const stageIndex = v.status === "done" ? stages.length : stages.findIndex((s) => s.id === v.stage);
   const working = v.status === "queued" || v.status === "running";
   const ready = v.status === "done" && data.urls.play;
-  // İnşaat videosu: drone yaklaşma çekimi bu sayfada, üretim sürerken çizilir (çekim videoya bağlanana dek; hata
-  // kartta gösterilir, "Yeniden dene" ile tekrarlanır).
-  const recordApproach = v.template === "insaat-videosu" && working && !(v.input as { approachKey?: string } | null)?.approachKey;
 
   return (
     <div>
@@ -128,8 +124,6 @@ export function VideoStatus({ id }: { id: string }) {
               <p className="mt-3 text-sm text-gri">Bu sayfa kendiliğinden güncellenir; kapatabilirsiniz, video Videolarım&apos;da sizi bekler.</p>
             </div>
           )}
-
-          {recordApproach && <ApproachRecorder videoId={v.id} />}
 
           {v.status === "done" && data.urls.download && (
             <div className="pnl-kart hidden items-center justify-between gap-4 p-6 lg:flex">
