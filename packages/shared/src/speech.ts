@@ -80,9 +80,24 @@ export function ordinalWords(n: number) {
 /**
  * Video modelinin kendisi seslendirdiği metinde rakam bırakılmaz (model rakamları bozuk ya da İngilizce okuyabiliyor):
  * "20. kat" → "yirminci kat", "2+1" → "iki artı bir", "89 m²" → "seksen dokuz metrekare", diğer tam sayılar yazıyla.
+ * İlan kısaltmaları da açılır ("Mah." → "Mahallesi", "%20" → "yüzde yirmi", "5 dk" → "beş dakika"): ses modeli
+ * kısaltmayı harf harf ya da İngilizce okuyabiliyor.
  */
 export function speakable(text: string) {
   return text
+    // Numaralı sokak/cadde yalın okunur ("1250. Sokak"), adlı olan iyelikli ("Cumhuriyet Caddesi").
+    .replace(/(\d+\.\s*)(?:Sok|Sk)\.?(?=\s|$)/g, "$1Sokak")
+    .replace(/(\d+\.\s*)(?:Cad|Cd)\.?(?=\s|$)/g, "$1Cadde")
+    .replace(/\b(?:Mah|Mh)\.?(?=\s|$)/g, "Mahallesi")
+    .replace(/\b(?:Cad|Cd)\.?(?=\s|$)/g, "Caddesi")
+    .replace(/\b(?:Sok|Sk)\.?(?=\s|$)/g, "Sokağı")
+    .replace(/\b(?:Bulv|Blv|Bul)\.?(?=\s|$)/g, "Bulvarı")
+    .replace(/\bvb\./g, "ve benzeri")
+    .replace(/%\s*(\d+)/g, (_, n: string) => `yüzde ${numberWords(Number(n))}`)
+    .replace(/(\d)\s*(?:dk|dak)\.?(?=$|[\s,!?])/g, "$1 dakika")
+    .replace(/(\d)\s*km\b/g, "$1 kilometre")
+    .replace(/\bNo:?\s*(?=\d)/g, "numara ")
+    .replace(/(\d)\s*mt?\.?(?=\s+(?:mesafe|yürü|uzak))/g, "$1 metre")
     .replace(/(\d+)(?:[.,](5))?\s*\+\s*(\d+)/g, (_, a: string, half: string | undefined, b: string) =>
       `${numberWords(Number(a))}${half ? " buçuk" : ""} artı ${numberWords(Number(b))}`)
     .replace(/(\d+)\.(?=\s*\p{L})/gu, (_, n: string) => ordinalWords(Number(n)))

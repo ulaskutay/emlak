@@ -181,7 +181,13 @@ export async function backgroundMusic(seconds: number, ctx: JobContext): Promise
   }
 }
 
-/** Seslendirme (ElevenLabs), metne göre önbellekli. Ses dosyası ve süresi; anahtar yoksa null. */
+/**
+ * Seslendirme (ElevenLabs), metne göre önbellekli; cümle başına ses dosyası ve süresi. Anahtar yoksa null.
+ *
+ * Bütün anlatım tek seferde okutulur, kelime zamanlarından cümlelere kesilir: eleven_v3 komşu cümle bağlamını
+ * almadığı için cümle cümle okutulunca her cümle baştan başlıyormuş gibi kopuk tonlanıyordu (2026-10-29).
+ * Kesim tutmazsa (kelime sayısı uyuşmazsa) cümleler tek tek okutulur.
+ */
 export async function speakLines(lines: string[], voiceId: string | null, ctx: JobContext): Promise<{ file: string; duration: number }[] | null> {
   const key = process.env.ELEVENLABS_API_KEY;
   if (!key) {
@@ -191,16 +197,42 @@ export async function speakLines(lines: string[], voiceId: string | null, ctx: J
   const model = process.env.ELEVENLABS_MODEL || "eleven_v3";
   const el = new ElevenLabsClient({ apiKey: key, voiceId: voiceId || process.env.ELEVENLABS_VOICE_ID, model });
   const voice = await el.resolveVoice();
-  const out: { file: string; duration: number }[] = [];
-  for (const [i, text] of lines.entries()) {
-    const file = join(ctx.cacheDir, `tts-${createHash("sha1").update(`${voice}|${model}|${text}`).digest("hex").slice(0, 16)}.mp3`);
+  const cached = async (text: string, extra = "") => {
+    const file = join(ctx.cacheDir, `tts-${createHash("sha1").update(`${voice}|${model}|${extra}${text}`).digest("hex").slice(0, 16)}.mp3`);
     const meta = file.replace(/\.mp3$/, ".json");
     if (!existsSync(meta)) {
-      const sp = await el.speak(text, { previous: lines[i - 1], next: lines[i + 1] });
+      const sp = await el.speak(text);
       await writeFile(file, sp.audio);
-      await writeFile(meta, JSON.stringify({ duration: sp.duration }));
+      await writeFile(meta, JSON.stringify({ duration: sp.duration, words: sp.words }));
     }
-    out.push({ file, duration: (JSON.parse(await readFile(meta, "utf8")) as { duration: number }).duration });
+    return { file, ...(JSON.parse(await readFile(meta, "utf8")) as { duration: number; words?: { start: number; end: number }[] }) };
+  };
+
+  const take = await cached(lines.join(" "), "tek|");
+  const counts = lines.map((l) => l.split(/\s+/).filter(Boolean).length);
+  if (take.words?.length === counts.reduce((a, b) => a + b, 0)) {
+    let w = 0;
+    const spans = counts.map((n) => {
+      const span = { start: take.words![w]!.start, end: take.words![w + n - 1]!.end };
+      w += n;
+      return span;
+    });
+    // Kesim cümleler arasındaki sessizliğin ortasından; ilk cümle baştan, son cümle sondan biraz pay alır.
+    return Promise.all(
+      spans.map(async (sp, k) => {
+        const from = k ? Math.max(spans[k - 1]!.end, (spans[k - 1]!.end + sp.start) / 2, sp.start - 0.15) : 0;
+        const to = k < spans.length - 1 ? Math.min((sp.end + spans[k + 1]!.start) / 2, sp.end + 0.2) : take.duration + 0.05;
+        const out = take.file.replace(/\.mp3$/, `-${k + 1}.m4a`);
+        if (!existsSync(out)) await ffmpeg(["-ss", from.toFixed(3), "-to", to.toFixed(3), "-i", take.file, "-c:a", "aac", "-b:a", "192k", out]);
+        return { file: out, duration: to - from };
+      }),
+    );
+  }
+  ctx.log(`! tek seferlik seslendirme cümlelere bölünemedi (${take.words?.length} kelime / ${counts.reduce((a, b) => a + b, 0)}): cümle cümle okutuluyor`);
+  const out: { file: string; duration: number }[] = [];
+  for (const text of lines) {
+    const sp = await cached(text);
+    out.push({ file: sp.file, duration: sp.duration });
   }
   return out;
 }

@@ -183,7 +183,8 @@ export function stagingNarration(rooms: (keyof typeof ROOM_LINES)[], d: Partial<
     if (extra) used.add(extra);
     return [h, extra].filter(Boolean).join(" ");
   });
-  return { rooms: lines, outro };
+  // Seslendirilecek biçim: ilandan gelen rakam ve kısaltmalar okunuşa çevrilir (önizleme de okunacağı gibi görünür).
+  return { rooms: lines.map(speakable), outro: speakable(outro) };
 }
 
 /**
