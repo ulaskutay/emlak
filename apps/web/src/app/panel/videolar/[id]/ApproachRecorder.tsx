@@ -2,13 +2,15 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * İnşaat videosunun drone yaklaşma çekimi, kullanıcının tarayıcısında: drone stüdyosu (/studio/, apps/drone-studio)
- * ekran dışı bir çerçevede açılır, parsel yüklenir, ~6 sn'lik iniş kare kare çizilip MP4'e kodlanır ve R2'ye yüklenir.
- * GPU sunucusu (RunPod) gerekmez. Çekim form doldurulurken arka planda sürer; olmazsa video yaklaşmasız üretilir.
+ * İnşaat videosunun drone yaklaşma çekimi, üretim sırasında video sayfasında, kullanıcının tarayıcısında: drone
+ * stüdyosu (/studio/, apps/drone-studio) ekran dışı bir çerçevede açılır, parsel yüklenir, ~6 sn'lik iniş kare kare
+ * çizilip MP4'e kodlanır, R2'ye yüklenip videoya bağlanır (/api/videos/[id]/approach). GPU sunucusu (RunPod) gerekmez.
+ * Sunucu bu sırada inşaat kliplerini üretir; bitince çekimi bekler (sayfa açık ve ilerleme geliyorsa), gelmezse
+ * video yaklaşmasız çıkar.
  */
-export type Approach =
+type Approach =
   | { status: "working"; progress: number }
-  | { status: "done"; key: string }
+  | { status: "done" }
   | { status: "failed"; error: string };
 
 type Studio = {
@@ -27,22 +29,28 @@ async function waitFor<T>(get: () => T | undefined, ms: number): Promise<T> {
   }
 }
 
-export function ApproachRecorder({ parcelText, onChange }: { parcelText: string; onChange: (a: Approach) => void }) {
+export function ApproachRecorder({ videoId }: { videoId: string }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [state, setState] = useState<Approach>({ status: "working", progress: 0 });
   const [phase, setPhase] = useState("Parsel ve çevre bilgisi hazırlanıyor");
   const [thumb, setThumb] = useState<string>();
   const [video, setVideo] = useState<string>();
   const [run, setRun] = useState(0);
-  const report = useRef(onChange);
-  report.current = onChange;
 
   useEffect(() => {
     const ctrl = new AbortController();
+    const api = `/api/videos/${videoId}/approach`;
+    const post = (body: object) =>
+      fetch(api, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+    // İlerleme sunucuya birkaç saniyede bir: worker sayfanın açık olduğunu ve çekimin sürdüğünü buradan bilir.
+    let lastPost = 0;
     const set = (a: Approach) => {
       if (ctrl.signal.aborted) return;
       setState(a);
-      report.current(a);
+      if (a.status === "working" && Date.now() - lastPost > 3000) {
+        lastPost = Date.now();
+        post({ progress: a.progress });
+      }
     };
     set({ status: "working", progress: 0 });
     setThumb(undefined);
@@ -50,7 +58,7 @@ export function ApproachRecorder({ parcelText, onChange }: { parcelText: string;
     (async () => {
       if (typeof VideoEncoder === "undefined") throw new Error("Bu tarayıcı video kodlamayı desteklemiyor (güncel Chrome, Edge ya da Safari gerekir)");
       setPhase("Parsel ve çevre bilgisi hazırlanıyor");
-      const res = await fetch("/api/parcel/prepare", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: parcelText }), signal: ctrl.signal });
+      const res = await fetch(api, { signal: ctrl.signal });
       const data = (await res.json()) as { parcel?: unknown; key?: string; error?: string };
       if (!res.ok || !data.parcel || !data.key) throw new Error(data.error ?? "Parsel hazırlanamadı");
       setPhase("3D harita yükleniyor");
@@ -74,14 +82,18 @@ export function ApproachRecorder({ parcelText, onChange }: { parcelText: string;
       const up = await fetch("/api/uploads", { method: "POST", body: fd, signal: ctrl.signal });
       const u = (await up.json()) as { key?: string; error?: string };
       if (!up.ok || !u.key) throw new Error(u.error ?? "Çekim yüklenemedi");
+      const done = await fetch(api, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: u.key }) });
+      if (!done.ok) throw new Error(((await done.json().catch(() => ({}))) as { error?: string }).error ?? "Çekim videoya eklenemedi");
       setVideo(URL.createObjectURL(blob));
-      set({ status: "done", key: u.key });
+      set({ status: "done" });
     })().catch((e) => {
       if (ctrl.signal.aborted) return;
-      set({ status: "failed", error: e instanceof Error ? e.message : String(e) });
+      const error = e instanceof Error ? e.message : String(e);
+      set({ status: "failed", error });
+      post({ failed: error });
     });
     return () => ctrl.abort();
-  }, [parcelText, run]);
+  }, [videoId, run]);
 
   const pct = state.status === "working" ? Math.round(state.progress * 100) : 100;
   return (
@@ -101,17 +113,18 @@ export function ApproachRecorder({ parcelText, onChange }: { parcelText: string;
         <div className="min-w-0 flex-1">
           <div className="font-semibold">Drone yaklaşma çekimi</div>
           <p className="mt-1 text-sm text-gri">
-            Video, kameranın mahallenin yukarısından arsaya inmesiyle başlar; yakındaki yerler etiketlenir. Çekim bu tarayıcıda hazırlanır.
+            Video, kameranın mahallenin yukarısından arsaya inmesiyle başlar; yakındaki yerler etiketlenir. Çekim bu tarayıcıda,
+            inşaat sahneleri sunucuda hazırlanırken çizilir.
           </p>
           {state.status === "working" && (
             <>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-zemin">
                 <div className="h-full rounded-full bg-gok transition-[width]" style={{ width: `${pct}%` }} />
               </div>
-              <p className="mt-2 text-sm text-gri">{phase}… %{pct}. Bitene kadar bu sekmeyi açık tutun.</p>
+              <p className="mt-2 text-sm text-gri">{phase}… %{pct}. Bitene kadar bu sayfayı kapatmayın.</p>
             </>
           )}
-          {state.status === "done" && <p className="mt-3 text-sm font-medium text-cimen-koyu">Çekim hazır</p>}
+          {state.status === "done" && <p className="mt-3 text-sm font-medium text-cimen-koyu">Çekim hazır; videonun başına eklenecek</p>}
           {state.status === "failed" && (
             <div className="mt-3 text-sm">
               <p className="text-mercan-koyu">Çekim hazırlanamadı: {state.error}. Video yaklaşmasız, doğrudan arsadan başlar.</p>

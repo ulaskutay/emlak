@@ -7,6 +7,7 @@
  * GPU sunucusu (RunPod) gerekmesin diye kullanıcının GPU'su kullanılır (2026-10-29); sunucuda GPU yok.
  */
 import { defaultSideShot, sideState } from "./side-shot.js";
+import { sleep } from "./timer.js";
 import type { Camera, FrameState, ParcelInfo } from "./types.js";
 
 /** MP4 paketleyici (CDN'den, Cesium gibi): depoya bağımlılık eklemeden. */
@@ -211,7 +212,7 @@ export async function recordApproach(host: ApproachHost, p: ParcelInfo, o: Appro
     encoder.encode(frame, { keyFrame: i % fps === 0 });
     frame.close();
     // Kodlayıcı kuyruğu birikmesin (telefonda bellek).
-    while (encoder.encodeQueueSize > 4) await new Promise((r) => setTimeout(r, 5));
+    while (encoder.encodeQueueSize > 4) await sleep(5);
     o.onProgress?.((i + 1) / n, out);
   }
   await encoder.flush();

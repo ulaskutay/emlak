@@ -68,10 +68,10 @@ export async function POST(req: Request) {
       await getDb().insert(videos).values({ ...base, ...parcel, input: { building: order.building, floors: order.floors } });
     else if (order.template === "insaat-videosu") {
       const own = (k?: string) => !k || k.startsWith(`uploads/${user.id}/`);
-      if (!own(order.agent.photoKey) || !own(order.agent.logoKey) || !own(order.approachKey)) return badRequest("Geçersiz görsel");
+      if (!own(order.agent.photoKey) || !own(order.agent.logoKey)) return badRequest("Geçersiz görsel");
       await getDb()
         .insert(videos)
-        .values({ ...base, ...parcel, input: { building: order.building, floors: order.floors, zoning: order.zoning, agent: order.agent, approachKey: order.approachKey }, voiceId: order.voiceId ?? null });
+        .values({ ...base, ...parcel, input: { building: order.building, floors: order.floors, zoning: order.zoning, agent: order.agent }, voiceId: order.voiceId ?? null });
     }
     else await getDb().insert(videos).values({ ...base, ...parcel, voiceId: order.voiceId ?? null });
   }

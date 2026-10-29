@@ -11,6 +11,7 @@
  */
 import { labelCanvas, makeGeometry, rgba, type Geometry, type LL, type XY } from "./geometry.js";
 import { easeOut } from "./overlay.js";
+import { later } from "./timer.js";
 import type { FrameState, ParcelInfo } from "./types.js";
 
 const VER = "1.143";
@@ -87,7 +88,7 @@ export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number; 
         stable = ready ? stable + 1 : 0;
         if (stable > 3) return resolve(true);
         if (performance.now() - t0 > timeoutMs) return resolve(false);
-        setTimeout(tick, 8);
+        later(tick, 8);
       };
       tick();
     });
@@ -95,16 +96,18 @@ export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number; 
 
   /** Yüzeye yapıştırılmış yükseklikler (render döngüsü kapalıyken örnekleme beklerken çizmek gerekir). */
   async function sampleHeights(points: LL[], timeoutMs: number): Promise<(number | undefined)[]> {
-    const pump = setInterval(() => viewer.render(), 30);
+    let pumping = true;
+    const pumpTick = () => pumping && (viewer.render(), later(pumpTick, 30));
+    pumpTick();
     try {
       const res = await Promise.race([
         viewer.scene.clampToHeightMostDetailed(points.map((q) => C.Cartesian3.fromDegrees(q.lng, q.lat, 0))),
-        new Promise<null>((r) => setTimeout(() => r(null), timeoutMs)),
+        new Promise<null>((r) => later(() => r(null), timeoutMs)),
       ]);
       if (!res) return points.map(() => undefined);
       return (res as any[]).map((p) => (p ? C.Cartographic.fromCartesian(p).height : undefined));
     } finally {
-      clearInterval(pump);
+      pumping = false;
     }
   }
 
@@ -169,7 +172,7 @@ export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number; 
           new Promise<boolean>((r) => {
             const code = err?.statusCode;
             if (code && code !== 429 && code < 500) return r(false);
-            setTimeout(() => r(true), 400 + Math.random() * 1200);
+            later(() => r(true), 400 + Math.random() * 1200);
           }),
       });
       tileset = await C.Cesium3DTileset.fromUrl(root, {

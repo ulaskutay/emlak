@@ -5,11 +5,37 @@
  */
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { eq, getDb, videos } from "@arsa/db";
 import { HiggsfieldCli, RunpodClient } from "@arsa/providers";
 import type { BuildingType, DosemeOrder, Zoning } from "@arsa/shared";
 import { download, priceText, type JobContext, type JobResult } from "./common.js";
 import { appendOutro, buildConstruction, editImage, ENHANCE_PROMPT, OUTRO_SECONDS, prependApproach, runJob, SEGMENT_SECONDS, stripAttribution, type Gen } from "./insaat-hat.js";
 import { addConstructionAudio } from "./insaat-ses.js";
+
+/** Sayfadan bu kadar süre haber gelmezse (kapandı ya da hiç açılmadı) çekim beklenmez. */
+const APPROACH_SILENCE_MS = 45_000;
+/** Çekim sürüyor olsa da en fazla bu kadar beklenir. */
+const APPROACH_MAX_WAIT_MS = 8 * 60_000;
+
+/**
+ * Video sayfasındaki çekimi bekler (ApproachRecorder → /api/videos/[id]/approach → input.approach / approachKey).
+ * Çekim bağlandıysa anahtarını, başarısız olduysa, sayfa sessizse ya da süre dolduysa null döner.
+ */
+async function waitApproach(id: string, progress: (p: number) => unknown, log: (m: string) => void): Promise<string | null> {
+  const db = getDb();
+  const t0 = Date.now();
+  for (;;) {
+    const [row] = await db.select({ input: videos.input }).from(videos).where(eq(videos.id, id));
+    const input = (row?.input ?? {}) as { approachKey?: string; approach?: { progress?: number; failed?: string; at?: number } };
+    if (input.approachKey) return input.approachKey;
+    const a = input.approach;
+    if (a?.failed) return (log(`yaklaşma çekimi yok (tarayıcı: ${a.failed})`), null);
+    if (!a?.at || Date.now() - a.at > APPROACH_SILENCE_MS) return (log("yaklaşma çekimi yok (video sayfası açık değil)"), null);
+    if (Date.now() - t0 > APPROACH_MAX_WAIT_MS) return (log(`yaklaşma çekimi beklenmedi (%${Math.round((a.progress ?? 0) * 100)})`), null);
+    await progress(a.progress ?? 0);
+    await new Promise((r) => setTimeout(r, 4000));
+  }
+}
 
 /** Dilim sayısı: 4 × 5 sn = 20 sn inşaat. */
 const CLIPS = 4;
@@ -18,14 +44,7 @@ const SEED = 10;
 export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
   const v = ctx.video;
   if (!v.parcelText || !v.parcelSummary) throw new Error("Parsel dosyası eksik");
-  const { building, floors = 4, zoning, agent, approachKey } = v.input as {
-    building?: BuildingType;
-    floors?: number;
-    zoning?: Zoning;
-    agent?: DosemeOrder["agent"];
-    /** Kullanıcının tarayıcısında çizilen drone yaklaşma çekimi (panel, ApproachRecorder). */
-    approachKey?: string;
-  };
+  const { building, floors = 4, zoning, agent } = v.input as { building?: BuildingType; floors?: number; zoning?: Zoning; agent?: DosemeOrder["agent"] };
   if (!building) throw new Error("Yapı tipi eksik");
   if (!zoning) throw new Error("İmar bilgisi eksik");
 
@@ -59,7 +78,10 @@ export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
     onStage: (s, p) => ctx.stage(s, p),
   });
 
-  // Drone yaklaşma çekimi varsa başa eklenir; inşaat, ses ve kartlar o kadar kayar. Çekim bozuksa video yaklaşmasız çıkar.
+  // Drone yaklaşma çekimi (video sayfasında, kullanıcının tarayıcısında çizilir) başa eklenir; inşaat, ses ve kartlar
+  // o kadar kayar. Gelmezse ya da bozuksa video yaklaşmasız çıkar.
+  await ctx.stage("approach");
+  const approachKey = await waitApproach(v.id, (p) => ctx.stage("approach", p), ctx.log);
   let construction = final;
   let offset = 0;
   if (approachKey) {

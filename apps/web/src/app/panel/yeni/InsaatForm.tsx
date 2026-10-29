@@ -2,7 +2,6 @@
 import { BUILDING_LABELS, BuildingType } from "@arsa/shared";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { ApproachRecorder, type Approach } from "./ApproachRecorder";
 import { ListingFields, listingPayload, type ListingValues } from "./ListingFields";
 import { uploadAgentPhoto, uploadLogo } from "./photoUpload";
 import { ParcelStep, VoiceStep, type Parsed } from "./Wizard";
@@ -88,8 +87,6 @@ export function InsaatForm() {
   const [music, setMusic] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [approach, setApproach] = useState<Approach>({ status: "working", progress: 0 });
-  const recording = approach.status === "working";
 
   const e = decimal(emsal);
   const t = decimal(taks);
@@ -116,7 +113,6 @@ export function InsaatForm() {
         listing: listingPayload(listing),
         ...(voiceId ? { voiceId } : {}),
         music,
-        ...(approach.status === "done" ? { approachKey: approach.key } : {}),
       }),
     });
     const data = await res.json();
@@ -141,8 +137,6 @@ export function InsaatForm() {
 
       {step === 1 && parcel && (
         <>
-          <ApproachRecorder parcelText={parcel.text} onChange={setApproach} />
-
           <fieldset className="pnl-kart p-5 sm:p-6">
             <legend className="sr-only">Yapı tipi</legend>
             <div className="mb-4 font-semibold">Arsaya ne yapılsın?</div>
@@ -229,13 +223,9 @@ export function InsaatForm() {
           <div className="flex items-center justify-between gap-4">
             <button className="pnl-btn-ghost" onClick={() => setStep(0)}>Geri</button>
             <div className="flex items-center gap-4">
-              {!emsalOk ? (
-                <span className="text-sm text-gri">Emsali girin</span>
-              ) : (
-                recording && <span className="text-sm text-gri">Drone çekimi bitince gönderilir</span>
-              )}
-              <button className="pnl-btn-primary" disabled={busy || recording || !emsalOk || !taksOk || !use.trim()} onClick={submit}>
-                {busy ? "Gönderiliyor…" : recording ? `Drone çekimi %${Math.round(approach.progress * 100)}` : "Videoyu oluştur"}
+              {!emsalOk && <span className="text-sm text-gri">Emsali girin</span>}
+              <button className="pnl-btn-primary" disabled={busy || !emsalOk || !taksOk || !use.trim()} onClick={submit}>
+                {busy ? "Gönderiliyor…" : "Videoyu oluştur"}
               </button>
             </div>
           </div>
