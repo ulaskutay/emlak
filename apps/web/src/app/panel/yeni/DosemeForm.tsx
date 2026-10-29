@@ -1,5 +1,5 @@
 "use client";
-import { parseListingText, presenterList, type PresenterId, ROOM_LABELS, RoomType, stagingNarration, STYLE_LABELS, StagingStyle, TOUR_MAX_WORDS, TOUR_QUALITY, TourQuality, tourScript, type TourNearby } from "@arsa/shared";
+import { HIGHLIGHT_MAX, parseListingText, presenterList, type PresenterId, ROOM_LABELS, RoomType, stagingNarration, STYLE_LABELS, StagingStyle, TOUR_MAX_WORDS, TOUR_QUALITY, TourQuality, tourScript, type TourNearby } from "@arsa/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ListingFields, listingPayload, type ListingValues } from "./ListingFields";
@@ -154,6 +154,7 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
   // Sunuculu tur: sahne başına otomatik senaryo; kullanıcı bir sahnenin metnini değiştirdiyse o kullanılır.
   const script = sunucu ? tourScript(typedRooms, detailsPayload(details), nearby, priceTry) : [];
   const sceneText = (p: Photo) => p.text ?? script[typed.indexOf(p)] ?? "";
+  const longHighlights = detailsPayload(details).highlights.filter((l) => l.length > HIGHLIGHT_MAX).length;
   const tooLong = sunucu ? typed.filter((p) => words(sceneText(p)) > TOUR_MAX_WORDS).length : 0;
 
   // Konum (ya da ilan koordinatı) değişince yakın yerler; senaryonun konum cümlesi bundan.
@@ -539,6 +540,9 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
           <label className="pnl-label" htmlFor="highlights">Öne çıkanlar (her satıra bir cümle, en fazla 5)</label>
           <textarea id="highlights" className="pnl-input min-h-20 py-2 text-sm" placeholder={"Örn. Metroya beş dakika yürüme mesafesinde.\nSite içinde, havuzlu."}
             value={details.highlights} onChange={(e) => setDetails({ ...details, highlights: e.target.value })} />
+          {longHighlights > 0 && (
+            <p className="mt-1 text-sm text-mercan-koyu">{longHighlights} satır {HIGHLIGHT_MAX} karakterden uzun; kısaltın ya da ikiye bölün.</p>
+          )}
         </div>
       </div>
 
@@ -671,9 +675,10 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
           <span className="text-sm text-gri">En az {MIN} fotoğraf gerekli</span>
         ) : (
           (untyped > 0 && <span className="text-sm text-gri">{untyped} fotoğrafın oda tipini seçin</span>) ||
-          (tooLong > 0 && <span className="text-sm text-gri">{tooLong} sahnenin metni çok uzun</span>)
+          (tooLong > 0 && <span className="text-sm text-gri">{tooLong} sahnenin metni çok uzun</span>) ||
+          (longHighlights > 0 && <span className="text-sm text-gri">Öne çıkanlarda uzun satır var</span>)
         )}
-        <button className="pnl-btn-primary" disabled={busy || uploading || ready.length < MIN || untyped > 0 || tooLong > 0} onClick={submit}>
+        <button className="pnl-btn-primary" disabled={busy || uploading || ready.length < MIN || untyped > 0 || tooLong > 0 || longHighlights > 0} onClick={submit}>
           {busy ? "Gönderiliyor…" : uploading ? "Fotoğraflar yükleniyor…" : "Videoyu oluştur"}
         </button>
       </div>

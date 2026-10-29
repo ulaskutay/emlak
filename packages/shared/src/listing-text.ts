@@ -6,6 +6,9 @@
 import { z } from "zod";
 import { locative, numberWords, speakable, spokenPrice } from "./speech.js";
 
+/** Öne çıkan cümlenin en fazla karakteri (anlatımda tek nefeste söylenebilecek kadar). */
+export const HIGHLIGHT_MAX = 80;
+
 export const ListingDetails = z.object({
   /** "Satılık Daire", "Kiralık Villa"… */
   kind: z.string().trim().max(40).optional(),
@@ -19,7 +22,7 @@ export const ListingDetails = z.object({
   /** İlan başlığı (sayfadan, olduğu gibi). */
   title: z.string().trim().max(120).optional(),
   /** Anlatımda geçecek kısa cümleler ("Site içinde.", "Krediye uygun."). */
-  highlights: z.array(z.string().trim().min(2).max(80)).max(5).default([]),
+  highlights: z.array(z.string().trim().min(2).max(HIGHLIGHT_MAX)).max(5).default([]),
 });
 export type ListingDetails = z.infer<typeof ListingDetails>;
 
@@ -66,7 +69,8 @@ function descriptionSentences(text: string) {
     .map((l) => l.replace(/^\s*[-•*–]\s*/, "").trim())
     .filter((l) => l.split(/\s+/).length >= 3 && l.split(/\s+/).length <= 12 && SELLING.test(l))
     .filter((l) => !/\b(the|and|with|rooms?|bedrooms?)\b/i.test(l) && !/metrekare|m²|m2\b|\d\s*\+\s*\d|tel|whatsapp|arayın|ofis|emlak/i.test(l))
-    .map(sentence);
+    .map(sentence)
+    .filter((l) => l.length <= HIGHLIGHT_MAX);
 }
 
 export function parseListingText(text: string): { details: ListingDetails; priceTry?: number } {
