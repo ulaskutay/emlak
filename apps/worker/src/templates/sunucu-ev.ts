@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { HiggsfieldCli } from "@arsa/providers";
 import {
   FORMAT_SPECS,
+  roomFromTitle,
   PRESENTERS,
   ROOM_LABELS,
   TOUR_QUALITY,
@@ -96,7 +97,7 @@ export async function sunucuEv(ctx: JobContext): Promise<JobResult> {
       const cw = "min(iw\\,ih*9/16)";
       const ch = "min(ih\\,iw*16/9)";
       await ffmpeg(["-i", raw, "-vf", `crop=${cw}:${ch}:(iw-${cw})*${p.focusX ?? 0.5}:(ih-${ch})/2`, "-q:v", "2", file]);
-      return { file, room: p.room, title: p.title, text: p.text };
+      return { file, room: roomFromTitle(p.title) ?? p.room, title: p.title, text: p.text };
     }),
   );
   const fetchAsset = (key: string | undefined, name: string) =>

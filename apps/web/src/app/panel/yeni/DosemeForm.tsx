@@ -1,5 +1,5 @@
 "use client";
-import { HIGHLIGHT_MAX, parseListingText, presenterList, type PresenterId, ROOM_LABELS, RoomType, stagingNarration, STYLE_LABELS, StagingStyle, TOUR_MAX_WORDS, TOUR_QUALITY, TourQuality, tourScript, type TourNearby } from "@arsa/shared";
+import { HIGHLIGHT_MAX, parseListingText, presenterList, type PresenterId, ROOM_LABELS, roomFromTitle, RoomType, stagingNarration, STYLE_LABELS, StagingStyle, TOUR_MAX_WORDS, TOUR_QUALITY, TourQuality, tourScript, type TourNearby } from "@arsa/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ListingFields, listingPayload, type ListingValues } from "./ListingFields";
@@ -457,7 +457,7 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
                   ))}
                 </select>
                 <input className="pnl-input py-2" maxLength={40} placeholder={p.room ? `Başlık (boşsa "${ROOM_LABELS[p.room]}")` : "Başlık (isteğe bağlı)"} value={p.title}
-                  aria-label={`${i + 1}. oda başlığı`} onChange={(e) => update(p.id, { title: e.target.value })} />
+                  aria-label={`${i + 1}. oda başlığı`} onChange={(e) => update(p.id, { title: e.target.value, ...(roomFromTitle(e.target.value) && { room: roomFromTitle(e.target.value) }) })} />
                 {sunucu && p.room && (
                   <div>
                     <textarea className="pnl-input min-h-20 py-2 text-sm" maxLength={220} value={sceneText(p)} aria-label={`${i + 1}. sahnede sunucunun söyleyeceği`}

@@ -1,16 +1,18 @@
 /**
- * Fotoğraftan ilan videosu: her fotoğraf RunPod'da (Hunyuan/LTX) kamera hareketli bir sahneye dönüşür,
- * sahneler paralel üretilir, başlıklar ve kapanış kartıyla birleştirilip müzik eklenir.
+ * Fotoğraftan ilan videosu: her fotoğraf Higgsfield'da (Gemini Omni Flash, 1080p 60 FPS büyütmeyle) kamera hareketli
+ * bir sahneye dönüşür, sahneler paralel üretilir, başlıklar ve kapanış kartıyla birleştirilip müzik eklenir.
  */
 import { join } from "node:path";
-import { MODEL_PROFILES, RunpodClient, RunpodVideoProvider, type ModelProfile } from "@arsa/providers";
-import { FORMAT_SPECS, type AiScene, type CameraMove, type IlanPhoto } from "@arsa/shared";
-import { addMusic, backgroundMusic, drawText, ffmpeg, priceText, runpodJob, saveOutput, type JobContext, type JobResult } from "./common.js";
+import { HiggsfieldCli } from "@arsa/providers";
+import { buildRealEstatePrompt, FORMAT_SPECS, type AiScene, type CameraMove, type IlanPhoto } from "@arsa/shared";
+import { addMusic, backgroundMusic, CLIP_FPS, download, drawText, ffmpeg, geminiClip, priceText, type JobContext, type JobResult } from "./common.js";
 
 const FORMAT = "reels_9x16" as const;
-const SCENE_SECONDS = 3.375; // 81 kare / 24 fps
+/** Gemini 5 sn üretir; sahnenin en akıcı ilk 4 sn'si kullanılır. */
+const CLIP_SECONDS = 5;
+const SCENE_SECONDS = 4;
 const OUTRO_SECONDS = 3;
-const OUT_FPS = 30;
+const OUT_FPS = CLIP_FPS;
 
 /** Fotoğraf sırasına göre kamera: dış mekânda havadan/yörünge, iç mekânda yaklaşma/kaydırma. */
 const EXTERIOR: CameraMove[] = ["drone_rise", "orbit_right", "slow_pull_out", "orbit_left"];
@@ -27,17 +29,18 @@ export async function ilanVideosu(ctx: JobContext): Promise<JobResult> {
   const photos = (v.input as { photos?: IlanPhoto[] }).photos;
   if (!photos?.length) throw new Error("Fotoğraf yok");
 
-  const apiKey = process.env.RUNPOD_API_KEY;
-  const endpoint = process.env.RUNPOD_VIDEO_ENDPOINT_ID;
-  if (!apiKey || !endpoint) throw new Error("RUNPOD_API_KEY / RUNPOD_VIDEO_ENDPOINT_ID eksik");
-  const profile = (process.env.RUNPOD_MODEL_PROFILE ?? "hunyuan15_480p") as ModelProfile;
-  if (!(profile in MODEL_PROFILES)) throw new Error(`Bilinmeyen RUNPOD_MODEL_PROFILE: ${profile}`);
-  const client = new RunpodClient(apiKey, endpoint);
-  const provider = new RunpodVideoProvider(client, profile);
+  const hf = new HiggsfieldCli();
 
-  // 1) Fotoğraflar: GPU worker'ı imzalı linkten kendisi indirir.
+  // 1) Fotoğraflar dikey kadraja (ortadan) kırpılır; model kareyi olduğu gibi canlandırır.
   await ctx.stage("photos");
-  const urls = await Promise.all(photos.map((p) => ctx.r2.url(p.key, 3600)));
+  const frames = await Promise.all(
+    photos.map(async (p, i) => {
+      const raw = await download(await ctx.r2.url(p.key, 3600), join(ctx.workDir, `ham-${i + 1}.jpg`));
+      const out = join(ctx.workDir, `kare-${i + 1}.jpg`);
+      await ffmpeg(["-i", raw, "-vf", "crop=min(iw\\,ih*9/16):min(ih\\,iw*16/9),scale=720:1280", "-q:v", "2", out]);
+      return out;
+    }),
+  );
 
   // 2) Sahneler paralel
   await ctx.stage("clips", 0);
@@ -51,18 +54,19 @@ export async function ilanVideosu(ctx: JobContext): Promise<JobResult> {
         id: `sahne-${i + 1}`,
         type: "ai_photo_motion",
         durationSec: SCENE_SECONDS,
-        photoUrl: urls[i]!,
+        photoUrl: "",
         camera,
         setting: p.setting,
         prompt: SCENE_PROMPT[p.setting],
       };
-      const out = await runpodJob(
-        client,
-        provider.buildInput({ projectId: v.id, scene, format: FORMAT, quality: "preview", seed: i + 1 }),
-        `sahne ${i + 1}`,
-        ctx.log,
-      );
-      const file = await saveOutput(out, "video", join(ctx.workDir, `sahne-${i + 1}.mp4`));
+      const file = await geminiClip(hf, {
+        prompt: `${buildRealEstatePrompt(scene).prompt} No people. Audio: no speech, only quiet ambience.`,
+        start: frames[i]!,
+        seconds: CLIP_SECONDS,
+        out: join(ctx.workDir, `sahne-${i + 1}.mp4`),
+        label: `sahne ${i + 1}`,
+        log: ctx.log,
+      });
       await ctx.stage("clips", ++done / photos.length);
       return file;
     }),
@@ -82,7 +86,7 @@ export async function ilanVideosu(ctx: JobContext): Promise<JobResult> {
   const filters = clips.map((_, i) => {
     const title = photos[i]!.title;
     return (
-      `[${i}:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=${OUT_FPS},format=yuv420p` +
+      `[${i}:v]trim=duration=${SCENE_SECONDS},setpts=PTS-STARTPTS,scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=${OUT_FPS},format=yuv420p` +
       (title ? `,${drawText(title, titleSize, "h*0.72", "white", 0.15)}` : "") +
       `[v${i}]`
     );
@@ -106,5 +110,5 @@ export async function ilanVideosu(ctx: JobContext): Promise<JobResult> {
     "-map", "[out]", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-movflags", "+faststart", silent,
   ]);
   const final = await addMusic(silent, music, duration, join(ctx.workDir, "ilan.mp4"));
-  return { videoPath: final, durationSec: duration, posterAt: 1.2, stats: { scenes: clips.length, profile } };
+  return { videoPath: final, durationSec: duration, posterAt: 1.2, stats: { scenes: clips.length, model: "gemini_omni_flash_1_1" } };
 }

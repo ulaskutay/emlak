@@ -10,6 +10,7 @@ import { HiggsfieldCli } from "@arsa/providers";
 import {
   FORMAT_SPECS,
   ROOM_LABELS,
+  roomFromTitle,
   stagingNarration,
   stagingVideoPrompt,
   type ListingDetails,
@@ -18,10 +19,12 @@ import {
 } from "@arsa/shared";
 import {
   backgroundMusic,
+  CLIP_FPS,
   download,
   drawText,
   ffmpeg,
   furnishRoom,
+  geminiClip,
   mixAudio,
   priceText,
   probeDuration,
@@ -31,8 +34,8 @@ import {
 } from "./common.js";
 import { agentCard } from "./agent-card.js";
 
-/** Büyütücü 60 FPS verir (AIGC ön ayarı); kurgu da 60 FPS. */
-const OUT_FPS = 60;
+/** Klipler 60 FPS büyütülür (AIGC); kurgu da 60 FPS. */
+const OUT_FPS = CLIP_FPS;
 const TOTAL_SECONDS = 21;
 const OUTRO_SECONDS = 3.5;
 /** Döşenmiş son kare her sahnenin sonunda bu kadar bekletilir (izleyici sonucu görsün). */
@@ -48,21 +51,25 @@ const OUTRO_TAIL = 1;
 /** Boş ve döşenmiş kare aynı boyutta: geçiş klibinin ilk/son kareleri hizalı kalır. */
 const EDIT_W = 720;
 const EDIT_H = 1280;
-/** Geçiş klibi: Gemini 360p (720p'nin üçte biri fiyatına, içerik aynı; 2026-10-29), büyütücü 1080p'ye çıkarır. */
-const CLIP_MODEL = "gemini_omni_flash_1_1";
+/** Geçiş klibi süresi (Gemini; eşyaların hareketle yerleşmesine yetiyor). */
 const CLIP_SECONDS = 5;
-const UPSCALE_MODEL = "bytedance_video_upscale";
 
 export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
   const v = ctx.video;
-  const { photos, style, details, agent, voice } = v.input as {
+  const { photos: input, style, details, agent, voice } = v.input as {
     photos?: RoomPhoto[];
     style?: StagingStyle;
     details?: ListingDetails;
     agent?: { name?: string; photoKey?: string; logoKey?: string };
     voice?: boolean;
   };
-  if (!photos?.length || !style) throw new Error("Fotoğraf ya da döşeme tarzı yok");
+  if (!input?.length || !style) throw new Error("Fotoğraf ya da döşeme tarzı yok");
+  // Başlık seçilen tiple çelişirse ("Çocuk Odası" başlığı, yatak odası tipi) döşeme başlığa göre yapılır.
+  const photos = input.map((p, i) => {
+    const room = roomFromTitle(p.title) ?? p.room;
+    if (room !== p.room) ctx.log(`oda ${i + 1}: tip ${p.room} → ${room} (başlık "${p.title}")`);
+    return { ...p, room };
+  });
 
   const hf = new HiggsfieldCli();
   const { width: W, height: H } = FORMAT_SPECS.reels_9x16;
@@ -113,20 +120,15 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
   done = 0;
   const clips = await Promise.all(
     photos.map(async (p, i) => {
-      const raw = await hf.generate(
-        CLIP_MODEL,
-        {
-          params: { prompt: stagingVideoPrompt(p.room), mode: "image-to-video", duration: CLIP_SECONDS, resolution: "360p", aspect_ratio: "9:16" },
-          media: [["start-image", empty[i]!], ["end-image", furnished[i]!]],
-        },
-        { label: `sahne ${i + 1}`, log: ctx.log },
-      );
-      const clip = await hf.generate(
-        UPSCALE_MODEL,
-        { params: { model_version: "standard", resolution: "1080p", fps: OUT_FPS, preset: "aigc" }, media: [["video-references", raw.id]] },
-        { label: `büyütme ${i + 1}`, log: ctx.log },
-      );
-      const file = await download(clip.url, join(ctx.workDir, `oda-${i + 1}.mp4`));
+      const file = await geminiClip(hf, {
+        prompt: stagingVideoPrompt(p.room),
+        start: empty[i]!,
+        end: furnished[i]!,
+        seconds: CLIP_SECONDS,
+        out: join(ctx.workDir, `oda-${i + 1}.mp4`),
+        label: `sahne ${i + 1}`,
+        log: ctx.log,
+      });
       await ctx.stage("clips", ++done / photos.length);
       return file;
     }),

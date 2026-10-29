@@ -240,6 +240,32 @@ export const ROOM_LABELS: Record<RoomType, string> = {
   dis_cephe: "Binanın dışı",
 };
 
+/**
+ * Başlıktaki oda adı → oda tipi. Sıra önemli: özel adlar genelden önce ("çocuk yatak odası" çocuk odası,
+ * "ebeveyn banyosu" banyo, "banyolu yatak odası" yatak odası).
+ */
+const TITLE_ROOMS: [RegExp, RoomType][] = [
+  [/çocuk|bebek|genç odası|oyun odası/i, "cocuk_odasi"],
+  [/çalışma|ofis|kütüphane/i, "calisma_odasi"],
+  [/yemek odası/i, "yemek_odasi"],
+  [/yatak odası/i, "yatak_odasi"],
+  [/banyo|tuvalet|\bwc\b|duş/i, "banyo"],
+  [/mutfak/i, "mutfak"],
+  [/balkon|teras/i, "balkon"],
+  [/salon|oturma|misafir odası|yaşam alanı/i, "salon"],
+  [/yatak|ebeveyn/i, "yatak_odasi"],
+  [/dış cephe|bina|cephe|bahçe/i, "dis_cephe"],
+];
+
+/**
+ * Başlıktan oda tipi; tanınmazsa undefined. Başlık videoda yazdığı için kullanıcının niyetidir: tip seçimiyle
+ * çeliştiğinde döşeme başlığa göre yapılır (2026-10-29: "Çocuk Odası" başlıklı oda yatak odası tipiyle döşenmişti).
+ */
+export function roomFromTitle(title?: string): RoomType | undefined {
+  const t = title?.toLocaleLowerCase("tr").trim();
+  return t ? TITLE_ROOMS.find(([re]) => re.test(t))?.[1] : undefined;
+}
+
 export const StagingStyle = z.enum(["modern", "iskandinav", "klasik", "luks", "dogal"]);
 export type StagingStyle = z.infer<typeof StagingStyle>;
 

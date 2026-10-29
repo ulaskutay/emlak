@@ -135,6 +135,35 @@ export async function furnishRoom(
   return out;
 }
 
+/** Higgsfield video: Gemini 360p üretip ByteDance ile 1080p 60 FPS (AIGC ön ayarı) büyütür; 720p'nin üçte biri fiyatına. */
+const CLIP_MODEL = "gemini_omni_flash_1_1";
+const UPSCALE_MODEL = "bytedance_video_upscale";
+export const CLIP_FPS = 60;
+
+/**
+ * Tek görselden (ya da ilk/son kareden) dikey klip: Gemini Omni Flash image-to-video → 1080p 60 FPS büyütme.
+ * Gemini ses de üretir; çağıran istemde konuşma istemez, kurgu sesi kullanmaz.
+ */
+export async function geminiClip(
+  hf: HiggsfieldCli,
+  o: { prompt: string; start: string; end?: string; seconds: number; out: string; label: string; log: (m: string) => void },
+) {
+  const raw = await hf.generate(
+    CLIP_MODEL,
+    {
+      params: { prompt: o.prompt, mode: "image-to-video", duration: o.seconds, resolution: "360p", aspect_ratio: "9:16" },
+      media: [["start-image", o.start], ...(o.end ? [["end-image", o.end] as [string, string]] : [])],
+    },
+    { label: o.label, log: o.log },
+  );
+  const clip = await hf.generate(
+    UPSCALE_MODEL,
+    { params: { model_version: "standard", resolution: "1080p", fps: CLIP_FPS, preset: "aigc" }, media: [["video-references", raw.id]] },
+    { label: `büyütme: ${o.label}`, log: o.log },
+  );
+  return download(clip.url, o.out);
+}
+
 /** Fon müziği (ElevenLabs), süreye göre önbellekli. Anahtar yoksa ya da üretilemezse null. */
 export async function backgroundMusic(seconds: number, ctx: JobContext): Promise<string | null> {
   const key = process.env.ELEVENLABS_API_KEY;
