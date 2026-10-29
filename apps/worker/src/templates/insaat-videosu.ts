@@ -1,17 +1,17 @@
 /**
- * Arsadan inşaat videosu: arsanın yandan yakın çekimi (RunPod drone worker, Cesium) → Qwen ile netleştirme →
- * kazıdan bitmiş yapıya ~20 sn timelapse (insaat-hat.ts) → emlakçı kapanış kartı → inşaat sesleri, imar bilgisini
+ * Arsadan inşaat videosu: arsanın yandan yakın çekimi (RunPod drone worker, Cesium) → Higgsfield ile netleştirme →
+ * kazıdan bitmiş yapıya ~20 sn timelapse (insaat-hat.ts, Higgsfield) → emlakçı kapanış kartı → inşaat sesleri, imar bilgisini
  * okuyan seslendirme, veri kartları ve müzik (insaat-ses.ts). Toplam ~24 sn.
  */
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { RunpodClient } from "@arsa/providers";
+import { HiggsfieldCli, RunpodClient } from "@arsa/providers";
 import type { BuildingType, DosemeOrder, Zoning } from "@arsa/shared";
 import { download, priceText, type JobContext, type JobResult } from "./common.js";
-import { appendOutro, buildConstruction, ENHANCE_PROMPT, OUTRO_SECONDS, qwenEdit, runJob, SEGMENT_SECONDS, type Gpu } from "./insaat-hat.js";
+import { appendOutro, buildConstruction, editImage, ENHANCE_PROMPT, OUTRO_SECONDS, runJob, SEGMENT_SECONDS, type Gen } from "./insaat-hat.js";
 import { addConstructionAudio } from "./insaat-ses.js";
 
-/** İnce klip sayısı: 4 × ~5 sn = 20 sn inşaat. */
+/** Dilim sayısı: 4 × 5 sn = 20 sn inşaat. */
 const CLIPS = 4;
 const SEED = 10;
 
@@ -23,13 +23,8 @@ export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
   if (!zoning) throw new Error("İmar bilgisi eksik");
 
   const env = process.env;
-  if (!env.RUNPOD_API_KEY || !env.RUNPOD_QWEN_ENDPOINT_ID || !env.RUNPOD_WAN_ENDPOINT_ID || !env.RUNPOD_DRONE_ENDPOINT_ID)
-    throw new Error("RUNPOD_DRONE_ENDPOINT_ID / RUNPOD_QWEN_ENDPOINT_ID / RUNPOD_WAN_ENDPOINT_ID eksik");
-  const gpu: Gpu = {
-    qwen: new RunpodClient(env.RUNPOD_API_KEY, env.RUNPOD_QWEN_ENDPOINT_ID),
-    wan: new RunpodClient(env.RUNPOD_API_KEY, env.RUNPOD_WAN_ENDPOINT_ID),
-    log: ctx.log,
-  };
+  if (!env.RUNPOD_API_KEY || !env.RUNPOD_DRONE_ENDPOINT_ID) throw new Error("RUNPOD_API_KEY / RUNPOD_DRONE_ENDPOINT_ID eksik");
+  const gen: Gen = { hf: new HiggsfieldCli(), log: ctx.log };
   const name = (x: string) => join(ctx.workDir, `insaat-${x}`);
 
   // 1) Yan kare: RunPod drone worker'ında Cesium ile tek kare (sunucuda GPU ve Chrome yok).
@@ -43,11 +38,11 @@ export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
   if (still.base64) await writeFile(side, Buffer.from(still.base64, "base64"));
   else await download(still.url ?? (await ctx.r2.url(still.key!, 3600)), side);
   // Cesium karosu yakında bulanık: aynı kadrajda fotogerçekçi drone fotoğrafına.
-  const start = await qwenEdit(gpu, side, ENHANCE_PROMPT, name("yan-net.png"), "qwen netleştirme", SEED);
+  const start = await editImage(gen, side, ENHANCE_PROMPT, name("yan-net.png"), "netleştirme", SEED);
 
   // 2) İnşaat timelapse'i
   const final = await buildConstruction({
-    gpu,
+    gen,
     start,
     type: building,
     floors,

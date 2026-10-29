@@ -1,44 +1,40 @@
 /**
  * İnşaat videosunun görüntü hattı (worker şablonu ve yerel CLI ortak kullanır):
- * arsanın yandan yakın karesinden bitmiş yapıya ~20 sn'lik inşaat timelapse'i.
+ * arsanın yandan yakın karesinden bitmiş yapıya ~20 sn'lik inşaat timelapse'i. Üretim Higgsfield'da (2026-10-29).
  *
- *   1) Qwen: yan kare netleştirilir (Cesium karosu bulanık; fotogerçekçi drone fotoğrafına).
- *   2) Qwen: bitmiş yapı karesi (hedef; kat sayısı çevreye göre boyla da tarif edilir).
- *   3) Qwen: hedef kareden kazı karesi (bina yerine temel çukuru); şantiye renge göre maskelenip boş arsaya
- *      yapıştırılır (Qwen bahçe ve otoparkı bırakıyordu, prompt'la da silmiyordu).
- *   4) Kaba klip: Wan ilk/son kare, kazı → bitmiş yapı (~5 sn, bütün aşamalar hızlıca).
- *   5) Ara kareler: kaba klipte toplam görüntü değişimi eşit parçalara bölünür (Wan binayı erken kuruyor).
- *   6) İnce klipler: ardışık iki ara kare arasında Wan ilk/son kare (paralel); 1. klip boş arsa → kazı.
- *   7) Klip içi tempo: ara kare üretimi + değişime göre kare seçimi (Wan değişimi klibin başına yığıyor).
- * Her klibin başı ve sonu sabit olduğundan zincirde kayma birikmez (yalnız ilk kareden zincirde bina bozuluyordu).
- * Wan klipleri ham 720p üretilir, büyütme en sonda bir kez (her klibi büyütüp tekrar Wan'a vermek keskinleştirmeyi
- * katlıyor, görüntü yağlı boyaya dönüyordu). Ara çıktılar name() ile adlanır; var olan adımlar tekrar üretilmez.
+ *   1) Nano Banana 2.1: yan kare netleştirilir (Cesium karosu bulanık; fotogerçekçi drone fotoğrafına).
+ *   2) Nano Banana 2.1: bitmiş yapı karesi (hedef; kat sayısı çevreye göre boyla da tarif edilir).
+ *   3) Nano Banana 2.1: hedef kareden kazı karesi (bina yerine temel çukuru); şantiye renge göre maskelenip boş
+ *      arsaya yapıştırılır (düzenleme modeli bahçe ve otoparkı bırakabiliyor, prompt'la da silmiyordu).
+ *   4) Kling 4.0 ilk/son kare, 1080p: boş arsa → kazı (1 dilim) ve kazı → bitmiş yapı (kalan dilimler) iki klip.
+ *      Wan'daki kaba klip / ara kare / tempo düzeltme zinciri Kling'de gerekmiyor: Kling uzun klipte aşamaları
+ *      zamana yayıyor ve uçları sabit kalıyor.
+ * Ara çıktılar name() ile adlanır; var olan adımlar tekrar üretilmez.
  */
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import type { RunpodClient } from "@arsa/providers";
+import type { HiggsfieldCli, RunpodClient } from "@arsa/providers";
 import { buildingSpec, type BuildingType } from "@arsa/shared";
 import { agentCard, type AgentCardInput } from "./agent-card.js";
+import { download } from "./common.js";
 import { compositeSite } from "./insaat-kare.js";
 
 const run = promisify(execFile);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Çıktı boyutu (9:16) ve Wan klibi: 81 kare @ 16 fps ≈ 5 sn, 720p. */
+/** Çıktı boyutu (9:16). */
 export const W = 1080;
 export const H = 1920;
-export const WAN_FRAMES = 81;
-export const WAN_FPS = 16;
-export const WAN_SIZE = [720, 1280] as const;
 export const OUT_FPS = 30;
-/** Bir ince klibin süresi (sn). */
-export const SEGMENT_SECONDS = WAN_FRAMES / WAN_FPS;
+/** Bir inşaat diliminin süresi (sn): ses de bu dilimlere göre yerleşir (insaat-ses.ts). */
+export const SEGMENT_SECONDS = 5;
+/** Görsel düzenleme ve video modelleri (Higgsfield). */
+const EDIT_MODEL = "nano_banana_2_1";
+const CLIP_MODEL = "kling4_0";
 
-/** Geçici ağ hatalarında tekrar dener: paralel büyük (base64) isteklerde RunPod HTTP/2 akışı kesebiliyor (ENHANCE_YOUR_CALM). */
+/** Geçici ağ hatalarında tekrar dener (RunPod drone worker'ı: yan kare). Paralel büyük isteklerde HTTP/2 akışı kesilebiliyor. */
 async function retry<T>(what: string, fn: () => Promise<T>, log: (m: string) => void, tries = 5): Promise<T> {
   for (let i = 1; ; i++) {
     try {
@@ -68,44 +64,36 @@ export async function runJob(client: RunpodClient, input: unknown, label: string
   }
 }
 
-const dataUrl = async (path: string) => `data:image/png;base64,${(await readFile(path)).toString("base64")}`;
-
-export interface Gpu {
-  qwen: RunpodClient;
-  wan: RunpodClient;
+export interface Gen {
+  hf: HiggsfieldCli;
   log: (m: string) => void;
 }
 
-/** Qwen-Image-Edit: görseli talimatla düzenler (çıktı girdiyle aynı boyutta PNG). */
-export async function qwenEdit(gpu: Gpu, image: string, prompt: string, out: string, label: string, seed = 7, cfg = 3) {
+/** Görseli talimatla düzenler (Nano Banana 2.1, 2k); çıktı W×H'ye kırpılır ki klip uçları hizalı kalsın. */
+export async function editImage(gen: Gen, image: string, prompt: string, out: string, label: string, seed = 7) {
   if (existsSync(out)) return out;
-  // true_cfg_scale 4 → 3: daha düşük CFG'de aşırı doygunluk ve keskinlik azalıyor.
-  const r = await runJob(gpu.qwen, { image_url: await dataUrl(image), width: W, height: H, seed, true_cfg_scale: cfg, prompt }, label, gpu.log);
-  await writeFile(out, Buffer.from(r.image_base64, "base64"));
+  const r = await gen.hf.generate(
+    EDIT_MODEL,
+    { params: { prompt, aspect_ratio: "9:16", resolution: "2k", seed }, media: [["image", image]] },
+    { label, log: gen.log },
+  );
+  const raw = await download(r.url, `${out}.ham`);
+  await run("ffmpeg", ["-v", "error", "-y", "-i", raw, "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`, "-frames:v", "1", "-update", "1", out]);
   return out;
 }
 
-/** Wan 2.2 ilk/son kare klibi, ham 720p (büyütmesiz). */
-export async function wanClip(gpu: Gpu, first: string, last: string, prompt: string, out: string, label: string, seed = 7) {
+/** Kling 4.0 ilk/son kare klibi (1080p, 9:16). Model ses de üretir; inşaat sesi ayrıca eklendiği için kullanılmaz. */
+export async function clip(gen: Gen, first: string, last: string, prompt: string, seconds: number, out: string, label: string) {
   if (existsSync(out)) return out;
-  const r = await runJob(
-    gpu.wan,
+  const r = await gen.hf.generate(
+    CLIP_MODEL,
     {
-      image_url: await dataUrl(first),
-      last_image_url: await dataUrl(last),
-      width: WAN_SIZE[0],
-      height: WAN_SIZE[1],
-      num_frames: WAN_FRAMES,
-      frame_rate: WAN_FPS,
-      num_steps: 4,
-      seed,
-      prompt,
+      params: { prompt, mode: "image-to-video", duration: seconds, resolution: "1080p", aspect_ratio: "9:16" },
+      media: [["start-image", first], ["end-image", last]],
     },
-    label,
-    gpu.log,
+    { label, log: gen.log },
   );
-  await writeFile(out, Buffer.from(r.video_base64, "base64"));
-  return out;
+  return download(r.url, out);
 }
 
 // ——— Prompt'lar ———
@@ -143,11 +131,6 @@ const CAMERA =
   "Fixed drone camera, no camera movement. The roads, the trees outside the plot, the houses in the background and the hills stay exactly unchanged. " +
   "Photorealistic, sharp, high detail.";
 
-const coarsePrompt = (building: string) =>
-  "Fast construction time-lapse. From the foundation pit, a reinforced concrete frame rises floor by floor with scaffolding and a tower crane, " +
-  "the walls, windows and facade are completed, the crane, scaffolding and machines are removed " +
-  `and the site is landscaped, revealing ${building}. Workers and trucks move quickly. ` + CAMERA;
-
 const FIRST_STAGE =
   "excavators, bulldozers and dump trucks clear the land and dig the foundation pit, a tower crane is erected, steel rebar is laid and the concrete foundation is poured";
 const STAGES = [
@@ -158,81 +141,18 @@ const STAGES = [
   "the crane and machines leave, the soil is levelled, lawns, trees, paths and parking are laid out",
 ];
 
-/** i. ince klibin prompt'u. Kalan klipler aşamaları birleştirir (az klipte hiçbir aşama atlanmaz). */
-function stagePrompt(i: number, n: number, building: string) {
-  // 1. klipte bina tarifi yok: tarif verilince Wan önce binayı dikip sonra çukura çeviriyordu.
-  if (i === 0) return `Construction time-lapse of an empty field turning into an excavation site: ${FIRST_STAGE}. No building above the ground. ` + "Workers and trucks move steadily, sunlight and shadows shift slowly. " + CAMERA;
-  const m = n - 1;
-  const from = Math.floor(((i - 1) * STAGES.length) / m);
-  const to = Math.max(from + 1, Math.floor((i * STAGES.length) / m));
-  return `Construction time-lapse of ${building}: ${STAGES.slice(from, to).join(", then ")}. Workers and trucks move steadily, sunlight and shadows shift slowly. ` + CAMERA;
-}
+/** Boş arsa → kazı klibi. Bina tarifi yok: tarif verilince model önce binayı dikip sonra çukura çeviriyordu. */
+const digPrompt = () =>
+  `Construction time-lapse of an empty field turning into an excavation site: ${FIRST_STAGE}. No building above the ground. ` +
+  "Workers and trucks move steadily, sunlight and shadows shift slowly. " + CAMERA;
 
-// ——— Tempo ———
+/** Kazı → bitmiş yapı klibi: aşamalar sırayla ve zamana eşit yayılarak (her biri yaklaşık bir dilim). */
+const buildPrompt = (building: string, seconds: number) =>
+  `Construction time-lapse of ${building}, evenly paced over ${seconds} seconds: first ${STAGES.join(", then ")}. ` +
+  "Each stage takes a similar share of the time; the building is not finished before the last seconds. " +
+  "Workers and trucks move steadily, sunlight and shadows shift slowly. " + CAMERA;
 
-/** Ardışık kare farklarının birikimli toplamı (küçük gri kareler üzerinden): klipte ne zaman ne kadar değişim var. */
-export async function changeCurve(video: string): Promise<number[]> {
-  const w = 72, h = 128;
-  const { stdout } = await run("ffmpeg", ["-v", "error", "-i", video, "-vf", `scale=${w}:${h},format=gray`, "-f", "rawvideo", "-"], {
-    encoding: "buffer",
-    maxBuffer: 256 * 1024 * 1024,
-  });
-  const buf = stdout as unknown as Buffer;
-  const size = w * h;
-  const frames = Math.floor(buf.length / size);
-  const cum = [0];
-  for (let i = 1; i < frames; i++) {
-    let d = 0;
-    for (let j = 0; j < size; j++) d += Math.abs(buf[i * size + j]! - buf[(i - 1) * size + j]!);
-    cum.push(cum[i - 1]! + d / size);
-  }
-  return cum;
-}
-
-/** Klipte toplam değişimi n eşit parçaya bölen kare numaraları (n-1 tane). */
-export async function changeAnchors(video: string, n: number): Promise<number[]> {
-  const cum = await changeCurve(video);
-  const frames = cum.length;
-  const total = cum[frames - 1]!;
-  const picks: number[] = [];
-  for (let k = 1; k < n; k++) {
-    let i = cum.findIndex((c) => c >= (total * k) / n);
-    // Ardışık ara kareler arasında en az 4 kare: aynı kareden iki ucu sabit klip olmasın.
-    i = Math.max(i, (picks.at(-1) ?? 0) + 4);
-    picks.push(Math.min(i, frames - 1 - 4 * (n - k)));
-  }
-  return picks;
-}
-
-/**
- * Klip içi tempo: Wan ilk/son kare modunda değişimi klibin başına yığıp sonra bekliyor.
- * Klip ara karelerle 4 kat sıklaştırılır (minterpolate), sonra kareler değişim zamana yayılacak şekilde seçilir.
- * Tam eşit değişim durağan anları tamamen atıp sarsıntı yapar; zamanla yarı yarıya karıştırılır.
- */
-export async function retime(input: string, out: string) {
-  if (existsSync(out)) return out;
-  const dense = out.replace(/\.mp4$/, "-mi.mp4");
-  await run("ffmpeg", ["-v", "error", "-y", "-i", input, "-vf", `minterpolate=fps=${WAN_FPS * 4}:mi_mode=mci:mc_mode=aobmc:vsbmc=1`, "-c:v", "libx264", "-crf", "14", "-preset", "fast", dense]);
-  const cum = await changeCurve(dense);
-  const n = cum.length;
-  const total = cum[n - 1]! || 1;
-  const g = cum.map((c, i) => 0.5 * (i / (n - 1)) + 0.5 * (c / total));
-  const M = Math.round(SEGMENT_SECONDS * OUT_FPS);
-  const idx = Array.from({ length: M }, (_, k) => Math.max(0, g.findIndex((v) => v >= k / (M - 1) - 1e-9)));
-  const framesDir = await mkdtemp(join(tmpdir(), "insaat-"));
-  try {
-    await run("ffmpeg", ["-v", "error", "-y", "-i", dense, "-q:v", "2", join(framesDir, "%05d.jpg")]);
-    const list = ["ffconcat version 1.0", ...idx.flatMap((i) => [`file '${String(i + 1).padStart(5, "0")}.jpg'`, `duration ${1 / OUT_FPS}`])];
-    await writeFile(join(framesDir, "list.txt"), list.join("\n"));
-    await run("ffmpeg", ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", join(framesDir, "list.txt"), "-vf", `fps=${OUT_FPS},format=yuv420p`, "-c:v", "libx264", "-crf", "14", "-preset", "fast", out]);
-  } finally {
-    await rm(framesDir, { recursive: true, force: true });
-    await rm(dense, { force: true });
-  }
-  return out;
-}
-
-/** Klipleri uç uca ekler: her klibin ilk karesi bir öncekinin son karesiyle aynı, tekrar etmesin diye atlanır. Büyütme burada bir kez. */
+/** Klipleri uç uca ekler: her klibin ilk karesi bir öncekinin son karesiyle aynı, tekrar etmesin diye atlanır. */
 export async function joinClips(parts: string[], out: string) {
   const chain = parts.map((_, i) => `[${i}:v]${i > 0 ? "trim=start_frame=1,setpts=PTS-STARTPTS," : ""}setsar=1[s${i}]`).join(";");
   await run("ffmpeg", [
@@ -245,58 +165,45 @@ export async function joinClips(parts: string[], out: string) {
 
 /**
  * Yan kareden (start) sessiz inşaat videosu. name(x): ara dosyanın yolu.
- * end verilirse (ör. CLI'de aday seçilen bitmiş yapı karesi) Qwen hedef karesi üretilmez.
+ * end verilirse (ör. CLI'de aday seçilen bitmiş yapı karesi) hedef kare üretilmez.
  */
 export async function buildConstruction(o: {
-  gpu: Gpu;
+  gen: Gen;
   /** Netleştirilmiş yan kare (boş arsa). */
   start: string;
   type: BuildingType;
   floors: number;
+  /** Dilim sayısı: ilk dilim kazı, kalanlar yapı (4 × 5 sn = 20 sn). */
   clips: number;
   seed: number;
   name: (x: string) => string;
   end?: string;
   onStage?: (stage: "build" | "timelapse" | "compose", progress?: number) => Promise<void> | void;
 }): Promise<string> {
-  const { gpu, start, name } = o;
-  const N = o.clips;
+  const { gen, start, name } = o;
   const spec = buildingSpec(o.type, o.floors);
 
   await o.onStage?.("build");
-  const end = o.end ?? (await qwenEdit(gpu, start, endPrompt(o.type, o.floors), name("bitis.png"), "qwen bitmiş yapı", o.seed));
-  const kaziHam = await qwenEdit(gpu, end, KAZI_PROMPT, name("kazi-ham.png"), "qwen kazı", o.seed);
+  const end = o.end ?? (await editImage(gen, start, endPrompt(o.type, o.floors), name("bitis.png"), "bitmiş yapı", o.seed));
+  const kaziHam = await editImage(gen, end, KAZI_PROMPT, name("kazi-ham.png"), "kazı", o.seed);
   const kazi = name("kazi.png");
   if (!existsSync(kazi)) await compositeSite(start, kaziHam, kazi, W, H, name("kazi-maske.png"));
 
+  // İki klip paralel; uçları ortak kazı karesi.
   await o.onStage?.("timelapse", 0);
-  const coarse = await wanClip(gpu, kazi, end, coarsePrompt(spec.edit), name("kaba.mp4"), "wan kaba", o.seed);
-  await o.onStage?.("timelapse", 1 / (N + 1));
-  const picks = await changeAnchors(coarse, N - 1);
-  gpu.log(`ara kareler (kaba klipte kare no): ${picks.join(", ")}`);
-  const anchors = [start, kazi];
-  for (const [k, n] of picks.entries()) {
-    const path = name(`ara-${k + 1}.png`);
-    if (!existsSync(path)) await run("ffmpeg", ["-v", "error", "-y", "-i", coarse, "-vf", `select=eq(n\\,${n})`, "-frames:v", "1", "-update", "1", path]);
-    anchors.push(path);
-  }
-  anchors.push(end);
-
+  const buildSeconds = (o.clips - 1) * SEGMENT_SECONDS;
   let done = 0;
-  const raw = await Promise.all(
-    // Gönderimler 3 sn arayla: aynı anda 4 büyük istek RunPod'un HTTP/2 sınırına takılıyordu.
-    Array.from({ length: N }, (_, i) =>
-      sleep(i * 3000)
-        .then(() => wanClip(gpu, anchors[i]!, anchors[i + 1]!, stagePrompt(i, N, spec.edit), name(`klip-${i + 1}.mp4`), `wan ${i + 1}/${N}`, o.seed))
-        .then(async (p) => {
-          await o.onStage?.("timelapse", (1 + ++done) / (N + 1));
-          return p;
-        }),
-    ),
-  );
+  const step = async (p: Promise<string>) => {
+    const f = await p;
+    await o.onStage?.("timelapse", ++done / 2);
+    return f;
+  };
+  const parts = await Promise.all([
+    step(clip(gen, start, kazi, digPrompt(), SEGMENT_SECONDS, name("klip-kazi.mp4"), "kazı klibi")),
+    step(clip(gen, kazi, end, buildPrompt(spec.edit, buildSeconds), buildSeconds, name("klip-yapi.mp4"), "yapı klibi")),
+  ]);
   await o.onStage?.("compose");
-  const parts = await Promise.all(raw.map((p) => retime(p, p.replace(/\.mp4$/, "-tempo.mp4"))));
-  return joinClips(parts, name(`${N * 5}sn.mp4`));
+  return joinClips(parts, name(`${o.clips * SEGMENT_SECONDS}sn.mp4`));
 }
 
 /** Kapanış kartı süresi (sn). */

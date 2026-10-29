@@ -1,12 +1,11 @@
 /**
- * Arsanın bitmiş hali: parselin drone çekimi (seslendirmesiz) → son kareye AI ile yapı eklenir (Qwen-Image-Edit)
- * → Wan 2.2 ilk/son kare inşaat timelapse'i → drone + inşaat + kapanış kartı + müzik.
+ * Arsanın bitmiş hali: parselin drone çekimi (seslendirmesiz, RunPod) → son kareye yapı eklenir (Higgsfield
+ * Nano Banana 2.1) → Kling 4.0 ilk/son kare inşaat timelapse'i → drone + inşaat + kapanış kartı + müzik.
  * (Arsadan inşaat videosu ayrı hat: insaat-videosu.ts.)
  */
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { produceReel } from "@arsa/drone-studio/pipeline";
-import { RunpodClient } from "@arsa/providers";
+import { HiggsfieldCli } from "@arsa/providers";
 import { buildingSpec, constructionPrompt, FORMAT_SPECS, type BuildingType } from "@arsa/shared";
 import {
   addMusic,
@@ -16,14 +15,14 @@ import {
   ffmpeg,
   priceText,
   probeDuration,
-  runpodJob,
-  saveOutput,
   type JobContext,
   type JobResult,
 } from "./common.js";
 
 const OUT_FPS = 30;
 const OUTRO_SECONDS = 3;
+/** İnşaat klibi (Kling 4.0, 1080p): Wan'ın ~5 sn'sinden biraz uzun, aşamalar okunsun. */
+const CLIP_SECONDS = 6;
 
 export const bitmisHali = (ctx: JobContext) => construction(ctx, true);
 
@@ -34,10 +33,7 @@ async function construction(ctx: JobContext, endFrame: boolean): Promise<JobResu
   if (!building) throw new Error("Yapı tipi eksik");
   const spec = buildingSpec(building, floors ?? 4);
 
-  const apiKey = process.env.RUNPOD_API_KEY;
-  const qwenId = process.env.RUNPOD_QWEN_ENDPOINT_ID;
-  const wanId = process.env.RUNPOD_WAN_ENDPOINT_ID;
-  if (!apiKey || !wanId || (endFrame && !qwenId)) throw new Error("RUNPOD_QWEN_ENDPOINT_ID / RUNPOD_WAN_ENDPOINT_ID eksik");
+  const hf = new HiggsfieldCli();
   const { width: W, height: H } = FORMAT_SPECS.reels_9x16;
 
   // 1) Drone çekimi: arsa hattı seslendirmesiz; son kare (parsel çizgili) inşaatın başlangıcı.
@@ -57,52 +53,43 @@ async function construction(ctx: JobContext, endFrame: boolean): Promise<JobResu
   const kfUrl = kf?.url ?? (kf?.key ? await ctx.r2.url(kf.key, 3600) : undefined);
   if (!kfUrl) throw new Error("Drone çekiminin son karesi alınamadı");
   const start = await download(kfUrl, join(ctx.workDir, "baslangic.png"));
-  const startData = `data:image/png;base64,${(await readFile(start)).toString("base64")}`;
 
-  // 2) Bitiş karesi: parselin içine yapı (yalnız bitmiş hali)
-  let endData: string | undefined;
+  // 2) Bitiş karesi: parselin içine yapı (yalnız bitmiş hali); başlangıç karesiyle aynı boyuta kırpılır.
+  let end: string | undefined;
   if (endFrame) {
     await ctx.stage("build");
-    const qwen = await runpodJob(
-      new RunpodClient(apiKey, qwenId!),
+    const edit = await hf.generate(
+      "nano_banana_2_1",
       {
-        image_url: startData,
-        width: W,
-        height: H,
-        seed: 7,
-        prompt:
-          `Add ${spec.edit}, built exactly inside the glowing outlined plot. ` +
-          "The building sits on the ground within the outline and matches the aerial camera perspective, scale, shadows and sunlight of the photo. " +
-          "Keep the glowing outline visible. Keep everything outside the outline exactly unchanged: roads, trees, neighboring buildings. Photorealistic aerial drone photo.",
+        params: {
+          aspect_ratio: "9:16",
+          resolution: "2k",
+          seed: 7,
+          prompt:
+            `Add ${spec.edit}, built exactly inside the glowing outlined plot. ` +
+            "The building sits on the ground within the outline and matches the aerial camera perspective, scale, shadows and sunlight of the photo. " +
+            "Keep the glowing outline visible. Keep everything outside the outline exactly unchanged: roads, trees, neighboring buildings. Photorealistic aerial drone photo.",
+        },
+        media: [["image", start]],
       },
-      "bitiş karesi",
-      ctx.log,
+      { label: "bitiş karesi", log: ctx.log },
     );
-    const end = await saveOutput(qwen, "image", join(ctx.workDir, "bitis.png"));
-    endData = `data:image/png;base64,${(await readFile(end)).toString("base64")}`;
+    const raw = await download(edit.url, join(ctx.workDir, "bitis-ham.png"));
+    end = join(ctx.workDir, "bitis.png");
+    await ffmpeg(["-i", raw, "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`, "-frames:v", "1", end]);
   }
 
   // 3) İnşaat timelapse'i. Bitiş karesi yoksa bina tarifi prompt'ta ayrıntılı olmalı: model yapıyı yalnız buradan bilir.
   await ctx.stage("timelapse");
-  const wan = await runpodJob(
-    new RunpodClient(apiKey, wanId),
+  const timelapse = await hf.generate(
+    "kling4_0",
     {
-      image_url: startData,
-      ...(endData && { last_image_url: endData }),
-      width: 480,
-      height: 832,
-      num_frames: 81, // Wan 16 fps → ~5 sn
-      frame_rate: 16,
-      num_steps: 4,
-      output_width: W,
-      output_height: H,
-      seed: 7,
-      prompt: constructionPrompt(spec.edit, !endData),
+      params: { prompt: constructionPrompt(spec.edit, !end), mode: "image-to-video", duration: CLIP_SECONDS, resolution: "1080p", aspect_ratio: "9:16" },
+      media: [["start-image", start], ...(end ? [["end-image", end] as [string, string]] : [])],
     },
-    "inşaat",
-    ctx.log,
+    { label: "inşaat", log: ctx.log },
   );
-  const clip = await saveOutput(wan, "video", join(ctx.workDir, "insaat.mp4"));
+  const clip = await download(timelapse.url, join(ctx.workDir, "insaat.mp4"));
 
   // 4) Kurgu
   await ctx.stage("compose");

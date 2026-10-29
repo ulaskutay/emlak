@@ -4,7 +4,7 @@
  * Hat worker'daki şablonla ortak: apps/worker/src/templates/insaat-hat.ts (adımların açıklaması orada).
  *
  *   pnpm insaat -- --parcel assets/parcels/<ad> [--start side-net.png] [--type konut] [--floors 4] [--clips 4]
- *     --candidates 4      bitmiş yapı karesi için farklı seed'lerle Qwen adayları üretip durur (insaat-…-aday-s<seed>.png)
+ *     --candidates 4      bitmiş yapı karesi için farklı seed'lerle aday üretip durur (insaat-…-aday-s<seed>.png)
  *     --pick <seed>       seçilen adayla videoyu üretir
  *     --emsal 1.20 [--taks 0.30] [--imar Konut] [--price 12500000]
  *                         inşaat efektleri + imar bilgisini okuyan seslendirme + veri kartları + fon müziği (…-sesli.mp4)
@@ -18,11 +18,10 @@ import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { RunpodClient } from "@arsa/providers";
+import { HiggsfieldCli } from "@arsa/providers";
 import { BuildingType } from "@arsa/shared";
-import { appendOutro, buildConstruction, endPrompt, qwenEdit, SEGMENT_SECONDS, type Gpu } from "../../worker/src/templates/insaat-hat.js";
+import { appendOutro, buildConstruction, editImage, endPrompt, SEGMENT_SECONDS, type Gen } from "../../worker/src/templates/insaat-hat.js";
 import { addConstructionAudio, readParcelInfo } from "../../worker/src/templates/insaat-ses.js";
-import { requireEnv } from "./env.js";
 
 const { values: args } = parseArgs({
   args: process.argv.slice(2).filter((a) => a !== "--"),
@@ -65,25 +64,20 @@ const seed = Number(args.pick ?? args.seed);
 const start = join(dir, args.start!);
 const base = (x: string) => join(dir, `insaat-${type}-${floors}k-${x}`);
 const name = (x: string) => base(`s${seed}-${x}`);
-const apiKey = requireEnv("RUNPOD_API_KEY");
-const gpu: Gpu = {
-  qwen: new RunpodClient(apiKey, requireEnv("RUNPOD_QWEN_ENDPOINT_ID")),
-  wan: new RunpodClient(apiKey, requireEnv("RUNPOD_WAN_ENDPOINT_ID")),
-  log: console.log,
-};
+const gen: Gen = { hf: new HiggsfieldCli(), log: console.log };
 const t0 = Date.now();
 
-// Bitmiş yapı adayları: Qwen kat sayısını her seed'de tutturamıyor, doğru olan elle seçilir.
+// Bitmiş yapı adayları: model kat sayısını her seed'de tutturamayabilir, doğru olan elle seçilir.
 if (args.candidates) {
   const seeds = Array.from({ length: Number(args.candidates) }, (_, i) => seed + i);
-  await Promise.all(seeds.map((s) => qwenEdit(gpu, start, endPrompt(type, floors), base(`aday-s${s}.png`), `qwen s${s}`, s)));
+  await Promise.all(seeds.map((s) => editImage(gen, start, endPrompt(type, floors), base(`aday-s${s}.png`), `aday s${s}`, s)));
   console.log(`Adaylar hazır: ${seeds.map((s) => base(`aday-s${s}.png`)).join(", ")}\nSeçip --pick <seed> ile çalıştırın.`);
   process.exit(0);
 }
 
 const cand = base(`aday-s${seed}.png`);
 const final = await buildConstruction({
-  gpu,
+  gen,
   start,
   type,
   floors,

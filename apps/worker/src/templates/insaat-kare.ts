@@ -1,6 +1,6 @@
 /**
- * Kazı karesini birleştirme: Qwen kazı karesinden yalnız şantiye (çıplak toprak, çukur, temel, makineler) alınır,
- * gerisi boş arsa karesinden gelir. Qwen bina yerine çukuru doğru yere koyuyor ama bahçe/otoparkı silmiyordu.
+ * Kazı karesini birleştirme: düzenleme modelinin kazı karesinden yalnız şantiye (çıplak toprak, çukur, temel, makineler) alınır,
+ * gerisi boş arsa karesinden gelir. Model (önce Qwen, şimdi Nano Banana) bina yerine çukuru doğru yere koyuyor ama bahçe/otoparkı silmiyordu.
  *
  * Maske: kazı toprağı rengi (turuncu-kırmızı) ve sarı makineler →
  * delik doldurma (toprak halkasıyla çevrili beton temel de dahil olur; halkanın dışındaki otopark olmaz) →
@@ -122,7 +122,7 @@ export async function compositeSite(basePath: string, sitePath: string, outPath:
   const raw = new Uint8Array(n);
   for (let i = 0; i < n; i++) {
     const [r, g, b] = [site[i * 3]!, site[i * 3 + 1]!, site[i * 3 + 2]!];
-    // Renk farkı kullanılamıyor: Qwen kareyi baştan çizdiği için her yer başlangıçtan biraz farklı.
+    // Renk farkı kullanılamıyor: model kareyi baştan çizdiği için her yer başlangıçtan biraz farklı.
     const soil = r > 110 && r - g > 45 && g > b; // kazı toprağı: turuncu-kırmızı (kuru çayırda r-g ~30)
     const machine = r > 170 && g > 130 && b < 70 && r - g < 70; // sarı iş makineleri
     raw[i] = soil || machine ? 1 : 0;
