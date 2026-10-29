@@ -156,12 +156,17 @@ export async function geminiClip(
     },
     { label: o.label, log: o.log },
   );
+  return upscale(hf, raw.id, o.out, `büyütme: ${o.label}`, o.log);
+}
+
+/** Higgsfield'daki bir video işini ByteDance ile 1080p 60 FPS (AIGC ön ayarı) büyütüp indirir. */
+export async function upscale(hf: HiggsfieldCli, jobId: string, out: string, label: string, log: (m: string) => void) {
   const clip = await hf.generate(
     UPSCALE_MODEL,
-    { params: { model_version: "standard", resolution: "1080p", fps: CLIP_FPS, preset: "aigc" }, media: [["video-references", raw.id]] },
-    { label: `büyütme: ${o.label}`, log: o.log },
+    { params: { model_version: "standard", resolution: "1080p", fps: CLIP_FPS, preset: "aigc" }, media: [["video-references", jobId]] },
+    { label, log },
   );
-  return download(clip.url, o.out);
+  return download(clip.url, out);
 }
 
 /** Fon müziği (ElevenLabs), süreye göre önbellekli. Anahtar yoksa ya da üretilemezse null. */
@@ -188,7 +193,11 @@ export async function backgroundMusic(seconds: number, ctx: JobContext): Promise
  * almadığı için cümle cümle okutulunca her cümle baştan başlıyormuş gibi kopuk tonlanıyordu (2026-10-29).
  * Kesim tutmazsa (kelime sayısı uyuşmazsa) cümleler tek tek okutulur.
  */
-export async function speakLines(lines: string[], voiceId: string | null, ctx: JobContext): Promise<{ file: string; duration: number }[] | null> {
+export async function speakLines(
+  lines: string[],
+  voiceId: string | null | undefined,
+  ctx: Pick<JobContext, "cacheDir" | "log">,
+): Promise<{ file: string; duration: number }[] | null> {
   const key = process.env.ELEVENLABS_API_KEY;
   if (!key) {
     ctx.log("! ELEVENLABS_API_KEY yok: seslendirmesiz");

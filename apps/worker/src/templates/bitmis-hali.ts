@@ -10,18 +10,20 @@ import { buildingSpec, constructionPrompt, FORMAT_SPECS, type BuildingType } fro
 import {
   addMusic,
   backgroundMusic,
+  CLIP_FPS,
   download,
   drawText,
   ffmpeg,
   priceText,
   probeDuration,
+  upscale,
   type JobContext,
   type JobResult,
 } from "./common.js";
 
-const OUT_FPS = 30;
+const OUT_FPS = CLIP_FPS;
 const OUTRO_SECONDS = 3;
-/** İnşaat klibi (Kling 4.0, 1080p): Wan'ın ~5 sn'sinden biraz uzun, aşamalar okunsun. */
+/** İnşaat klibi (Kling 4.0 720p → 1080p 60 FPS AIGC büyütme): aşamalar okunsun diye 6 sn. */
 const CLIP_SECONDS = 6;
 
 export const bitmisHali = (ctx: JobContext) => construction(ctx, true);
@@ -84,12 +86,12 @@ async function construction(ctx: JobContext, endFrame: boolean): Promise<JobResu
   const timelapse = await hf.generate(
     "kling4_0",
     {
-      params: { prompt: constructionPrompt(spec.edit, !end), mode: "image-to-video", duration: CLIP_SECONDS, resolution: "1080p", aspect_ratio: "9:16" },
+      params: { prompt: constructionPrompt(spec.edit, !end), mode: "image-to-video", duration: CLIP_SECONDS, resolution: "720p", aspect_ratio: "9:16" },
       media: [["start-image", start], ...(end ? [["end-image", end] as [string, string]] : [])],
     },
     { label: "inşaat", log: ctx.log },
   );
-  const clip = await download(timelapse.url, join(ctx.workDir, "insaat.mp4"));
+  const clip = await upscale(hf, timelapse.id, join(ctx.workDir, "insaat.mp4"), "büyütme: inşaat", ctx.log);
 
   // 4) Kurgu
   await ctx.stage("compose");

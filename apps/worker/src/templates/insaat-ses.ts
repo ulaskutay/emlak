@@ -1,5 +1,10 @@
 /**
- * İnşaat videosunun sesi: aşamalara göre inşaat efektleri + imar bilgisini okuyan seslendirme + hafif fon müziği.
+ * İnşaat videosunun sesi: şantiye sesi + imar bilgisini okuyan seslendirme + hafif fon müziği.
+ *
+ * Şantiye sesi aşama aşama Higgsfield Mirelo efektleriyle kurulur (kazı → beton/vinç → çekiç/matkap → bitmiş site),
+ * her biri videodaki aşamanın saniyesinde; ses yükseklikleri eşitlenir, aralarda yumuşak geçiş. 2026-10-29'a kadar
+ * ElevenLabs'in genel efektleriydi, "çok kötü" bulundu; Kling'in kendi sesi de istemde yasaklansa müzik çıkıyor.
+ * Seslendirme tek seferde okutulup cümlelere kesilir (common.ts speakLines), tonlama baştan sona tek akış.
  *
  * Videonun 4 dilimi (~5 sn) ile eşlenir: kazı → kaba yapı → cephe → peyzaj. Her dilime bir efekt ve bir cümle düşer;
  * cümle uzarsa sonrakiler kayar. Rakamlar seslendirmeye yazıyla gider (ElevenLabs ondalıkları bozabiliyor).
@@ -12,8 +17,9 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { ElevenLabsClient } from "@arsa/providers";
+import { ElevenLabsClient, HiggsfieldCli } from "@arsa/providers";
 import { locative, numberWords, spokenPrice } from "@arsa/shared";
+import { download, speakLines } from "./common.js";
 
 const run = promisify(execFile);
 // Sitenin yazı tipleri (agent-card ile aynı): kartlar ve uyarı yazısı.
@@ -103,13 +109,19 @@ export function constructionScript(i: ScriptInput): { at: number; text: string; 
   return lines;
 }
 
-/** Dilim efektleri: videodaki aşamayla aynı sırada (kazı, kaba yapı, cephe, bitmiş site). */
+/**
+ * Aşama efektleri (Mirelo), videodaki sırayla ve her biri bir dilim: kazı, kaba yapı, ince işler, bitmiş site.
+ * Uzaktan kayıt gibi tarif edilir: drone yüksekten bakıyor, yakın ve sert sesler kulağı rahatsız ediyordu.
+ */
+const SFX_MODEL = "mirelo_text_to_audio";
 const SFX = [
-  "Construction site time-lapse ambience: excavators digging soil, heavy diesel engines rumbling, dump truck unloading dirt and rocks",
-  "Construction site: concrete mixer truck pouring concrete, steel rebar clanking, tower crane motor whirring, workers hammering",
-  "Busy construction site: power drills, hammering on scaffolding, angle grinder, crane reversing beeps, metal clanks",
-  "Quiet new residential neighbourhood after construction: birds chirping, light breeze, a car arriving slowly and parking",
+  "Construction site recorded from a distance: two excavators digging soil with diesel engines rumbling, buckets scraping earth, a dump truck unloading dirt and rocks. Realistic field recording, no music, no voices.",
+  "Construction site recorded from a distance: a concrete mixer truck pouring concrete, a tower crane motor humming, steel rebar clanking, steady hammering. Realistic field recording, no music, no voices.",
+  "Construction site recorded from a distance: hammering on scaffolding, short power drill bursts, a brick saw, a crane reversing beep far away. Realistic field recording, no music, no voices.",
+  "A quiet, newly finished residential neighbourhood on a sunny day: birds chirping, a soft breeze in the trees, a car arriving slowly in the distance. Realistic field recording, no music, no voices.",
 ];
+/** Efektler arası çapraz geçiş (sn). */
+const SFX_FADE = 1.5;
 const MUSIC =
   "Light modern real estate background music, soft piano and warm pads with a gentle steady pulse, optimistic and calm, " +
   "slowly building to a confident resolved ending. No vocals, no drops, no risers.";
@@ -137,17 +149,14 @@ export async function addConstructionAudio(o: {
   const D = await probe(o.video);
   const voiceId = await el.resolveVoice();
 
-  // Seslendirme: cümleler sırayla, üst üste binmeden (uzayan cümle sonrakini kaydırır).
+  // Seslendirme: tek seferde okunur, cümleler sırayla ve üst üste binmeden yerleşir (uzayan cümle sonrakini kaydırır).
   const lines = constructionScript(o.script);
+  const spoken = await speakLines(lines.map((l) => l.text), voiceId, { cacheDir: o.cacheDir, log });
+  if (!spoken) throw new Error("Seslendirme üretilemedi");
   const cues: { at: number; file: string; text: string; dur: number; card?: Card }[] = [];
   let free = 0;
   for (const [k, l] of lines.entries()) {
-    const file = join(o.cacheDir, `ses-${hash(`${voiceId}|${l.text}`)}.mp3`);
-    if (!existsSync(file)) {
-      const sp = await el.speak(l.text, { previous: lines[k - 1]?.text, next: lines[k + 1]?.text });
-      await writeFile(file, sp.audio);
-    }
-    const dur = await probe(file);
+    const { file, duration: dur } = spoken[k]!;
     const at = Math.max(l.at, free);
     cues.push({ at, file, text: l.text, dur, card: l.card });
     free = at + dur + 0.25;
@@ -160,15 +169,21 @@ export async function addConstructionAudio(o: {
   }
   if (cues[0]!.at < 0) log(`! seslendirme videoya sığmıyor (${(-cues[0]!.at).toFixed(1)} sn taşıyor)`);
 
-  // Efektler: dilim başına biraz uzun üretilir, komşularla çapraz geçişle örtüşür.
-  const n = Math.ceil(D / o.segment - 0.01);
-  const sfx: string[] = [];
-  for (let k = 0; k < n; k++) {
-    const prompt = SFX[Math.min(SFX.length - 1, Math.floor((k * SFX.length) / n))]!;
-    const file = join(o.cacheDir, `efekt-${hash(`${prompt}|${o.segment + 1.5}`)}.mp3`);
-    if (!existsSync(file)) await writeFile(file, await el.soundEffect(prompt, o.segment + 1.5));
-    sfx.push(file);
-  }
+  // Şantiye sesi: aşama başına bir efekt; son efekt (bitmiş site) kapanışa kadar sürer. Komşularla çapraz geçiş payı.
+  const hf = new HiggsfieldCli();
+  const starts = SFX.map((_, k) => k * o.segment);
+  const lens = SFX.map((_, k) => (k < SFX.length - 1 ? o.segment + SFX_FADE : Math.max(o.segment, D - starts[k]!) + 0.5));
+  const sfx = await Promise.all(
+    SFX.map(async (prompt, k) => {
+      const seconds = Math.ceil(lens[k]!);
+      const file = join(o.cacheDir, `efekt-${hash(`${SFX_MODEL}|${prompt}|${seconds}`)}.audio`);
+      if (!existsSync(file)) {
+        const r = await hf.generate(SFX_MODEL, { params: { prompt, duration: seconds } }, { label: `efekt ${k + 1}`, log });
+        await download(r.url, file);
+      }
+      return file;
+    }),
+  );
   let music: string | null = null;
   if (o.music !== false) {
     const file = join(o.cacheDir, `muzik-${hash(`${MUSIC}|${Math.ceil(D)}`)}.mp3`);
@@ -187,15 +202,19 @@ export async function addConstructionAudio(o: {
     return `[v${k}]`;
   });
   f.push(`${vl.join("")}amix=inputs=${vl.length}:normalize=0,volume=1.2,apad,atrim=0:${D.toFixed(2)},asplit=3[voice][sc1][sc2]`);
+  // Her efekt aynı ses yüksekliğine getirilir (loudnorm), aşamanın başlangıcından yarım geçiş önce girer.
   const sl = sfx.map((file, k) => {
     inputs.push("-i", file);
-    const start = Math.max(0, k * o.segment - 0.75);
+    const start = Math.max(0, starts[k]! - SFX_FADE / 2);
     const ms = Math.round(start * 1000);
-    const len = o.segment + 1.5;
-    f.push(`[${idx++}:a]aresample=44100,afade=t=in:d=0.75,afade=t=out:st=${(len - 1).toFixed(2)}:d=1,adelay=${ms}|${ms}[e${k}]`);
+    const len = lens[k]!;
+    f.push(
+      `[${idx++}:a]aresample=44100,aformat=channel_layouts=stereo,loudnorm=I=-24:TP=-3:LRA=9,aresample=44100,atrim=0:${len.toFixed(2)},` +
+        `afade=t=in:d=${k ? SFX_FADE : 0.4},afade=t=out:st=${(len - SFX_FADE).toFixed(2)}:d=${SFX_FADE},adelay=${ms}|${ms}[e${k}]`,
+    );
     return `[e${k}]`;
   });
-  f.push(`${sl.join("")}amix=inputs=${sl.length}:normalize=0,volume=0.55,apad,atrim=0:${D.toFixed(2)}[sfx]`);
+  f.push(`${sl.join("")}amix=inputs=${sl.length}:normalize=0,volume=0.9,apad,atrim=0:${D.toFixed(2)}[sfx]`);
   f.push(`[sfx][sc1]sidechaincompress=threshold=0.03:ratio=6:attack=20:release=400[sfxd]`);
   const buses = ["[voice]", "[sfxd]"];
   if (music) {

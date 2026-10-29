@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { HiggsfieldCli, RunpodClient } from "@arsa/providers";
 import type { BuildingType, DosemeOrder, Zoning } from "@arsa/shared";
 import { download, priceText, type JobContext, type JobResult } from "./common.js";
-import { appendOutro, buildConstruction, editImage, ENHANCE_PROMPT, OUTRO_SECONDS, runJob, SEGMENT_SECONDS, type Gen } from "./insaat-hat.js";
+import { appendOutro, buildConstruction, editImage, ENHANCE_PROMPT, OUTRO_SECONDS, runJob, SEGMENT_SECONDS, stripAttribution, type Gen } from "./insaat-hat.js";
 import { addConstructionAudio } from "./insaat-ses.js";
 
 /** Dilim sayısı: 4 × 5 sn = 20 sn inşaat. */
@@ -38,7 +38,7 @@ export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
   if (still.base64) await writeFile(side, Buffer.from(still.base64, "base64"));
   else await download(still.url ?? (await ctx.r2.url(still.key!, 3600)), side);
   // Cesium karosu yakında bulanık: aynı kadrajda fotogerçekçi drone fotoğrafına.
-  const start = await editImage(gen, side, ENHANCE_PROMPT, name("yan-net.png"), "netleştirme", SEED);
+  const start = await editImage(gen, await stripAttribution(side, name("yan-kirpik.png")), ENHANCE_PROMPT, name("yan-net.png"), "netleştirme", SEED);
 
   // 2) İnşaat timelapse'i
   const final = await buildConstruction({

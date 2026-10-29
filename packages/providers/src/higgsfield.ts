@@ -6,7 +6,8 @@ import { spawn } from "node:child_process";
  * ~/.config/higgsfield/credentials.json dosyasında durur ve kendiliğinden yenilenir.
  *
  * Plan aynı anda en fazla 8 iş kabul eder (Plus); fazlası "rate_limit_reached" ile döner. Süreç içinde
- * HIGGSFIELD_CONCURRENCY kadar iş aynı anda gönderilir, sınıra takılan iş bekleyip yeniden denenir.
+ * HIGGSFIELD_CONCURRENCY kadar iş aynı anda gönderilir, sınıra takılan iş bekleyip yeniden denenir; geçici 5xx ve
+ * ağ hataları da birkaç kez yeniden denenir.
  */
 export interface HiggsfieldJob {
   id: string;
@@ -75,8 +76,16 @@ export class HiggsfieldCli {
         return ids[0];
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (!/rate_limit_reached/.test(msg) || attempt >= 40) throw e;
-        await sleep(15_000);
+        if (/rate_limit_reached/.test(msg) && attempt < 40) {
+          await sleep(15_000);
+          continue;
+        }
+        // Geçici sunucu/ağ hatası (ör. medya yüklemede "HTTP 520"): artan beklemeyle birkaç kez daha denenir.
+        if (/HTTP 5\d\d|: 5\d\d\b|ECONNRESET|ETIMEDOUT|socket hang up|timeout/i.test(msg) && attempt < 4) {
+          await sleep((attempt + 1) * 10_000);
+          continue;
+        }
+        throw e;
       }
     }
   }

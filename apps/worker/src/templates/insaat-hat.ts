@@ -6,9 +6,10 @@
  *   2) Nano Banana 2.1: bitmiş yapı karesi (hedef; kat sayısı çevreye göre boyla da tarif edilir).
  *   3) Nano Banana 2.1: hedef kareden kazı karesi (bina yerine temel çukuru); şantiye renge göre maskelenip boş
  *      arsaya yapıştırılır (düzenleme modeli bahçe ve otoparkı bırakabiliyor, prompt'la da silmiyordu).
- *   4) Kling 4.0 ilk/son kare, 1080p: boş arsa → kazı (1 dilim) ve kazı → bitmiş yapı (kalan dilimler) iki klip.
- *      Wan'daki kaba klip / ara kare / tempo düzeltme zinciri Kling'de gerekmiyor: Kling uzun klipte aşamaları
- *      zamana yayıyor ve uçları sabit kalıyor.
+ *   4) Kling 4.0 ilk/son kare, 720p → ByteDance 1080p 60 FPS (AIGC) büyütme: boş arsa → kazı (1 dilim) ve
+ *      kazı → bitmiş yapı (kalan dilimler) iki klip. Kling uzun klipte aşamaları zamana yayıyor, uçları sabit kalıyor.
+ *      Kling'in kendi sesi kullanılmaz: istemde "müzik yok" yazsa da şantiye sesi yerine müzik üretiyor (2026-10-29);
+ *      şantiye sesi insaat-ses.ts'te aşamalara göre ayrı üretilir.
  * Ara çıktılar name() ile adlanır; var olan adımlar tekrar üretilmez.
  */
 import { execFile } from "node:child_process";
@@ -18,7 +19,7 @@ import { promisify } from "node:util";
 import type { HiggsfieldCli, RunpodClient } from "@arsa/providers";
 import { buildingSpec, type BuildingType } from "@arsa/shared";
 import { agentCard, type AgentCardInput } from "./agent-card.js";
-import { download } from "./common.js";
+import { CLIP_FPS, download, upscale } from "./common.js";
 import { compositeSite } from "./insaat-kare.js";
 
 const run = promisify(execFile);
@@ -27,7 +28,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Çıktı boyutu (9:16). */
 export const W = 1080;
 export const H = 1920;
-export const OUT_FPS = 30;
+/** Klipler 60 FPS büyütülür; kurgu da 60 FPS. */
+export const OUT_FPS = CLIP_FPS;
 /** Bir inşaat diliminin süresi (sn): ses de bu dilimlere göre yerleşir (insaat-ses.ts). */
 export const SEGMENT_SECONDS = 5;
 /** Görsel düzenleme ve video modelleri (Higgsfield). */
@@ -82,18 +84,52 @@ export async function editImage(gen: Gen, image: string, prompt: string, out: st
   return out;
 }
 
-/** Kling 4.0 ilk/son kare klibi (1080p, 9:16). Model ses de üretir; inşaat sesi ayrıca eklendiği için kullanılmaz. */
+/** Kling 4.0 ilk/son kare klibi: 720p üretilir (1080p'den ucuz), ByteDance ile 1080p 60 FPS (AIGC) büyütülür. */
 export async function clip(gen: Gen, first: string, last: string, prompt: string, seconds: number, out: string, label: string) {
   if (existsSync(out)) return out;
   const r = await gen.hf.generate(
     CLIP_MODEL,
     {
-      params: { prompt, mode: "image-to-video", duration: seconds, resolution: "1080p", aspect_ratio: "9:16" },
+      params: { prompt, mode: "image-to-video", duration: seconds, resolution: "720p", aspect_ratio: "9:16" },
       media: [["start-image", first], ["end-image", last]],
     },
     { label, log: gen.log },
   );
-  return download(r.url, out);
+  return upscale(gen.hf, r.id, out, `büyütme: ${label}`, gen.log);
+}
+
+/**
+ * Bitmiş yapı karesi: iki aday üretilir, parselin dışında (gökyüzü/arka plan ve ön plandaki yollar) başlangıç
+ * karesine en çok benzeyen seçilir. Model zaman zaman yolları, ağaçları siler ya da binayı kadraja taşırıyordu.
+ */
+export async function pickEnd(gen: Gen, start: string, prompt: string, out: string, seed: number) {
+  if (existsSync(out)) return out;
+  const cands = await Promise.all([0, 1].map((k) => editImage(gen, start, prompt, out.replace(/\.png$/, `-aday${k + 1}.png`), `bitmiş yapı ${k + 1}`, seed + k)));
+  const score = async (f: string) => {
+    // Üst %38 (arka plan) ve alt %14 (ön plandaki yollar) bölgelerinin SSIM ortalaması.
+    const ssim = async (y: string, h: string) => {
+      const { stderr } = await run("ffmpeg", [
+        "-i", start, "-i", f, "-filter_complex",
+        `[0]scale=540:960,crop=540:${h}:0:${y}[a];[1]scale=540:960,crop=540:${h}:0:${y}[b];[a][b]ssim`, "-f", "null", "-",
+      ]);
+      return Number(stderr.match(/All:([\d.]+)/)?.[1] ?? 0);
+    };
+    return ((await ssim("0", "365")) + (await ssim("826", "134"))) / 2;
+  };
+  const scores = await Promise.all(cands.map(score));
+  const best = scores[1]! > scores[0]! ? 1 : 0;
+  gen.log(`bitmiş yapı adayları: ${scores.map((x) => x.toFixed(3)).join(" / ")} → ${best + 1}`);
+  await run("cp", [cands[best]!, out]);
+  return out;
+}
+
+/**
+ * Cesium karesinin altındaki atıf yazılarını ("CESIUM ion", "Görüntüler © Google") kırpar: düzenleme modeli
+ * istemde yazı istenmese de onları koruyordu. Kırpılan şerit düzenlemeden sonra W×H'ye kırpmayla telafi edilir.
+ */
+export async function stripAttribution(image: string, out: string) {
+  await run("ffmpeg", ["-v", "error", "-y", "-i", image, "-vf", "crop=iw:ih*0.955:0:0", "-frames:v", "1", "-update", "1", out]);
+  return out;
 }
 
 // ——— Prompt'lar ———
@@ -101,6 +137,8 @@ export async function clip(gen: Gen, first: string, last: string, prompt: string
 export const ENHANCE_PROMPT =
   "Turn this blurry 3D map render into a sharp, photorealistic aerial drone photograph taken from the same position. " +
   "Keep the exact same camera angle, composition and horizon. Keep every road, dirt track, tree position, the forest, the houses in the background and the hills exactly where they are. " +
+  "Keep every tree on the plot: the same number of trees at the same positions and sizes. " +
+  "Keep the same season and colors as the render: green patches of grass stay green and dry grass stays golden; do not make the land drier, browner or more yellow. " +
   "The empty plot of land in the foreground stays empty land. Add realistic detail: individual grass, soil texture, tree foliage with natural shadows, clear house roofs. " +
   "Bright natural daylight, clear blue sky, high detail, 4K drone photo. No text, no watermark, no logo.";
 
@@ -109,11 +147,14 @@ export function endPrompt(type: BuildingType, floors: number) {
   const tall = type === "konut" || type === "ticari";
   return (
     `Build ${spec.edit} in the middle of the empty plot in the foreground. ` +
+    "The building and its grounds stay inside the plot, between the dirt roads, with open land around them: its footprint covers only about a third of the plot " +
+    "and the whole building, its garden and its parking are fully visible in the frame. " +
     (tall
       ? `It is a low-rise building with exactly ${floors} floors: ${floors} rows of windows from the ground to the flat roof, no more. ` +
         `It is only about ${floors * 3} meters tall, roughly ${Math.max(2, Math.round(floors / 1.5))} times the height of the trees around it, and wider than it is tall. `
       : "") +
     "The site is finished and clean: no construction equipment, no bare soil, neat lawns, young trees, paved paths and a small parking area around the building. " +
+    "Keep the existing trees on the plot that are not where the building and its grounds stand, and keep both dirt roads exactly as they are. " +
     "It sits naturally on the ground and matches the drone camera perspective, scale, shadows and sunlight of the photo. " +
     "Keep the camera angle, the roads, the trees outside the plot, the houses in the background and the hills exactly unchanged, with the same natural colors and softness as the photo. " +
     "Photorealistic aerial drone photo."
@@ -184,7 +225,7 @@ export async function buildConstruction(o: {
   const spec = buildingSpec(o.type, o.floors);
 
   await o.onStage?.("build");
-  const end = o.end ?? (await editImage(gen, start, endPrompt(o.type, o.floors), name("bitis.png"), "bitmiş yapı", o.seed));
+  const end = o.end ?? (await pickEnd(gen, start, endPrompt(o.type, o.floors), name("bitis.png"), o.seed));
   const kaziHam = await editImage(gen, end, KAZI_PROMPT, name("kazi-ham.png"), "kazı", o.seed);
   const kazi = name("kazi.png");
   if (!existsSync(kazi)) await compositeSite(start, kaziHam, kazi, W, H, name("kazi-maske.png"));
