@@ -4,7 +4,8 @@
 export type Move = "push" | "pull" | "panRight" | "panLeft";
 
 /** Sahnenin girişi; önceki sahne aynı türün çıkışını oynar. */
-export type Transition = "slide" | "zoom" | "rise" | "iris";
+/** fade: yumuşak çözülme (ilan videosunda hepsi bu; diğerleri eski videolar için). */
+export type Transition = "fade" | "slide" | "zoom" | "rise" | "iris";
 
 export interface IlanScene {
   src: string;

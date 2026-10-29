@@ -74,6 +74,14 @@ function transitionStyle(enter: Transition | null, p: number, exit: Transition |
   const tf: string[] = [];
   if (enter && p < 1) {
     const e = out(p);
+    // Yumuşak çözülme: yeni kare hafif büyükten ve bulanıktan netleşerek belirir (kamera hareketi sürüyormuş gibi).
+    if (enter === "fade") {
+      // Sinüs eğrisi: harman geçişin tamamına yayılır (kübik eğride ortada ani bir kesme gibi duruyordu).
+      const d = Easing.inOut(Easing.sin)(p);
+      s.opacity = d;
+      tf.push(`scale(${interpolate(d, [0, 1], [1.05, 1])})`);
+      s.filter = `blur(${(1 - d) * 6}px)`;
+    }
     if (enter === "slide") tf.push(`translateX(${(1 - e) * 100}%)`);
     if (enter === "rise") tf.push(`translateY(${(1 - e) * 100}%)`);
     if (enter === "zoom") (tf.push(`scale(${interpolate(e, [0, 1], [1.35, 1])})`), (s.opacity = Math.min(1, p * 2.2)));
@@ -81,6 +89,7 @@ function transitionStyle(enter: Transition | null, p: number, exit: Transition |
   }
   if (exit && q > 0) {
     const e = Easing.in(Easing.cubic)(q);
+    if (exit === "fade") (tf.push(`scale(${1 + Easing.inOut(Easing.sin)(q) * 0.04})`), (s.filter = `blur(${Easing.inOut(Easing.sin)(q) * 5}px)`));
     if (exit === "slide") tf.push(`translateX(${-e * 35}%)`);
     if (exit === "rise") tf.push(`translateY(${-e * 30}%)`);
     if (exit === "zoom") tf.push(`scale(${1 + e * 0.12})`);
@@ -97,6 +106,9 @@ function SceneFrame({ enter, exit, frames, T, children }: { enter: Transition | 
   const q = exit ? interpolate(f, [frames - T, frames], [0, 1], clamp) : 0;
   return <AbsoluteFill style={{ overflow: "hidden", ...transitionStyle(enter, p, exit, q) }}>{children}</AbsoluteFill>;
 }
+
+/** 30 FPS'e göre yazılmış kare sayısını videonun FPS'ine çevirir (süre aynı kalır; video 60 FPS render edilir). */
+const fr = (n: number, fps: number) => Math.round((n * fps) / 30);
 
 /** Alttan maskeyle yükselen satır. */
 function Reveal({ delay, children, style }: { delay: number; children: ReactNode; style?: CSSProperties }) {
@@ -128,17 +140,18 @@ const titleStyle: CSSProperties = {
 /** Sahne başlığı: altın sıra numarası ve büyük oda adı; sahne bitmeden söner. */
 function SceneTitle({ index, total, title, start, frames }: { index: number; total: number; title: string; start: number; frames: number }) {
   const f = useCurrentFrame();
-  const fade = interpolate(f, [frames - 14, frames - 4], [1, 0], clamp);
+  const { fps } = useVideoConfig();
+  const fade = interpolate(f, [frames - fr(14, fps), frames - fr(4, fps)], [1, 0], clamp);
   return (
     <AbsoluteFill style={{ justifyContent: "flex-end", padding: `0 84px ${SAFE_BOTTOM}px`, opacity: fade }}>
       <Reveal delay={start}>
         <div style={{ display: "flex", alignItems: "center", gap: 20, fontFamily: SANS, fontWeight: 600, fontSize: 34, letterSpacing: "0.18em", color: GOLD }}>
           <span>{String(index + 1).padStart(2, "0")}</span>
-          <span style={{ width: interpolate(f - start, [0, 18], [0, 90], { ...clamp, easing: out }), height: 3, background: GOLD, borderRadius: 2 }} />
+          <span style={{ width: interpolate(f - start, [0, fr(18, fps)], [0, 90], { ...clamp, easing: out }), height: 3, background: GOLD, borderRadius: 2 }} />
           <span style={{ color: "rgba(255,255,255,0.75)" }}>{String(total).padStart(2, "0")}</span>
         </div>
       </Reveal>
-      <Reveal delay={start + 4}>
+      <Reveal delay={start + fr(4, fps)}>
         <div style={titleStyle}>{title}</div>
       </Reveal>
     </AbsoluteFill>
@@ -148,7 +161,8 @@ function SceneTitle({ index, total, title, start, frames }: { index: number; tot
 /** İlk sahne: ilanın tipi, konumu ve künyesi. */
 function Intro({ intro, start, frames, fallback }: { intro: NonNullable<IlanVideoProps["intro"]>; start: number; frames: number; fallback?: string }) {
   const f = useCurrentFrame();
-  const fade = interpolate(f, [frames - 14, frames - 4], [1, 0], clamp);
+  const { fps } = useVideoConfig();
+  const fade = interpolate(f, [frames - fr(14, fps), frames - fr(4, fps)], [1, 0], clamp);
   return (
     <AbsoluteFill style={{ justifyContent: "flex-end", padding: `0 84px ${SAFE_BOTTOM}px`, opacity: fade }}>
       {intro.kind && (
@@ -158,11 +172,11 @@ function Intro({ intro, start, frames, fallback }: { intro: NonNullable<IlanVide
           </span>
         </Reveal>
       )}
-      <Reveal delay={start + 5} style={{ marginTop: 22 }}>
+      <Reveal delay={start + fr(5, fps)} style={{ marginTop: 22 }}>
         <div style={titleStyle}>{intro.location ?? fallback ?? ""}</div>
       </Reveal>
       {intro.facts.length > 0 && (
-        <Reveal delay={start + 10} style={{ marginTop: 14 }}>
+        <Reveal delay={start + fr(10, fps)} style={{ marginTop: 14 }}>
           <div style={{ fontFamily: SANS, fontWeight: 600, fontSize: 44, color: "rgba(255,255,255,0.92)" }}>{intro.facts.join("  ·  ")}</div>
         </Reveal>
       )}
@@ -182,7 +196,7 @@ function PhoneIcon() {
 function Outro({ o, T }: { o: IlanVideoProps["outro"]; T: number }) {
   const f = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const pop = (d: number) => spring({ frame: f - T - d, fps, config: { damping: 14, mass: 0.8 } });
+  const pop = (d: number) => spring({ frame: f - T - fr(d, fps), fps, config: { damping: 14, mass: 0.8 } });
   const zoom = interpolate(f, [0, o.frames + T], [1.25, 1.12]);
   const item = (d: number): CSSProperties => ({ opacity: Math.min(1, pop(d) * 1.4), transform: `translateY(${(1 - pop(d)) * 60}px)` });
   return (
@@ -252,7 +266,7 @@ function Captions({ words }: { words: Words }) {
   const f = useCurrentFrame();
   const { fps } = useVideoConfig();
   const parts = chunks(words);
-  const k = parts.findIndex((c, i) => f >= c[0]!.start && f < (parts[i + 1]?.[0]!.start ?? c[c.length - 1]!.end + 8));
+  const k = parts.findIndex((c, i) => f >= c[0]!.start && f < (parts[i + 1]?.[0]!.start ?? c[c.length - 1]!.end + fr(8, fps)));
   if (k < 0) return null;
   const part = parts[k]!;
   const pop = spring({ frame: f - part[0]!.start, fps, config: { damping: 14, mass: 0.5 } });
@@ -272,7 +286,7 @@ function Captions({ words }: { words: Words }) {
         }}
       >
         {part.map((w, i) => (
-          <span key={i} style={{ color: f >= w.start && f < w.end + 2 ? GOLD : "white" }}>
+          <span key={i} style={{ color: f >= w.start && f < w.end + fr(2, fps) ? GOLD : "white" }}>
             {w.text.replace(/[.,!?;:]+$/, "").toLocaleUpperCase("tr")}
             {i < part.length - 1 ? " " : ""}
           </span>
@@ -283,15 +297,18 @@ function Captions({ words }: { words: Words }) {
 }
 
 /** Müzik: başta açılır, sonda kısılır, anlatım sırasında yumuşakça kısılır. */
-function musicVolume(f: number, total: number, voice: IlanVideoProps["audio"]["voice"]) {
-  const base = 0.5 * interpolate(f, [0, 15, total - 45, total], [0, 1, 1, 0], clamp);
-  const duck = voice.reduce((m, v) => Math.max(m, interpolate(f, [v.from - 8, v.from, v.from + v.frames, v.from + v.frames + 12], [0, 1, 1, 0], clamp)), 0);
+function musicVolume(f: number, total: number, voice: IlanVideoProps["audio"]["voice"], fps: number) {
+  const base = 0.5 * interpolate(f, [0, fr(15, fps), total - fr(45, fps), total], [0, 1, 1, 0], clamp);
+  const duck = voice.reduce(
+    (m, v) => Math.max(m, interpolate(f, [v.from - fr(8, fps), v.from, v.from + v.frames, v.from + v.frames + fr(12, fps)], [0, 1, 1, 0], clamp)),
+    0,
+  );
   return base * (1 - 0.68 * duck);
 }
 
 export function IlanVideo(props: IlanVideoProps) {
   useFonts(props.fontBase);
-  const { scenes, outro, audio, transition: T, durationInFrames } = props;
+  const { scenes, outro, audio, transition: T, durationInFrames, fps } = props;
   const n = scenes.length;
   return (
     <AbsoluteFill style={{ background: INK }}>
@@ -299,7 +316,7 @@ export function IlanVideo(props: IlanVideoProps) {
         const start = i === 0 ? 0 : s.from - T;
         const frames = s.from + s.frames - start;
         const exit = i < n - 1 ? scenes[i + 1]!.transition : outro.transition;
-        const textAt = i === 0 ? 6 : T + 2;
+        const textAt = i === 0 ? fr(6, fps) : T + fr(2, fps);
         return (
           <Sequence key={i} from={start} durationInFrames={frames}>
             <SceneFrame enter={i === 0 ? null : s.transition} exit={exit} frames={frames} T={T}>
@@ -322,20 +339,20 @@ export function IlanVideo(props: IlanVideoProps) {
 
       {/* Kapanış kartında fiyat zaten yazılı: altyazı yalnız sahnelerde. */}
       {audio.voice.filter((v) => v.from < outro.from).map((v, i) => (
-        <Sequence key={`c${i}`} from={v.from} durationInFrames={v.frames + 10}>
+        <Sequence key={`c${i}`} from={v.from} durationInFrames={v.frames + fr(10, fps)}>
           <Captions words={v.words} />
         </Sequence>
       ))}
 
-      {audio.music && <Html5Audio src={audio.music} volume={(f) => musicVolume(f, durationInFrames, audio.voice)} />}
+      {audio.music && <Html5Audio src={audio.music} volume={(f) => musicVolume(f, durationInFrames, audio.voice, fps)} />}
       {audio.voice.map((v, i) => (
-        <Sequence key={`v${i}`} from={v.from} durationInFrames={v.frames + 6}>
+        <Sequence key={`v${i}`} from={v.from} durationInFrames={v.frames + fr(6, fps)}>
           <Html5Audio src={v.src} volume={1} />
         </Sequence>
       ))}
       {audio.whoosh &&
         audio.whooshAt.map((at, i) => (
-          <Sequence key={`w${i}`} from={Math.max(0, at - 10)} durationInFrames={30}>
+          <Sequence key={`w${i}`} from={Math.max(0, at - fr(10, fps))} durationInFrames={fr(30, fps)}>
             <Html5Audio src={audio.whoosh!} volume={0.35} />
           </Sequence>
         ))}

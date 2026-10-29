@@ -1,15 +1,11 @@
 /**
  * Fotoğraftan ilan videosu (yapay zekâ videosu yok, sunucuda Remotion): her fotoğraf yavaş kamera hareketiyle akar,
  * sahneler geçiş efektleriyle bağlanır; ilk sahnede ilanın kimliği, sonrakilerde oda başlığı, sonda fiyat ve emlakçı kartı.
- * Ses: ilan bilgisinden kurulan Türkçe seslendirme (ElevenLabs), anlatımda kısılan müzik ve geçişlerde whoosh.
+ * Ses: ilan bilgisinden kurulan Türkçe seslendirme (ElevenLabs) ve anlatımda kısılan müzik.
  *
  * Sahne süresi anlatıma uyar: cümle uzunsa sahne uzar (anlatım hızlandırılmaz, kesilmez).
  */
-import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { ElevenLabsClient } from "@arsa/providers";
 import { ROOM_LABELS, stagingNarration, type DosemeOrder, type IlanPhoto, type ListingDetails, type RoomPhoto, type RoomType } from "@arsa/shared";
 import sharp from "sharp";
 import type { IlanVideoProps, Move, Transition } from "../../remotion/types.js";
@@ -17,9 +13,10 @@ import { backgroundMusic, download, priceText, speakLines, type JobContext, type
 import { enhancePhoto } from "./enhance.js";
 import { renderComposition } from "./remotion.js";
 
-const FPS = 30;
+/** Sunucuda 60 FPS render edilir (yapay zekâ büyütmesi gerekmez; kaynak zaten 1080p). */
+const FPS = 60;
 /** Geçiş süresi (kare). */
-const T = 12;
+const T = Math.round(0.8 * FPS);
 const SCENE_SECONDS = 3.4;
 /** İlk sahnede ilanın kimliği okunacak kadar. */
 const FIRST_SECONDS = 4;
@@ -31,8 +28,11 @@ const OUTRO_TAIL = 1.2;
 /** Kadraj 1920 yükseklikte en fazla ~1,16 kat yakınlaşır: fotoğrafın 2400 piksel yüksekliği yeter. */
 const PHOTO_FIT = { width: 4200, height: 2400 };
 
-const TRANSITIONS: Transition[] = ["slide", "zoom", "rise", "iris"];
-const WHOOSH_PROMPT = "Short soft cinematic whoosh transition, airy swoosh, clean, no music";
+/**
+ * Geçiş: yumuşak çözülme (2026-10-30: kayan/büyüyen/yükselen/iris geçişler ve whoosh sesi sert bulundu; kullanıcı
+ * fade istedi). Kamera hareketi kesilmeden sürüyormuş gibi: yeni kare hafif büyükten ve bulanıktan netleşir.
+ */
+const TRANSITIONS: Transition[] = ["fade"];
 
 const VIDEO_LABELS: Partial<Record<RoomType, string>> = { dis_cephe: "Dış cephe" };
 
@@ -49,19 +49,6 @@ function moveFor(i: number, w: number, h: number): Move {
   return m === "panRight" ? "pull" : "push";
 }
 
-async function whoosh(ctx: JobContext): Promise<string | null> {
-  const key = process.env.ELEVENLABS_API_KEY;
-  if (!key) return null;
-  const file = join(ctx.cacheDir, `whoosh-${createHash("sha1").update(WHOOSH_PROMPT).digest("hex").slice(0, 12)}.mp3`);
-  if (existsSync(file)) return file;
-  try {
-    await writeFile(file, await new ElevenLabsClient({ apiKey: key }).soundEffect(WHOOSH_PROMPT, 1));
-    return file;
-  } catch (e) {
-    ctx.log(`! geçiş efekti üretilemedi: ${String(e).slice(0, 160)}`);
-    return null;
-  }
-}
 
 export async function ilanVideosu(ctx: JobContext): Promise<JobResult> {
   const v = ctx.video;
@@ -76,12 +63,10 @@ export async function ilanVideosu(ctx: JobContext): Promise<JobResult> {
   const typed = photos.every((p) => p.room);
   const narration = typed ? stagingNarration(photos.map((p) => p.room!), details, v.listing.priceTry, { tour: true }) : null;
   const lines = narration ? [...narration.rooms, narration.outro] : [];
-  const speech = Promise.all([
+  const speech =
     input.voice === true && lines.length
       ? speakLines(lines, v.voiceId, ctx).catch((e) => (ctx.log(`! seslendirme üretilemedi: ${String(e).slice(0, 160)}`), null))
-      : null,
-    whoosh(ctx),
-  ]);
+      : Promise.resolve(null);
 
   // 1) Fotoğraflar: Real-ESRGAN ile JPEG bozulması temizlenip büyütülür (sırayla; her biri bütün çekirdekleri kullanır).
   await ctx.stage("photos");
@@ -108,7 +93,7 @@ export async function ilanVideosu(ctx: JobContext): Promise<JobResult> {
 
   // 2) Seslendirme
   await ctx.stage("voice");
-  const [voices, sfx] = await speech;
+  const voices = await speech;
 
   // 3) Zaman çizelgesi (kare): sahne anlatımına göre uzar.
   const sec = (s: number) => Math.round(s * FPS);
@@ -152,7 +137,7 @@ export async function ilanVideosu(ctx: JobContext): Promise<JobResult> {
       intro: details.kind || details.location ? { kind: details.kind, location: details.location, facts } : undefined,
       outro: {
         ...outro,
-        transition: "zoom",
+        transition: "fade",
         background: url(frames[n - 1]!.file),
         price: priceText(v.listing.priceTry),
         priceLabel: rent ? "Aylık kira" : "Fiyat",
@@ -172,8 +157,7 @@ export async function ilanVideosu(ctx: JobContext): Promise<JobResult> {
               words: vc.words.map((w) => ({ text: w.word, start: sec(w.start), end: sec(w.end) })),
             }))
           : [],
-        whoosh: sfx ? url(sfx) : undefined,
-        whooshAt: [...scenes.slice(1).map((s) => s.from - T / 2), outro.from - T / 2],
+        whooshAt: [],
       },
     }),
     out,

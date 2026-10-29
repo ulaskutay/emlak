@@ -15,7 +15,7 @@ import type { TemplateId } from "@arsa/shared";
 import { Worker } from "bullmq";
 import { arsaDrone } from "./templates/arsa-drone.js";
 import { bitmisHali } from "./templates/bitmis-hali.js";
-import { ffmpeg, upscaleFinal, type JobContext, type JobResult } from "./templates/common.js";
+import { ffmpeg, type JobContext, type JobResult } from "./templates/common.js";
 import { dosenmisEv } from "./templates/dosenmis-ev.js";
 import { ilanVideosu } from "./templates/ilan-videosu.js";
 import { insaatVideosu } from "./templates/insaat-videosu.js";
@@ -24,9 +24,6 @@ import { sunucuEv } from "./templates/sunucu-ev.js";
 const QUEUE = "reel";
 const CONCURRENCY = Number(process.env.REEL_CONCURRENCY ?? 2);
 const CACHE_DIR = process.env.REEL_CACHE_DIR ?? join(tmpdir(), "arsa-reel-cache");
-
-/** Klipleri kendisi 1080p 60 FPS AIGC büyütmeyen şablonlar: bitmiş video büyütülür (common.ts upscaleFinal). */
-const UPSCALE_FINAL = new Set<TemplateId>(["ilan-videosu", "arsa-drone"]);
 
 const PIPELINES: Record<TemplateId, (ctx: JobContext) => Promise<JobResult>> = {
   "arsa-drone": arsaDrone,
@@ -71,10 +68,6 @@ async function processVideo(videoId: string) {
   await mkdir(CACHE_DIR, { recursive: true });
   try {
     const r = await pipeline({ video: v, r2: r2!, workDir, cacheDir: CACHE_DIR, log, stage });
-    if (UPSCALE_FINAL.has(v.template)) {
-      await stage("upscale");
-      r.videoPath = await upscaleFinal(r.videoPath, log);
-    }
     const poster = join(workDir, "poster.jpg");
     await ffmpeg(["-ss", String(r.posterAt), "-i", r.videoPath, "-frames:v", "1", "-vf", "scale=540:-2", "-q:v", "3", poster]);
     const reelKey = `reels/${videoId}/reel.mp4`;

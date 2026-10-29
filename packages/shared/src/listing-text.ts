@@ -155,6 +155,49 @@ const words = (t: string) => t.split(/\s+/).filter(Boolean).length;
  * özelliğin ardına odanın cümlesi de eklenir.
  * Kapanış: fiyat ve çağrı.
  */
+type RoomKey = keyof typeof ROOM_LINES;
+
+/**
+ * Öne çıkan cümlenin ait olduğu oda tipleri (tercih sırasıyla); eşleşmeyen cümle geneldir (boya, klima, krediye
+ * uygun…). 2026-10-30: cümleler sahnelere sırayla dağıtılıyordu, "beşli ankastre" dış cephe sahnesinde söylendi.
+ */
+const HIGHLIGHT_ROOMS: [RegExp, RoomKey[]][] = [
+  [/ankastre|mutfa[kğ]|ocak|fırın|davlumbaz|bulaşık|tezgah|kiler/i, ["mutfak", "yemek_odasi"]],
+  [/banyo|duş|jakuzi|küvet|lavabo|\bwc\b|tuvalet/i, ["banyo", "yatak_odasi"]],
+  [/çocuk/i, ["cocuk_odasi"]],
+  [/yatak|ebeveyn|giyinme/i, ["yatak_odasi"]],
+  [/balkon|teras|manzara|deniz|boğaz/i, ["balkon", "salon", "dis_cephe"]],
+  [/salon|şömine|oturma/i, ["salon"]],
+  [/çalışma|ofis/i, ["calisma_odasi"]],
+  [/site|asansör|otopark|güvenlik|havuz|bahçe|kapıcı|bina|metro|marmaray|metrobüs|okul|avm|cadde|merkez|ulaşım|durağ|kat\b/i, ["dis_cephe"]],
+];
+
+/**
+ * Öne çıkan cümleleri sahnelere dağıtır (0. sahne açılış, ona verilmez): odaya özgü cümle o tipteki ilk boş sahneye,
+ * genel cümleler sırayla boş iç mekân sahnelerine, kalırsa kalan sahnelere. Sahne başına en fazla bir cümle.
+ */
+function placeHighlights(rooms: RoomKey[], highlights: string[]): Map<number, string> {
+  const out = new Map<number, string>();
+  const general: string[] = [];
+  for (const h of highlights) {
+    const prefs = HIGHLIGHT_ROOMS.find(([re]) => re.test(h))?.[1];
+    const at = prefs
+      ?.flatMap((r) => rooms.map((x, i) => (x === r && i > 0 && !out.has(i) ? i : -1)).filter((i) => i >= 0))
+      .at(0);
+    if (at !== undefined) out.set(at, h);
+    else general.push(h);
+  }
+  const free = (inside: boolean) => rooms.map((r, i) => i).filter((i) => i > 0 && !out.has(i) && (rooms[i] !== "dis_cephe") === inside);
+  for (const h of general) {
+    const i = free(true)[0] ?? free(false)[0];
+    if (i === undefined) break;
+    out.set(i, h);
+  }
+  return out;
+}
+
+const capitalize = (t: string) => t.charAt(0).toLocaleUpperCase("tr") + t.slice(1);
+
 export function stagingNarration(rooms: (keyof typeof ROOM_LINES)[], d: Partial<ListingDetails> = {}, priceTry?: number, o: { tour?: boolean } = {}) {
   // "Satılık Villa" → "satılık, dört artı bir, iki yüz yirmi metrekare villa"
   const [deal, ...noun] = (d.kind ?? "").toLocaleLowerCase("tr").split(/\s+/).filter(Boolean);
@@ -172,7 +215,7 @@ export function stagingNarration(rooms: (keyof typeof ROOM_LINES)[], d: Partial<
 
   // İlan videosunda fotoğraf sayısı 8'e çıkar: bütçe sahne başına ~8 kelime (her sahne ~3,5 sn).
   let left = (o.tour ? Math.max(NARRATION_WORDS, rooms.length * 8) : NARRATION_WORDS) - words(opener) - words(outro);
-  const highlights = [...(d.highlights ?? [])];
+  const placed = placeHighlights(rooms, d.highlights ?? []);
   const take = (t: string) => (words(t) <= left ? ((left -= words(t)), t) : "");
   // Odanın cümlesi: tipin ilk cümlesi, o kullanıldıysa yedekleri (aynı cümle iki kez söylenmez).
   const used = new Set<string>();
@@ -180,13 +223,13 @@ export function stagingNarration(rooms: (keyof typeof ROOM_LINES)[], d: Partial<
     [ROOM_LINES[r], ...(MORE_ROOM_LINES[r] ?? []), ...SPARE_LINES].find((l) => !used.has(l)) ?? ROOM_LINES[r];
   const lines = rooms.map((r, i) => {
     if (i === 0) return opener;
-    const h = highlights.shift();
+    const h = placed.get(i);
     const own = roomLine(r);
     if (!h) return (left -= words(own), used.add(own), own);
     left -= words(h);
     const extra = take(own);
     if (extra) used.add(extra);
-    return [h, extra].filter(Boolean).join(" ");
+    return [capitalize(h), extra].filter(Boolean).join(" ");
   });
   // Seslendirilecek biçim: ilandan gelen rakam ve kısaltmalar okunuşa çevrilir (önizleme de okunacağı gibi görünür).
   return { rooms: lines.map(speakable), outro: speakable(outro) };

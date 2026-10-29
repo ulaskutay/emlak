@@ -20,6 +20,9 @@ import type { ParcelInfo } from "../src/types.js";
 import { buildStory, numberWords, type Story, type StoryListing } from "./story.js";
 import { buildTimeline } from "./timeline.js";
 
+/** Drone videosunun kare hızı (RunPod drone worker'ına fps olarak gider; worker'da varsayılan 30). */
+const DRONE_FPS = Number(process.env.DRONE_FPS ?? 60);
+
 export type ReelStage = "parcel" | "script" | "voice" | "render" | "mix" | "done";
 
 export interface ReelInput {
@@ -170,7 +173,8 @@ export async function produceReel(i: ReelInput): Promise<ReelResult> {
     // Bölünmüş render: kareler parçalara ayrılır, her parça ayrı bir RunPod worker'ında aynı anda çizilir,
     // sonra uç uca eklenir (toplam GPU süresi aynı, bekleme parça sayısına bölünür).
     const client = new RunpodClient(env.RUNPOD_API_KEY!, env.RUNPOD_DRONE_ENDPOINT_ID!);
-    const fps = 30;
+    // 60 FPS: video kaynağında akıcı üretilir (sonradan yapay zekâ büyütmesi gerekmez); GPU süresi iki katı.
+    const fps = DRONE_FPS;
     const totalFrames = Math.round(timeline.duration * fps);
     const chunks = Math.max(1, Math.min(i.renderChunks ?? Number(env.DRONE_RENDER_CHUNKS ?? 3), Math.ceil(totalFrames / 90)));
     const size = Math.ceil(totalFrames / chunks);
@@ -182,6 +186,7 @@ export async function produceReel(i: ReelInput): Promise<ReelResult> {
         parcel: i.parcelText,
         context,
         story: renderStory,
+        fps,
         from_frame: a0,
         limit_frames: b0 - a0,
         // Cesium ayarları (RunPod RTX 4090 ölçümleri, EGL): 4 sayfa, MSAA kapalı, karo keskinliği 16 (4 ile gözle fark yok, 2 kat hızlı).
@@ -246,7 +251,7 @@ export async function produceReel(i: ReelInput): Promise<ReelResult> {
     const { renderDrone } = await import("./render.js");
     const key = env.GOOGLE_MAPS_API_KEY;
     if (!key) throw new Error("GOOGLE_MAPS_API_KEY yok");
-    const r = await renderDrone({ parcel, googleKey: key, outDir: i.workDir, parallel: i.parallel ?? 8, story: renderStory, log });
+    const r = await renderDrone({ parcel, googleKey: key, outDir: i.workDir, parallel: i.parallel ?? 8, story: renderStory, fps: DRONE_FPS, log });
     renderer = r.renderer;
   }
   lap("render");

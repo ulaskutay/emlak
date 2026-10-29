@@ -169,25 +169,6 @@ export async function upscale(hf: HiggsfieldCli, jobId: string, out: string, lab
   return download(clip.url, out);
 }
 
-/**
- * Bitmiş videoyu (yazılar ve kartlar dahil) 1080p 60 FPS AIGC'ye büyütür; büyütücü sesi korumadığı için özgün ses
- * geri eklenir. Klipleri kendisi büyütmeyen şablonlar için (Remotion ilan videosu, RunPod drone turu, 30 FPS):
- * bütün videolar 1080p 60 FPS AIGC çıkar (2026-10-29 kullanıcı kararı). Büyütülemezse özgün video döner.
- */
-export async function upscaleFinal(video: string, log: (m: string) => void) {
-  const hf = new HiggsfieldCli();
-  const big = video.replace(/\.mp4$/, "-60fps.mp4");
-  const out = video.replace(/\.mp4$/, "-1080p60.mp4");
-  try {
-    await upscale(hf, video, big, "son büyütme", log);
-    await ffmpeg(["-i", big, "-i", video, "-map", "0:v", "-map", "1:a?", "-c:v", "copy", "-c:a", "copy", "-shortest", "-movflags", "+faststart", out]);
-    return out;
-  } catch (e) {
-    log(`! son büyütme yapılamadı, özgün video kullanılıyor: ${String(e).slice(0, 200)}`);
-    return video;
-  }
-}
-
 /** Fon müziği (ElevenLabs), süreye göre önbellekli. Anahtar yoksa ya da üretilemezse null. */
 export async function backgroundMusic(seconds: number, ctx: JobContext): Promise<string | null> {
   const key = process.env.ELEVENLABS_API_KEY;
