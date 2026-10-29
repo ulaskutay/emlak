@@ -1,8 +1,9 @@
 /**
  * Boş evi döşe: her oda fotoğrafı Higgsfield (Nano Banana 2.1) ile döşenir, Gemini Omni Flash ilk/son kare
  * (boş → döşenmiş) eşyaların yerleştiği sahneyi üretir, ByteDance büyütücü 1080p'ye çıkarır; sahneler oda başlıkları ve emlakçı kartıyla birleşir, ilan bilgisinden
- * kurulan Türkçe anlatım ve müzik eklenir. Video oda sayısından bağımsız TOTAL_SECONDS sürer: odalar süreyi
- * eşit paylaşır, geçiş sahnesi gerekirse yavaşlatılır/hızlandırılır, sonunda döşenmiş kare kısa bekletilir.
+ * kurulan Türkçe anlatım ve müzik eklenir. Video en az TOTAL_SECONDS sürer: odalar süreyi eşit paylaşır, odanın
+ * cümlesi uzunsa o sahne uzar (anlatım hızlandırılmaz, kesilmez); geçiş sahnesi gerekirse yavaşlatılır/hızlandırılır,
+ * sonunda döşenmiş kare bekletilir.
  */
 import { join } from "node:path";
 import { HiggsfieldCli } from "@arsa/providers";
@@ -30,7 +31,8 @@ import {
 } from "./common.js";
 import { agentCard } from "./agent-card.js";
 
-const OUT_FPS = 30;
+/** Büyütücü 60 FPS verir (AIGC ön ayarı); kurgu da 60 FPS. */
+const OUT_FPS = 60;
 const TOTAL_SECONDS = 21;
 const OUTRO_SECONDS = 3.5;
 /** Döşenmiş son kare her sahnenin sonunda bu kadar bekletilir (izleyici sonucu görsün). */
@@ -38,10 +40,11 @@ const HOLD_SECONDS = 0.7;
 /** Geçiş sahnesinin hız sınırları (klip ~5 sn; 2 odada yavaşlar, 4 odada hızlanır). */
 const MIN_SPEED = 0.6;
 const MAX_SPEED = 1.5;
-/** Anlatım: ilk cümle bu saniyede başlar, cümleler arası boşluk; sığmazsa ses en fazla bu kadar hızlandırılır. */
+/** Anlatım: cümle sahnesinin başından bu kadar sonra başlar, bitince sahne en az bu kadar daha sürer. */
 const VOICE_LEAD = 0.4;
-const VOICE_GAP = 0.25;
-const MAX_VOICE_TEMPO = 1.15;
+const VOICE_TAIL = 0.4;
+/** Kapanışta fiyat cümlesinden sonra kartın kalacağı süre. */
+const OUTRO_TAIL = 1;
 /** Boş ve döşenmiş kare aynı boyutta: geçiş klibinin ilk/son kareleri hizalı kalır. */
 const EDIT_W = 720;
 const EDIT_H = 1280;
@@ -129,19 +132,27 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
     }),
   );
 
-  // 4) Kurgu
+  // 4) Kurgu: her oda en az eşit payını alır; cümlesi uzunsa sahne uzar, ses kendi hızında kalır.
   await ctx.stage("compose");
   const voices = await speech;
+  const all = [...narration.rooms, narration.outro];
+  const spokenAt = all.flatMap((t, i) => (t ? [i] : []));
+  const voiceDur = all.map((_, i) => (voices ? (voices[spokenAt.indexOf(i)]?.duration ?? 0) : 0));
+  const n = clips.length;
+  const base = (TOTAL_SECONDS - OUTRO_SECONDS) / n;
+  const scenes = clips.map((_, i) => Math.max(base, voiceDur[i]! ? VOICE_LEAD + voiceDur[i]! + VOICE_TAIL : 0));
+  const outroSec = Math.max(OUTRO_SECONDS, voiceDur[n]! ? VOICE_LEAD + voiceDur[n]! + OUTRO_TAIL : 0);
+  const starts = [...scenes.map((_, i) => scenes.slice(0, i).reduce((a, b) => a + b, 0)), scenes.reduce((a, b) => a + b, 0)];
+  const total = starts[n]! + outroSec;
   const titleSize = Math.round(W * 0.075);
   const subSize = Math.round(W * 0.045);
-  const scene = (TOTAL_SECONDS - OUTRO_SECONDS) / clips.length;
   const clipDur = await Promise.all(clips.map((c) => probeDuration(c)));
   // Klibin oynama süresi: sahneden bekleme payı düşülür, hız sınırları içinde kalır.
-  const play = clipDur.map((d) => Math.min(d / MIN_SPEED, Math.max(d / MAX_SPEED, scene - HOLD_SECONDS)));
+  const play = clipDur.map((d, i) => Math.min(d / MIN_SPEED, Math.max(d / MAX_SPEED, scenes[i]! - HOLD_SECONDS)));
   const filters = clips.map(
     (_, i) =>
       `[${i}:v]setpts=PTS*${(play[i]! / clipDur[i]!).toFixed(4)},scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=${OUT_FPS},format=yuv420p,` +
-      `tpad=stop_mode=clone:stop_duration=${scene.toFixed(3)},trim=duration=${scene.toFixed(3)},setpts=PTS-STARTPTS,` +
+      `tpad=stop_mode=clone:stop_duration=${scenes[i]!.toFixed(3)},trim=duration=${scenes[i]!.toFixed(3)},setpts=PTS-STARTPTS,` +
       `${drawText(photos[i]!.title || ROOM_LABELS[photos[i]!.room], titleSize, "h*0.10", "white", 0.3)},` +
       `${drawText("Temsili döşemedir", Math.round(subSize * 0.7), "h*0.93", "white@0.8")}[v${i}]`,
   );
@@ -159,9 +170,8 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
     photo: await fetchAsset(agent?.photoKey, "emlakci.jpg"),
     logo: await fetchAsset(agent?.logoKey, "logo.png"),
     background: lastFrame,
-    seconds: OUTRO_SECONDS,
+    seconds: outroSec,
   });
-  const n = clips.length;
   filters.push(`[${n}:v]fps=${OUT_FPS},format=yuv420p,setsar=1[v${n}]`);
   filters.push(`${Array.from({ length: n + 1 }, (_, i) => `[v${i}]`).join("")}concat=n=${n + 1}:v=1:a=0[out]`);
   const silent = join(ctx.workDir, "dosenmis-sessiz.mp4");
@@ -169,38 +179,12 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
     ...clips.flatMap((c) => ["-i", c]),
     "-i", outroFile,
     "-filter_complex", filters.join(";"),
-    "-map", "[out]", "-t", String(TOTAL_SECONDS), "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-movflags", "+faststart", silent,
+    "-map", "[out]", "-t", total.toFixed(3), "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-movflags", "+faststart", silent,
   ]);
   const duration = await probeDuration(silent);
 
-  // Anlatım yerleşimi: her cümle kendi sahnesinin başında, önceki bitmeden değil; sona sığmazsa ses hızlandırılır.
-  const all = [...narration.rooms, narration.outro];
-  const starts = [...clips.map((_, i) => i * scene), TOTAL_SECONDS - OUTRO_SECONDS];
-  let cues: { at: number; file: string }[] = [];
-  if (voices) {
-    const spoken = all.map((t, i) => ({ t, at: starts[i]! })).filter((x) => x.t);
-    // İleri: her cümle sahnesinin başında ya da öncekinin ardından. Geri: son cümle videonun sonuna sığacak
-    // kadar öne çekilir, öncekiler de ona göre. İlk cümle baştaki payın önüne düşerse bu hızda sığmıyor demektir.
-    const place = (tempo: number) => {
-      const len = voices.map((s) => s.duration / tempo);
-      const at: number[] = [];
-      spoken.forEach((x, k) => at.push(Math.max(x.at + VOICE_LEAD, k ? at[k - 1]! + len[k - 1]! + VOICE_GAP : 0)));
-      let limit = duration - 0.3;
-      for (let k = at.length - 1; k >= 0; k--) {
-        at[k] = Math.min(at[k]!, limit - len[k]!);
-        limit = at[k]! - VOICE_GAP;
-      }
-      return { out: at.map((t, k) => ({ at: Math.max(0, t), file: voices[k]!.file })), fits: at[0]! >= VOICE_LEAD - 0.05 };
-    };
-    let tempo = 1;
-    let placed = place(tempo);
-    while (!placed.fits && tempo < MAX_VOICE_TEMPO) {
-      tempo = Math.min(MAX_VOICE_TEMPO, tempo + 0.05);
-      placed = place(tempo);
-    }
-    if (tempo > 1) ctx.log(`anlatım ${tempo.toFixed(2)}x hızlandırıldı${placed.fits ? "" : " (yine de sığmadı, sonu kesilebilir)"}`);
-    cues = tempo > 1 ? await Promise.all(placed.out.map(async (c, k) => ({ at: c.at, file: await speedUp(c.file, tempo, join(ctx.workDir, `ses-${k}.m4a`)) }))) : placed.out;
-  }
+  // Her cümle kendi sahnesinin başında; sahneler cümleye göre uzadığı için üst üste binmez.
+  const cues = voices ? spokenAt.map((i, k) => ({ at: starts[i]! + VOICE_LEAD, file: voices[k]!.file })) : [];
   const music = v.music ? await backgroundMusic(duration, ctx) : null;
   const final = await mixAudio(silent, cues, music, duration, join(ctx.workDir, "dosenmis.mp4"));
   return {
@@ -210,5 +194,3 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
     stats: { rooms: photos.length, style, narration: all, voiced: !!voices },
   };
 }
-
-const speedUp = async (file: string, tempo: number, out: string) => (await ffmpeg(["-i", file, "-af", `atempo=${tempo.toFixed(3)}`, "-c:a", "aac", out]), out);

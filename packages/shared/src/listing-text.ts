@@ -136,13 +136,23 @@ export const ROOM_LINES = {
   dis_cephe: "Bakımlı ve şık bir binada.",
 } as const;
 
-/** Anlatımın kelime bütçesi: seslendirme ~2,2 kelime/sn, 21 sn'lik videoda boşluklarla birlikte ~40 kelime sığar. */
+/** Aynı tipten ikinci, üçüncü oda aynı cümleyi tekrarlamasın diye; tükenirse genel cümleler. */
+const MORE_ROOM_LINES: Partial<Record<keyof typeof ROOM_LINES, string[]>> = {
+  salon: ["Misafirlerinizi ağırlayacağınız ikinci bir oturma alanı."],
+  yatak_odasi: ["Huzurlu uykular için bir yatak odası daha.", "Misafirleriniz için rahat bir oda."],
+  banyo: ["Bir banyo daha, sabah telaşına son."],
+  balkon: ["Bir balkon daha, ferah ve aydınlık."],
+};
+const SPARE_LINES = ["Her köşesi ferah ve aydınlık.", "Yaşamaya hazır, sıcacık bir oda daha."];
+
+/** Anlatımın kelime bütçesi (~2,2 kelime/sn): odanın ikinci cümlesi bu bütçe kalırsa eklenir. Video süresi anlatıma uyar. */
 export const NARRATION_WORDS = 40;
 const words = (t: string) => t.split(/\s+/).filter(Boolean).length;
 
 /**
- * Sahne sahne anlatım (toplam NARRATION_WORDS kelimeyi aşmaz). İlk oda: ilanın kimliği (yer, tip, oda sayısı, m²).
- * Sonraki odalar: öne çıkan özellikler sırayla, sığarsa odanın kendi cümlesi; sığmayan sahne sessiz geçer.
+ * Sahne sahne anlatım. İlk oda: ilanın kimliği (yer, tip, oda sayısı, m²). Sonraki her oda en az bir cümle alır
+ * (sıradaki öne çıkan özellik, yoksa odanın kendi cümlesi; sessiz sahne kalmaz); NARRATION_WORDS bütçesi kalırsa
+ * özelliğin ardına odanın cümlesi de eklenir.
  * Kapanış: fiyat ve çağrı.
  */
 export function stagingNarration(rooms: (keyof typeof ROOM_LINES)[], d: Partial<ListingDetails> = {}, priceTry?: number) {
@@ -159,13 +169,19 @@ export function stagingNarration(rooms: (keyof typeof ROOM_LINES)[], d: Partial<
   let left = NARRATION_WORDS - words(opener) - words(outro);
   const highlights = [...(d.highlights ?? [])];
   const take = (t: string) => (words(t) <= left ? ((left -= words(t)), t) : "");
+  // Odanın cümlesi: tipin ilk cümlesi, o kullanıldıysa yedekleri (aynı cümle iki kez söylenmez).
+  const used = new Set<string>();
+  const roomLine = (r: keyof typeof ROOM_LINES) =>
+    [ROOM_LINES[r], ...(MORE_ROOM_LINES[r] ?? []), ...SPARE_LINES].find((l) => !used.has(l)) ?? ROOM_LINES[r];
   const lines = rooms.map((r, i) => {
     if (i === 0) return opener;
     const h = highlights.shift();
-    const line = (h && take(h)) || "";
-    // Özellik kısaysa ve bütçe kalırsa odanın cümlesi de eklenir; özellik yoksa yalnız odanın cümlesi.
-    const room = !h || line ? take(ROOM_LINES[r]) : "";
-    return [line, room].filter(Boolean).join(" ");
+    const own = roomLine(r);
+    if (!h) return (left -= words(own), used.add(own), own);
+    left -= words(h);
+    const extra = take(own);
+    if (extra) used.add(extra);
+    return [h, extra].filter(Boolean).join(" ");
   });
   return { rooms: lines, outro };
 }
