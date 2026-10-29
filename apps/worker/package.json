@@ -21,6 +21,7 @@
     "@remotion/renderer": "4.0.539",
     "bullmq": "^6.3.15",
     "ioredis": "^5.11.1",
+    "onnxruntime-node": "^1.31.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "remotion": "4.0.539",

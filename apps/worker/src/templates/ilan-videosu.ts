@@ -14,6 +14,7 @@ import { ROOM_LABELS, stagingNarration, type DosemeOrder, type IlanPhoto, type L
 import sharp from "sharp";
 import type { IlanVideoProps, Move, Transition } from "../../remotion/types.js";
 import { backgroundMusic, download, priceText, speakLines, type JobContext, type JobResult } from "./common.js";
+import { enhancePhoto } from "./enhance.js";
 import { renderComposition } from "./remotion.js";
 
 const FPS = 30;
@@ -27,6 +28,8 @@ const OUTRO_SECONDS = 3.8;
 const VOICE_LEAD = 0.15;
 const VOICE_TAIL = 0.45;
 const OUTRO_TAIL = 1.2;
+/** Kadraj 1920 yükseklikte en fazla ~1,16 kat yakınlaşır: fotoğrafın 2400 piksel yüksekliği yeter. */
+const PHOTO_FIT = { width: 4200, height: 2400 };
 
 const TRANSITIONS: Transition[] = ["slide", "zoom", "rise", "iris"];
 const WHOOSH_PROMPT = "Short soft cinematic whoosh transition, airy swoosh, clean, no music";
@@ -68,34 +71,44 @@ export async function ilanVideosu(ctx: JobContext): Promise<JobResult> {
   const details: Partial<ListingDetails> = input.details ?? {};
   const agent = input.agent ?? {};
 
-  // 1) Fotoğraflar: döndürme düzeltilir, render'ı yormasın diye kadrajın gerektirdiğinden büyüğü küçültülür.
-  await ctx.stage("photos");
-  const fetchAsset = (key: string | undefined, name: string) =>
-    key ? ctx.r2.url(key, 600).then((u) => download(u, join(ctx.workDir, name))).catch(() => undefined) : Promise.resolve(undefined);
-  const [frames, photo, logo] = await Promise.all([
-    Promise.all(
-      photos.map(async (p, i) => {
-        const raw = await download(await ctx.r2.url(p.key, 3600), join(ctx.workDir, `ham-${i + 1}.jpg`));
-        const file = join(ctx.workDir, `kare-${i + 1}.jpg`);
-        const info = await sharp(raw).rotate().resize({ width: 4200, height: 2400, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toFile(file);
-        return { file, width: info.width, height: info.height };
-      }),
-    ),
-    fetchAsset(agent.photoKey, "emlakci.jpg"),
-    fetchAsset(agent.logoKey, "logo.png"),
-  ]);
-
-  // 2) Seslendirme: ilk sahne ilanın kimliği, sonrakiler öne çıkanlar ve oda cümleleri, kapanışta fiyat ve çağrı.
-  await ctx.stage("voice");
+  // Seslendirme ilk: fotoğraflar iyileştirilirken üretilir. İlk sahne ilanın kimliği, sonrakiler öne çıkanlar ve oda
+  // cümleleri, kapanışta fiyat ve çağrı.
   const typed = photos.every((p) => p.room);
   const narration = typed ? stagingNarration(photos.map((p) => p.room!), details, v.listing.priceTry, { tour: true }) : null;
   const lines = narration ? [...narration.rooms, narration.outro] : [];
-  const [voices, sfx] = await Promise.all([
+  const speech = Promise.all([
     input.voice === true && lines.length
       ? speakLines(lines, v.voiceId, ctx).catch((e) => (ctx.log(`! seslendirme üretilemedi: ${String(e).slice(0, 160)}`), null))
       : null,
     whoosh(ctx),
   ]);
+
+  // 1) Fotoğraflar: Real-ESRGAN ile JPEG bozulması temizlenip büyütülür (sırayla; her biri bütün çekirdekleri kullanır).
+  await ctx.stage("photos");
+  const fetchAsset = (key: string | undefined, name: string) =>
+    key ? ctx.r2.url(key, 600).then((u) => download(u, join(ctx.workDir, name))).catch(() => undefined) : Promise.resolve(undefined);
+  const [raws, photo, logo] = await Promise.all([
+    Promise.all(photos.map(async (p, i) => download(await ctx.r2.url(p.key, 3600), join(ctx.workDir, `ham-${i + 1}.jpg`)))),
+    fetchAsset(agent.photoKey, "emlakci.jpg"),
+    fetchAsset(agent.logoKey, "logo.png"),
+  ]);
+  const frames: { file: string; width: number; height: number; enhanced: boolean }[] = [];
+  const t0 = Date.now();
+  for (const [i, raw] of raws.entries()) {
+    const file = join(ctx.workDir, `kare-${i + 1}.jpg`);
+    const r = await enhancePhoto(raw, file, { fit: PHOTO_FIT, onProgress: (p) => void ctx.stage("photos", (i + p) / raws.length) }).catch(async (e) => {
+      // Model açılamazsa video yine çıksın: fotoğraf yalnız döndürülüp küçültülür.
+      ctx.log(`! fotoğraf ${i + 1} iyileştirilemedi: ${String(e).slice(0, 160)}`);
+      const info = await sharp(raw).rotate().resize({ ...PHOTO_FIT, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toFile(file);
+      return { file, width: info.width, height: info.height, enhanced: false };
+    });
+    frames.push(r);
+  }
+  ctx.log(`fotoğraflar: ${frames.filter((f) => f.enhanced).length}/${frames.length} iyileştirildi, ${((Date.now() - t0) / 1000).toFixed(0)} sn`);
+
+  // 2) Seslendirme
+  await ctx.stage("voice");
+  const [voices, sfx] = await speech;
 
   // 3) Zaman çizelgesi (kare): sahne anlatımına göre uzar.
   const sec = (s: number) => Math.round(s * FPS);
@@ -152,7 +165,12 @@ export async function ilanVideosu(ctx: JobContext): Promise<JobResult> {
       audio: {
         music: music ? url(music) : undefined,
         voice: voices
-          ? voices.map((vc, k) => ({ src: url(vc.file), from: (k < n ? scenes[k]!.from : outro.from) + sec(VOICE_LEAD), frames: sec(vc.duration) }))
+          ? voices.map((vc, k) => ({
+              src: url(vc.file),
+              from: (k < n ? scenes[k]!.from : outro.from) + sec(VOICE_LEAD),
+              frames: sec(vc.duration),
+              words: vc.words.map((w) => ({ text: w.word, start: sec(w.start), end: sec(w.end) })),
+            }))
           : [],
         whoosh: sfx ? url(sfx) : undefined,
         whooshAt: [...scenes.slice(1).map((s) => s.from - T / 2), outro.from - T / 2],
@@ -165,6 +183,6 @@ export async function ilanVideosu(ctx: JobContext): Promise<JobResult> {
     videoPath: out,
     durationSec: total / FPS,
     posterAt: 1.5,
-    stats: { scenes: n, renderer: "remotion", narration: lines, voiced: !!voices, music: !!music },
+    stats: { scenes: n, renderer: "remotion", enhanced: frames.filter((f) => f.enhanced).length, narration: lines, voiced: !!voices, music: !!music },
   };
 }

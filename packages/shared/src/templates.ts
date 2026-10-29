@@ -53,10 +53,10 @@ export const TEMPLATES: Record<TemplateId, TemplateInfo> = {
     name: "Fotoğraftan ilan videosu",
     tagline: "İlan fotoğrafları seslendirme ve müzikle sinematik videoya dönüşür",
     description:
-      "Her fotoğraf yavaş bir kamera hareketiyle akar, sahneler geçiş efektleriyle bağlanır. İlan bilgilerinden kurulan Türkçe seslendirme, oda başlıkları, fon müziği ve sonda fiyat ile emlakçı kartı. sahibinden.com ilanından tek seferde aktarılır.",
+      "Fotoğraflar önce netleştirilir (sıkıştırma bozulması temizlenir), sonra her biri yavaş bir kamera hareketiyle akar, sahneler geçiş efektleriyle bağlanır. İlan bilgilerinden kurulan Türkçe seslendirme ve kelime kelime altyazı, oda başlıkları, fon müziği ve sonda fiyat ile emlakçı kartı. sahibinden.com ilanından tek seferde aktarılır.",
     category: "Konut",
     needs: ["3–8 ilan fotoğrafı ve oda tipleri (sahibinden.com ilanından aktarılır)", "İlan bilgileri: tip, konum, oda sayısı, m² (seslendirme için)", "Fiyat ve ofis telefonu (isteğe bağlı)"],
-    includes: ["Fotoğraf başına sinematik kamera hareketi", "Geçiş efektleri", "Türkçe seslendirme", "Oda başlıkları", "Fiyat ve emlakçı kartı", "Müzik"],
+    includes: ["Fotoğraf netleştirme", "Fotoğraf başına sinematik kamera hareketi", "Geçiş efektleri", "Türkçe seslendirme ve altyazı", "Oda başlıkları", "Fiyat ve emlakçı kartı", "Müzik"],
     duration: "20–40 sn",
     preview: { video: "/media/sablon-ilan.mp4", poster: "/media/sablon-ilan-poster.jpg" },
     badge: "Yeni",

@@ -224,6 +224,64 @@ function Outro({ o, T }: { o: IlanVideoProps["outro"]; T: number }) {
   );
 }
 
+/** Altyazı kenarı: kontur harfleri kalınlaştırıp birbirine yapıştırıyordu; çevresel gölgelerle ince, net kenar. */
+const OUTLINE = [
+  ...Array.from({ length: 16 }, (_, i) => {
+    const a = (i / 16) * Math.PI * 2;
+    return `${(Math.cos(a) * 5).toFixed(1)}px ${(Math.sin(a) * 5).toFixed(1)}px 0 rgba(10,14,12,0.95)`;
+  }),
+  "0 8px 28px rgba(0,0,0,0.5)",
+].join(", ");
+
+type Words = IlanVideoProps["audio"]["voice"][number]["words"];
+
+/** Kelimeleri en fazla 3'lük parçalara böler; cümle sonu ve virgülde parça biter. */
+function chunks(words: Words) {
+  const out: Words[] = [];
+  let cur: Words = [];
+  for (const w of words) {
+    cur.push(w);
+    if (cur.length === 3 || /[.,!?;:]$/.test(w.text)) (out.push(cur), (cur = []));
+  }
+  if (cur.length) out.push(cur);
+  return out;
+}
+
+/** Kelime kelime altyazı: parça belirerek gelir, o an söylenen kelime altın renkte. Kareler anlatımın başına göre. */
+function Captions({ words }: { words: Words }) {
+  const f = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const parts = chunks(words);
+  const k = parts.findIndex((c, i) => f >= c[0]!.start && f < (parts[i + 1]?.[0]!.start ?? c[c.length - 1]!.end + 8));
+  if (k < 0) return null;
+  const part = parts[k]!;
+  const pop = spring({ frame: f - part[0]!.start, fps, config: { damping: 14, mass: 0.5 } });
+  return (
+    <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-start", padding: "690px 70px 0" }}>
+      <div
+        style={{
+          transform: `scale(${interpolate(pop, [0, 1], [0.82, 1])})`,
+          opacity: Math.min(1, pop * 1.6),
+          textAlign: "center",
+          fontFamily: DISPLAY,
+          fontWeight: 800,
+          fontSize: 78,
+          lineHeight: 1.12,
+          letterSpacing: "-0.01em",
+          textShadow: OUTLINE,
+        }}
+      >
+        {part.map((w, i) => (
+          <span key={i} style={{ color: f >= w.start && f < w.end + 2 ? GOLD : "white" }}>
+            {w.text.replace(/[.,!?;:]+$/, "").toLocaleUpperCase("tr")}
+            {i < part.length - 1 ? " " : ""}
+          </span>
+        ))}
+      </div>
+    </AbsoluteFill>
+  );
+}
+
 /** Müzik: başta açılır, sonda kısılır, anlatım sırasında yumuşakça kısılır. */
 function musicVolume(f: number, total: number, voice: IlanVideoProps["audio"]["voice"]) {
   const base = 0.5 * interpolate(f, [0, 15, total - 45, total], [0, 1, 1, 0], clamp);
@@ -261,6 +319,13 @@ export function IlanVideo(props: IlanVideoProps) {
           <Outro o={outro} T={T} />
         </SceneFrame>
       </Sequence>
+
+      {/* Kapanış kartında fiyat zaten yazılı: altyazı yalnız sahnelerde. */}
+      {audio.voice.filter((v) => v.from < outro.from).map((v, i) => (
+        <Sequence key={`c${i}`} from={v.from} durationInFrames={v.frames + 10}>
+          <Captions words={v.words} />
+        </Sequence>
+      ))}
 
       {audio.music && <Html5Audio src={audio.music} volume={(f) => musicVolume(f, durationInFrames, audio.voice)} />}
       {audio.voice.map((v, i) => (

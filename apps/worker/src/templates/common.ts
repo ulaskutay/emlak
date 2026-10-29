@@ -6,7 +6,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Video } from "@arsa/db";
 import { MUSIC_PROMPT } from "@arsa/drone-studio/pipeline";
-import { ElevenLabsClient, HiggsfieldCli, type R2, type RunpodClient } from "@arsa/providers";
+import { ElevenLabsClient, HiggsfieldCli, type R2, type RunpodClient, type Word } from "@arsa/providers";
 import { stagingEditPrompt, type RoomType, type StagingStyle } from "@arsa/shared";
 
 export interface JobContext {
@@ -206,7 +206,8 @@ export async function backgroundMusic(seconds: number, ctx: JobContext): Promise
 }
 
 /**
- * Seslendirme (ElevenLabs), metne göre önbellekli; cümle başına ses dosyası ve süresi. Anahtar yoksa null.
+ * Seslendirme (ElevenLabs), metne göre önbellekli; cümle başına ses dosyası, süresi ve dosyanın başına göre kelime
+ * zamanları (altyazı için). Anahtar yoksa null.
  *
  * Bütün anlatım tek seferde okutulur, kelime zamanlarından cümlelere kesilir: eleven_v3 komşu cümle bağlamını
  * almadığı için cümle cümle okutulunca her cümle baştan başlıyormuş gibi kopuk tonlanıyordu (2026-10-29).
@@ -216,7 +217,7 @@ export async function speakLines(
   lines: string[],
   voiceId: string | null | undefined,
   ctx: Pick<JobContext, "cacheDir" | "log">,
-): Promise<{ file: string; duration: number }[] | null> {
+): Promise<{ file: string; duration: number; words: Word[] }[] | null> {
   const key = process.env.ELEVENLABS_API_KEY;
   if (!key) {
     ctx.log("! ELEVENLABS_API_KEY yok: seslendirmesiz");
@@ -233,7 +234,7 @@ export async function speakLines(
       await writeFile(file, sp.audio);
       await writeFile(meta, JSON.stringify({ duration: sp.duration, words: sp.words }));
     }
-    return { file, ...(JSON.parse(await readFile(meta, "utf8")) as { duration: number; words?: { start: number; end: number }[] }) };
+    return { file, ...(JSON.parse(await readFile(meta, "utf8")) as { duration: number; words?: Word[] }) };
   };
 
   const take = await cached(lines.join(" "), "tek|");
@@ -241,7 +242,7 @@ export async function speakLines(
   if (take.words?.length === counts.reduce((a, b) => a + b, 0)) {
     let w = 0;
     const spans = counts.map((n) => {
-      const span = { start: take.words![w]!.start, end: take.words![w + n - 1]!.end };
+      const span = { start: take.words![w]!.start, end: take.words![w + n - 1]!.end, words: take.words!.slice(w, w + n) };
       w += n;
       return span;
     });
@@ -252,15 +253,15 @@ export async function speakLines(
         const to = k < spans.length - 1 ? Math.min((sp.end + spans[k + 1]!.start) / 2, sp.end + 0.2) : take.duration + 0.05;
         const out = take.file.replace(/\.mp3$/, `-${k + 1}.m4a`);
         if (!existsSync(out)) await ffmpeg(["-ss", from.toFixed(3), "-to", to.toFixed(3), "-i", take.file, "-c:a", "aac", "-b:a", "192k", out]);
-        return { file: out, duration: to - from };
+        return { file: out, duration: to - from, words: sp.words.map((x) => ({ ...x, start: x.start - from, end: x.end - from })) };
       }),
     );
   }
   ctx.log(`! tek seferlik seslendirme cümlelere bölünemedi (${take.words?.length} kelime / ${counts.reduce((a, b) => a + b, 0)}): cümle cümle okutuluyor`);
-  const out: { file: string; duration: number }[] = [];
+  const out: { file: string; duration: number; words: Word[] }[] = [];
   for (const text of lines) {
     const sp = await cached(text);
-    out.push({ file: sp.file, duration: sp.duration });
+    out.push({ file: sp.file, duration: sp.duration, words: sp.words ?? [] });
   }
   return out;
 }

@@ -46,7 +46,8 @@ export interface IlanVideoProps {
   };
   audio: {
     music?: string;
-    voice: { src: string; from: number; frames: number }[];
+    /** Anlatım parçaları; kelimeler parçanın başına göre kare cinsinden (altyazı). */
+    voice: { src: string; from: number; frames: number; words: { text: string; start: number; end: number }[] }[];
     whoosh?: string;
     /** Geçiş efektlerinin kareleri (geçişin ortası). */
     whooshAt: number[];
