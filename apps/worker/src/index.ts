@@ -71,7 +71,10 @@ async function processVideo(videoId: string) {
   await mkdir(CACHE_DIR, { recursive: true });
   try {
     const r = await pipeline({ video: v, r2: r2!, workDir, cacheDir: CACHE_DIR, log, stage });
-    if (UPSCALE_FINAL.has(v.template)) r.videoPath = await upscaleFinal(r.videoPath, log);
+    if (UPSCALE_FINAL.has(v.template)) {
+      await stage("upscale");
+      r.videoPath = await upscaleFinal(r.videoPath, log);
+    }
     const poster = join(workDir, "poster.jpg");
     await ffmpeg(["-ss", String(r.posterAt), "-i", r.videoPath, "-frames:v", "1", "-vf", "scale=540:-2", "-q:v", "3", poster]);
     const reelKey = `reels/${videoId}/reel.mp4`;

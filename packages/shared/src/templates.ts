@@ -64,6 +64,8 @@ export const TEMPLATES: Record<TemplateId, TemplateInfo> = {
       { id: "photos", label: "Fotoğraflar" },
       { id: "voice", label: "Seslendirme" },
       { id: "render", label: "Kurgu" },
+      { id: "upscale", label: "1080p 60 FPS" },
+      { id: "upscale", label: "1080p 60 FPS" },
       { id: "done", label: "Hazır" },
     ],
   },
