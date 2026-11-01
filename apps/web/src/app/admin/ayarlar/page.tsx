@@ -4,6 +4,8 @@ import { PageTitle } from "@/components/admin/ui";
 import { getPricing } from "@/lib/credits";
 import { formatTry } from "@/lib/format";
 import { requireAdmin } from "@/lib/auth";
+import { getIntegrations, isGoogleReady, isMailReady, storedIntegrations } from "@/lib/integrations";
+import { BaglantiForm } from "./BaglantiForm";
 
 function Field({ name, label, value, unit }: { name: string; label: string; value: number; unit?: string }) {
   return (
@@ -46,8 +48,9 @@ function sceneUsd(q: "orta" | "yuksek", p: PricingSettings) {
 export default async function SettingsPage() {
   // Yerleşim de denetler; sayfa yerleşimle paralel çalıştığı için veri sorgusundan önce burada da.
   await requireAdmin();
-  const p = await getPricing();
+  const [p, stored, live] = await Promise.all([getPricing(), storedIntegrations(), getIntegrations()]);
   const c = p.costUsd;
+  const authUrl = (process.env.BETTER_AUTH_URL ?? "").replace(/\/$/, "");
   return (
     <>
       <PageTitle sub="Maliyet tahmini ve sipariş kredisi bu değerlerle hesaplanır. Gerçek maliyeti video sayfasından tek tek girebilirsiniz.">Ayarlar</PageTitle>
@@ -146,6 +149,21 @@ export default async function SettingsPage() {
           <button className="adm-btn-primary px-6">Kaydet</button>
         </div>
       </form>
+
+      <h2 id="baglantilar" className="mt-12 text-xl font-extrabold tracking-[-0.02em]">Bağlantılar</h2>
+      <BaglantiForm
+        smtp={{
+          host: stored.smtp?.host ?? "",
+          port: stored.smtp?.port ?? live.smtp.port,
+          user: stored.smtp?.user ?? "",
+          from: stored.smtp?.from ?? "",
+          hasPass: Boolean(stored.smtp?.pass),
+        }}
+        google={{ clientId: stored.google?.clientId ?? "", hasSecret: Boolean(stored.google?.clientSecret) }}
+        mailReady={isMailReady(live)}
+        googleReady={isGoogleReady(live)}
+        callbackUrl={`${authUrl}/api/auth/callback/google`}
+      />
     </>
   );
 }

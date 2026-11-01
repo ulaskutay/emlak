@@ -12,7 +12,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
   const notice = q.engelli ? "engelli" : q.sifre === "yenilendi" ? "sifre" : undefined;
   return (
     <AuthShell next={next}>
-      <AuthForm mode="login" next={next} google={googleEnabled} notice={notice} />
+      <AuthForm mode="login" next={next} google={await googleEnabled()} notice={notice} />
     </AuthShell>
   );
 }

@@ -6,6 +6,7 @@ import { SiteLogo } from "@/components/site/SiteLogo";
 import { isSuperAdmin, requireUser } from "@/lib/auth";
 import { creditBalance } from "@/lib/credits";
 import { formatInt } from "@/lib/format";
+import { mailEnabled } from "@/lib/mail";
 
 export default async function PanelLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
@@ -64,7 +65,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
         </div>
       </aside>
       <main className="mx-auto w-full max-w-[84rem] px-4 pb-28 pt-6 sm:px-8 lg:py-10">
-        {!user.emailVerified && <VerifyBanner email={user.email} />}
+        {!user.emailVerified && (await mailEnabled()) && <VerifyBanner email={user.email} />}
         {children}
         <div className="mt-12 flex items-center justify-between gap-4 border-t border-ayrac pt-5 text-sm lg:hidden">
           <span className="min-w-0 truncate text-gri">{user.email}</span>

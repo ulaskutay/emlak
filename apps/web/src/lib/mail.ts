@@ -1,22 +1,32 @@
 import "server-only";
 import nodemailer, { type Transporter } from "nodemailer";
+import { getIntegrations, isMailReady } from "./integrations";
 import { site } from "./site";
 
-let transport: Transporter | null | undefined;
+let transport: { key: string; t: Transporter } | null = null;
 
-/** SMTP_HOST tanımlı değilse null: geliştirmede e-posta gönderilmez, bağlantı konsola yazılır. */
-function getTransport() {
-  if (transport !== undefined) return transport;
-  const host = process.env.SMTP_HOST;
-  if (!host) return (transport = null);
-  const port = Number(process.env.SMTP_PORT ?? 587);
-  transport = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
-  });
-  return transport;
+/** E-posta gönderilebiliyor mu (Yönetim > Ayarlar ya da SMTP_HOST): değilse doğrulama zorunlu tutulmaz, kullanıcı bağlantıyı hiç alamaz. */
+export async function mailEnabled() {
+  return isMailReady(await getIntegrations());
+}
+
+/** SMTP tanımlı değilse null: e-posta gönderilmez, bağlantı loga yazılır. Ayar değişince bağlantı yeniden kurulur. */
+async function getTransport() {
+  const { smtp } = await getIntegrations();
+  if (!smtp.host) return null;
+  const key = JSON.stringify(smtp);
+  if (transport?.key !== key) {
+    transport = {
+      key,
+      t: nodemailer.createTransport({
+        host: smtp.host,
+        port: smtp.port,
+        secure: smtp.port === 465,
+        auth: smtp.user ? { user: smtp.user, pass: smtp.pass } : undefined,
+      }),
+    };
+  }
+  return { t: transport.t, from: smtp.from || `${site.name} <${site.email}>` };
 }
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
@@ -39,12 +49,12 @@ function layout({ title, body, cta, url, foot }: { title: string; body: string; 
 }
 
 async function send(to: string, subject: string, html: string, text: string) {
-  const t = getTransport();
-  if (!t) {
-    console.info(`[e-posta gönderilmedi: SMTP_HOST yok] ${to} · ${subject}\n${text}`);
+  const m = await getTransport();
+  if (!m) {
+    console.info(`[e-posta gönderilmedi: SMTP ayarı yok] ${to} · ${subject}\n${text}`);
     return;
   }
-  await t.sendMail({ from: process.env.SMTP_FROM ?? `${site.name} <${site.email}>`, to, subject, html, text });
+  await m.t.sendMail({ from: m.from, to, subject, html, text });
 }
 
 export async function sendVerifyMail(to: string, url: string) {
@@ -67,4 +77,20 @@ export async function sendResetMail(to: string, url: string) {
     layout({ title, body, cta: "Yeni şifre belirle", url, foot: "Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz; şifreniz değişmez." }),
     `${body}\n\n${url}`,
   );
+}
+
+/** Yönetim > Ayarlar'daki deneme düğmesi: gönderildiyse true, SMTP ayarı yoksa false; sunucu hatası fırlatılır. */
+export async function sendTestMail(to: string) {
+  const m = await getTransport();
+  if (!m) return false;
+  const title = "Deneme e-postası";
+  const body = "E-posta ayarlarınız çalışıyor. Doğrulama ve şifre yenileme e-postaları bu sunucudan gönderilecek.";
+  await m.t.sendMail({
+    from: m.from,
+    to,
+    subject: `${title} · ${site.name}`,
+    html: layout({ title, body, cta: "Siteye gidin", url: site.url, foot: "Bu e-posta Yönetim > Ayarlar'dan istendi." }),
+    text: body,
+  });
+  return true;
 }

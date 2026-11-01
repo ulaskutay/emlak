@@ -4,6 +4,7 @@ import { TEMPLATES, TemplateOrder, videoCredits, type TemplateInput } from "@ars
 import { NextResponse } from "next/server";
 import { apiUser, badRequest, unauthorized } from "@/lib/api";
 import { creditsEnforced, getPricing } from "@/lib/credits";
+import { mailEnabled } from "@/lib/mail";
 import { summarizeParcel } from "@/lib/parcel";
 import { enqueueReel } from "@/lib/queue";
 
@@ -32,7 +33,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const user = await apiUser();
   if (!user) return unauthorized();
-  if (!user.emailVerified)
+  if (!user.emailVerified && (await mailEnabled()))
     return NextResponse.json({ error: "Sipariş vermek için önce e-posta adresinizi doğrulayın; bağlantı gelen kutunuzda." }, { status: 403 });
   const parsed = TemplateOrder.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return badRequest(parsed.error.issues[0]?.message ?? "Geçersiz istek");

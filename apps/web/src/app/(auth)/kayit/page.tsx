@@ -8,7 +8,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
   const next = safeNext((await searchParams).sonra);
   return (
     <AuthShell next={next}>
-      <AuthForm mode="signup" next={next} google={googleEnabled} />
+      <AuthForm mode="signup" next={next} google={await googleEnabled()} />
     </AuthShell>
   );
 }
