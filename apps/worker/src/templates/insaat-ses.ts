@@ -215,8 +215,10 @@ export async function addConstructionAudio(o: {
   const vl = cues.map((c, k) => {
     inputs.push("-i", c.file);
     const ms = Math.round(c.at * 1000);
-    f.push(`[${idx++}:a]adelay=${ms}|${ms},aresample=44100[v${k}]`);
-    return `[v${k}]`;
+    // "s" önekli: görüntü zinciri "[v…]" etiketlerini kullanıyor. 2026-11-01'de ikisi de [v0] idi; ffmpeg ilk cümleyi
+    // yanlış bağlayıp miksi sonsuza dek bekledi (Ses aşamasında %100 işlemci, dosya büyümüyor).
+    f.push(`[${idx++}:a]adelay=${ms}|${ms},aresample=44100[s${k}]`);
+    return `[s${k}]`;
   });
   f.push(`${vl.join("")}amix=inputs=${vl.length}:normalize=0,volume=1.2,apad,atrim=0:${D.toFixed(2)},asplit=3[voice][sc1][sc2]`);
   // Her efekt aynı ses yüksekliğine getirilir (loudnorm), aşamanın başlangıcından yarım geçiş önce girer.
