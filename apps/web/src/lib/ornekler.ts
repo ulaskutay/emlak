@@ -28,6 +28,9 @@ export const digerOrnekler: Ornek[] = [
   duvar("ilan-videosu", "ilan-4"),
   duvar("ilan-videosu", "ilan-5"),
   duvar("ilan-videosu", "ilan-6"),
+  duvar("ilan-videosu", "ilan-7"),
+  duvar("dosenmis-ev", "dosenmis-3"),
+  duvar("ilan-videosu", "ilan-8"),
   duvar("sunucu-ev", "sunucu-1"),
   duvar("dosenmis-ev", "dosenmis-1"),
   duvar("insaat-videosu", "insaat-1"),
@@ -36,10 +39,10 @@ export const digerOrnekler: Ornek[] = [
   duvar("insaat-videosu", "insaat-2"),
 ].filter((o) => !TEMPLATES[o.template].hidden);
 
-/** Bir şablonun çıktıları: önce ana örnek, sonra kısa döngüler. */
+/** Bir şablonun çıktıları: önce ana örnek, sonra kısa döngüler (en yeni önce). */
 export const sablonCiktilari = (id: TemplateId): Ornek[] => [
   ...sablonOrnekleri.filter((o) => o.template === id),
-  ...digerOrnekler.filter((o) => o.template === id),
+  ...digerOrnekler.filter((o) => o.template === id).reverse(),
 ];
 
 export const ornekAdi = (o: Ornek) => TEMPLATES[o.template].name;

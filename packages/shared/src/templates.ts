@@ -58,7 +58,7 @@ export const TEMPLATES: Record<TemplateId, TemplateInfo> = {
     needs: ["3–8 ilan fotoğrafı ve oda tipleri (sahibinden.com ilanından aktarılır)", "İlan bilgileri: tip, konum, oda sayısı, m² (seslendirme için)", "Fiyat ve ofis telefonu (isteğe bağlı)"],
     includes: ["Fotoğraf netleştirme", "Fotoğraf başına sinematik kamera hareketi", "Geçiş efektleri", "Türkçe seslendirme ve altyazı", "Oda başlıkları", "Fiyat ve emlakçı kartı", "Müzik"],
     duration: "20–40 sn",
-    preview: { video: "/media/sablon-ilan.mp4", poster: "/media/sablon-ilan-poster.jpg" },
+    preview: { video: "/media/sablon-ilan-2.mp4", poster: "/media/sablon-ilan-2-poster.jpg" },
     badge: "Yeni",
     stages: [
       { id: "photos", label: "Fotoğraflar" },
