@@ -5,11 +5,15 @@ import { usePathname } from "next/navigation";
 const ICON: Record<string, React.ReactNode> = {
   sablonlar: <><rect x="3" y="3" width="6" height="6" rx="1.5" /><rect x="11" y="3" width="6" height="6" rx="1.5" /><rect x="3" y="11" width="6" height="6" rx="1.5" /><rect x="11" y="11" width="6" height="6" rx="1.5" /></>,
   videolar: <><rect x="3" y="4" width="11" height="12" rx="2" /><path d="m14 8.5 3.5-2v7l-3.5-2" /></>,
+  emlakcilar: <><circle cx="8" cy="7" r="3" /><path d="M2.5 16.5c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5" /><path d="M13.5 4.2a3 3 0 0 1 0 5.6M15.5 12.4c1.2.7 1.9 2 2.1 4.1" /></>,
+  kredi: <><circle cx="10" cy="10" r="7" /><path d="M12.2 7.6c-.4-.7-1.2-1.1-2.2-1.1-1.3 0-2.2.7-2.2 1.7 0 2.3 4.5 1.2 4.5 3.6 0 1-1 1.7-2.3 1.7-1 0-1.9-.4-2.3-1.2M10 5v1.5M10 13.5V15" /></>,
 };
 
 const NAV = [
   { href: "/panel", label: "Şablonlar", icon: "sablonlar" },
   { href: "/panel/videolar", label: "Videolarım", icon: "videolar" },
+  { href: "/panel/emlakcilar", label: "Emlakçılar", icon: "emlakcilar" },
+  { href: "/panel/kredi", label: "Kredi", icon: "kredi" },
 ];
 
 /** Şablon formları da "Şablonlar" altında sayılır. */
@@ -55,7 +59,7 @@ export function PanelTabBar() {
   return (
     <nav
       aria-label="Panel menüsü"
-      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-2 border-t border-ayrac bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-ayrac bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
     >
       {NAV.map((n) => {
         const on = active(n.href);

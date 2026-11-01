@@ -1,5 +1,5 @@
 /** Sitenin logosu: gök mavisi kare içinde beyaz parsel sınırı ve güneş sarısı köşe kazığı. */
-export function SiteLogo({ className = "" }: { tone?: "light" | "dark"; className?: string }) {
+export function SiteLogo({ className = "" }: { className?: string }) {
   return (
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
       <svg viewBox="0 0 32 32" className="h-9 w-9 shrink-0" aria-hidden>

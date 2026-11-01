@@ -1,4 +1,4 @@
-import { and, eq, getDb, creditLedger, user, videos } from "@arsa/db";
+import { eq, getDb, user, videoNetCharge, videos } from "@arsa/db";
 import { TEMPLATES, estimateCostTry } from "@arsa/shared";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -19,10 +19,11 @@ export default async function ProductionDetail({ params }: { params: Promise<{ i
   const [row] = await db.select({ v: videos, email: user.email }).from(videos).innerJoin(user, eq(user.id, videos.userId)).where(eq(videos.id, id));
   if (!row) notFound();
   const { v, email } = row;
-  const [pricing, refunds] = await Promise.all([
+  const [pricing, charged] = await Promise.all([
     getPricing(),
-    db.select({ delta: creditLedger.delta }).from(creditLedger).where(and(eq(creditLedger.videoId, id), eq(creditLedger.reason, "refund"))),
+    videoNetCharge(db, id),
   ]);
+  const refunded = v.credits > 0 && charged <= 0;
   const estimate = estimateCostTry(v.template, v.input, pricing);
   const play = v.status === "done" && v.reelKey ? await r2().url(v.reelKey, 3600).catch(() => null) : null;
   const poster = v.keyframeKey ? await r2().url(v.keyframeKey, 3600).catch(() => null) : null;
@@ -54,19 +55,19 @@ export default async function ProductionDetail({ params }: { params: Promise<{ i
           {v.status === "failed" || v.status === "done" ? (
             <form action={retryVideo}>
               <input type="hidden" name="id" value={v.id} />
-              <ConfirmButton className="adm-btn-ghost" message="Video baştan yeniden üretilsin mi? Kredi yeniden düşülmez, maliyet yeniden oluşur.">
+              <ConfirmButton className="adm-btn-ghost" message={refunded ? `Video baştan yeniden üretilsin mi? İade edilen ${v.credits} kredi yeniden düşülür.` : "Video baştan yeniden üretilsin mi? Kredi yeniden düşülmez, maliyet yeniden oluşur."}>
                 Yeniden üret
               </ConfirmButton>
             </form>
           ) : null}
-          {v.credits && !refunds.length ? (
+          {v.credits && !refunded ? (
             <form action={refundVideo}>
               <input type="hidden" name="id" value={v.id} />
               <ConfirmButton className="adm-btn-ghost" message={`${v.credits} kredi kullanıcıya iade edilsin mi?`}>
                 {v.credits} krediyi iade et
               </ConfirmButton>
             </form>
-          ) : refunds.length ? (
+          ) : refunded ? (
             <span className="adm-btn border border-ayrac bg-zemin text-gri">Kredi iade edildi</span>
           ) : null}
         </div>

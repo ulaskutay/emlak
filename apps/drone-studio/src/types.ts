@@ -3,6 +3,8 @@ export interface ParcelInfo {
   name?: string;
   properties: Record<string, string>;
   ring: { lat: number; lng: number }[];
+  /** Tüm parseller (yan yana ya da parçalı arsa); yoksa yalnızca ring. Alan, merkez ve yarıçap hepsinin toplamıdır. */
+  rings?: { lat: number; lng: number }[][];
   centroid: { lat: number; lng: number };
   areaM2: number;
   radiusM: number;

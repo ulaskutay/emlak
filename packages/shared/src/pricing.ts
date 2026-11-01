@@ -4,7 +4,19 @@ import { type TemplateId, type TemplateInput, type TourQuality } from "./templat
  * Kredi ve maliyet: siparişte düşülen kullanıcı kredisi ve yönetici panelindeki tahmini maliyet.
  * Değerler yönetici panelinden (/admin/ayarlar) değiştirilir; buradakiler ilk değerlerdir.
  */
+/** Satın alınabilen kredi paketi; fiyat KDV dahil TL. */
+export interface CreditPackage {
+  id: string;
+  name: string;
+  credits: number;
+  priceTry: number;
+}
+
 export interface PricingSettings {
+  /** Kredi paketleri (küçükten büyüğe); büyük pakette kredi başı fiyat düşer. */
+  packages: CreditPackage[];
+  /** Yeni kayıt olan kullanıcıya bir kez verilen kredi. */
+  welcomeCredits: number;
   /** Bir kredinin satış fiyatı (TL): paket fiyatı yokken gelir tahmininde kullanılır. */
   creditPriceTry: number;
   /** Dolar kuru: maliyetler dolar girilir, panelde TL gösterilir. */
@@ -36,6 +48,13 @@ export interface PricingSettings {
  *   ByteDance büyütme 1080p 60 FPS ~0,4 kredi/sn. Plus aylık $49/1000 kredi; ek paketlerle $0,06 (canlı ayar).
  */
 export const DEFAULT_PRICING: PricingSettings = {
+  // Kredi başı 1,98 / 1,79 / 1,60 ₺.
+  packages: [
+    { id: "baslangic", name: "Başlangıç", credits: 500, priceTry: 990 },
+    { id: "profesyonel", name: "Profesyonel", credits: 1500, priceTry: 2690 },
+    { id: "ajans", name: "Ajans", credits: 5000, priceTry: 7990 },
+  ],
+  welcomeCredits: 100,
   creditPriceTry: 2,
   usdTry: 49.79,
   higgsfieldCreditUsd: 0.06,
@@ -65,6 +84,7 @@ export function mergePricing(saved: unknown): PricingSettings {
   return {
     ...d,
     ...s,
+    packages: Array.isArray(s.packages) && s.packages.length ? s.packages : d.packages,
     credits: { ...d.credits, ...s.credits },
     tourCredits: { ...d.tourCredits, ...s.tourCredits },
     costUsd: {

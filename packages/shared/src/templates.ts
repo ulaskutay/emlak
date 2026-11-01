@@ -184,7 +184,30 @@ export const SOON_TEMPLATES: SoonTemplate[] = [
 
 // ——— Sipariş şemaları ———
 
-export const ArsaDroneOrder = ReelOrder.extend({ template: z.literal("arsa-drone") });
+const AgentAsset = z.string().regex(/^uploads\/[\w-]+\/[\w-]+\.(jpg|png)$/, "Geçersiz görsel");
+
+/** Kapanış kartındaki emlakçı: ad, profil fotoğrafı ve ofis logosu (ofis adı ve telefon listing'de). */
+export const OrderAgent = z
+  .object({
+    name: z.string().trim().max(60).optional(),
+    photoKey: AgentAsset.optional(),
+    logoKey: AgentAsset.optional(),
+  })
+  .default({});
+export type OrderAgent = z.infer<typeof OrderAgent>;
+
+/** Panelde kaydedilen emlakçı (Emlakçılar sayfası); şablon formunda seçilince OrderAgent + ofis/telefon olur. */
+export const SavedAgentInput = z.object({
+  name: z.string().trim().min(2, "Emlakçının adını yazın").max(60),
+  officeName: ReelListing.shape.officeName,
+  phone: ReelListing.shape.phone,
+  photoKey: AgentAsset.optional(),
+  logoKey: AgentAsset.optional(),
+});
+export type SavedAgentInput = z.infer<typeof SavedAgentInput>;
+
+/** Arsa drone turu; emlakçı seçilirse drone kapanışından sonra emlakçı kartı eklenir. */
+export const ArsaDroneOrder = ReelOrder.extend({ template: z.literal("arsa-drone"), agent: OrderAgent });
 
 /** Eski ilan siparişlerinin fotoğrafı (oda tipi yerine dış/iç mekân); yenileri RoomPhoto. */
 export const IlanPhoto = z.object({
@@ -277,7 +300,6 @@ export const RoomPhoto = IlanPhoto.pick({ key: true, title: true }).extend({
 });
 export type RoomPhoto = z.infer<typeof RoomPhoto>;
 
-const AgentAsset = z.string().regex(/^uploads\/[\w-]+\/[\w-]+\.(jpg|png)$/, "Geçersiz görsel");
 
 export const DosemeOrder = z.object({
   template: z.literal("dosenmis-ev"),
@@ -287,14 +309,8 @@ export const DosemeOrder = z.object({
     .max(4, "En fazla 4 fotoğraf")
     .refine((ps) => ps.every((p) => p.room !== "dis_cephe"), "Binanın dışı döşenemez; yalnız oda fotoğrafları seçin"),
   style: StagingStyle,
-  /** Kapanış kartındaki emlakçı (ilan aktarmadan): profil fotoğrafı ve ofis logosu kullanıcının yüklemeleri. */
-  agent: z
-    .object({
-      name: z.string().trim().max(60).optional(),
-      photoKey: AgentAsset.optional(),
-      logoKey: AgentAsset.optional(),
-    })
-    .default({}),
+  /** Kapanış kartındaki emlakçı (kayıtlı emlakçı ya da ilan aktarmadan): görseller kullanıcının yüklemeleri. */
+  agent: OrderAgent,
   listing: ReelListing.pick({ priceTry: true, officeName: true, phone: true }).default({}),
   details: ListingDetails.default({}),
   voice: z.boolean().default(true),
@@ -383,6 +399,7 @@ export type TemplateInput =
   | { photos: RoomPhoto[]; style: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; voice?: boolean }
   | { photos: TourScene[]; style?: StagingStyle; details?: ListingDetails; agent?: DosemeOrder["agent"]; presenter?: PresenterId; quality?: TourQuality }
   | { building: BuildingType; floors: number }
+  | { agent?: DosemeOrder["agent"] }
   | { building: BuildingType; floors: number; zoning: Zoning; agent?: DosemeOrder["agent"] }
   | Record<string, never>;
 

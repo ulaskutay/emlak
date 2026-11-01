@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { apiUser, badRequest, unauthorized } from "@/lib/api";
 import { hookText } from "@/lib/hook";
-import { summarizeParcel } from "@/lib/parcel";
+import { mergeParcelTexts, summarizeParcel } from "@/lib/parcel";
 import { tkgmList, tkgmParcel } from "@/lib/tkgm";
 
 /** Sihirbaz 1. adım, TKGM sorgusu: ?tip=il | ilce&id=<ilId> | mahalle&id=<ilceId> seçenek listesi döner. */
@@ -19,25 +19,37 @@ export async function GET(req: Request) {
   }
 }
 
-/** Mahalle + ada + parsel ile parseli TKGM'den çeker; dosya yüklemeyle aynı yanıtı (özet, çokgen, ses cümlesi) ve dosya metnini döner. */
+type ParcelQuery = { mahalleId?: number; ada?: string; parsel?: string };
+
+/**
+ * Mahalle + ada + parsel ile parseli TKGM'den çeker; dosya yüklemeyle aynı yanıtı (özet, çokgenler, ses cümlesi) ve dosya metnini döner.
+ * parcels verilirse (yan yana / parçalı arsa, en fazla 10) hepsi sırayla çekilir ve tek dosyada birleşir.
+ */
 export async function POST(req: Request) {
   if (!(await apiUser())) return unauthorized();
-  const { mahalleId, ada, parsel } = (await req.json().catch(() => ({}))) as { mahalleId?: number; ada?: string; parsel?: string };
-  const a = String(ada ?? "").trim();
-  const p = String(parsel ?? "").trim();
-  if (!Number.isInteger(mahalleId) || mahalleId! <= 0) return badRequest("Mahalle seçin");
-  if (!/^\d{1,7}$/.test(a)) return badRequest("Ada numarası yalnızca rakam olmalı");
-  if (!/^\d{1,7}$/.test(p)) return badRequest("Parsel numarası yalnızca rakam olmalı");
-  let text: string;
-  try {
-    text = await tkgmParcel(mahalleId!, a, p);
-  } catch (e) {
-    return badRequest(e instanceof Error ? e.message : String(e));
+  const body = (await req.json().catch(() => ({}))) as ParcelQuery & { parcels?: ParcelQuery[] };
+  const queries = Array.isArray(body.parcels) ? body.parcels : [body];
+  if (!queries.length) return badRequest("Parsel seçin");
+  if (queries.length > 10) return badRequest("Bir videoda en fazla 10 parsel olabilir");
+  const texts: string[] = [];
+  for (const q of queries) {
+    const a = String(q.ada ?? "").trim();
+    const p = String(q.parsel ?? "").trim();
+    if (!Number.isInteger(q.mahalleId) || q.mahalleId! <= 0) return badRequest("Mahalle seçin");
+    if (!/^\d{1,7}$/.test(a)) return badRequest("Ada numarası yalnızca rakam olmalı");
+    if (!/^\d{1,7}$/.test(p)) return badRequest("Parsel numarası yalnızca rakam olmalı");
+    try {
+      texts.push(await tkgmParcel(q.mahalleId!, a, p));
+    } catch (e) {
+      return badRequest(e instanceof Error ? e.message : String(e));
+    }
   }
   try {
+    const text = mergeParcelTexts(texts);
     const parsed = summarizeParcel(text);
-    const m = parsed.summary.mahalle ?? "parsel";
-    return NextResponse.json({ fileName: `TKGM ${m} ${a}-${p}.geojson`, text, summary: parsed.summary, ring: parsed.ring, hook: hookText(parsed) });
+    const m = parsed.summary.mahalle?.split(",")[0] ?? "parsel";
+    const nos = queries.map((q) => `${String(q.ada).trim()}-${String(q.parsel).trim()}`).join("_");
+    return NextResponse.json({ fileName: `TKGM ${m} ${nos}.geojson`, text, summary: parsed.summary, rings: parsed.rings, hook: hookText(parsed) });
   } catch (e) {
     return badRequest(e instanceof Error ? e.message : String(e));
   }

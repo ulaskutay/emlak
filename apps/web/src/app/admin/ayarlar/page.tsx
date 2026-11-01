@@ -52,8 +52,35 @@ export default async function SettingsPage() {
     <>
       <PageTitle sub="Maliyet tahmini ve sipariş kredisi bu değerlerle hesaplanır. Gerçek maliyeti video sayfasından tek tek girebilirsiniz.">Ayarlar</PageTitle>
       <form action={savePricing} className="max-w-4xl space-y-3">
+        <section className="adm-kart p-5">
+          <h2 className="font-extrabold">Kredi paketleri</h2>
+          <p className="mt-1 text-sm text-gri">Kullanıcı panelinde kartla satılır (PayTR). Fiyat KDV dahil. Satırı silmek için alanları boşaltın; yeni paket için son satırı doldurun.</p>
+          <div className="mt-4 grid gap-3">
+            {[...p.packages, { id: "", name: "", credits: 0, priceTry: 0 }].map((pk, i) => (
+              <div key={pk.id || "yeni"} className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] items-end gap-3">
+                <input type="hidden" name={`packages.${i}.id`} value={pk.id} />
+                <div>
+                  <label className="adm-label" htmlFor={`packages.${i}.name`}>{pk.id ? "Paket adı" : "Yeni paket"}</label>
+                  <input id={`packages.${i}.name`} name={`packages.${i}.name`} defaultValue={pk.name} className="adm-input" />
+                </div>
+                <div>
+                  <label className="adm-label" htmlFor={`packages.${i}.credits`}>Kredi</label>
+                  <input id={`packages.${i}.credits`} name={`packages.${i}.credits`} defaultValue={pk.credits || ""} inputMode="numeric" className="adm-input" />
+                </div>
+                <div>
+                  <label className="adm-label" htmlFor={`packages.${i}.priceTry`}>
+                    Fiyat (₺){pk.credits ? <span className="font-normal"> · kredisi {(pk.priceTry / pk.credits).toLocaleString("tr-TR", { maximumFractionDigits: 2 })} ₺</span> : null}
+                  </label>
+                  <input id={`packages.${i}.priceTry`} name={`packages.${i}.priceTry`} defaultValue={pk.priceTry || ""} inputMode="decimal" className="adm-input" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className="adm-kart grid gap-4 p-5 sm:grid-cols-3">
           <h2 className="font-extrabold sm:col-span-3">Genel</h2>
+          <Field name="welcomeCredits" label="Hoş geldin kredisi (kayıtta)" value={p.welcomeCredits} unit="kredi" />
           <Field name="creditPriceTry" label="1 kredinin fiyatı" value={p.creditPriceTry} unit="₺" />
           <Field name="usdTry" label="Dolar kuru" value={p.usdTry} unit="₺" />
           <Field name="higgsfieldCreditUsd" label="Higgsfield plan kredisi" value={p.higgsfieldCreditUsd} unit="$" />

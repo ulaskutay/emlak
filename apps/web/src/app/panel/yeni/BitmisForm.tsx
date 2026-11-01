@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ListingFields, listingPayload, type ListingValues } from "./ListingFields";
 import { ParcelStep, type Parsed } from "./Wizard";
+import { OrderError } from "@/components/panel/ui";
 
 const TYPES = BuildingType.options;
 const HINTS: Record<BuildingType, string> = {
@@ -103,7 +104,7 @@ export function BitmisForm({ template }: { template: keyof typeof INTRO }) {
             </label>
           </div>
 
-          {error && <p className="rounded-lg bg-mercan-acik px-3 py-2 text-sm text-mercan-koyu">{error}</p>}
+          {error && <OrderError error={error} />}
           <div className="flex justify-between gap-3">
             <button className="pnl-btn-ghost" onClick={() => setStep(0)}>Geri</button>
             <button className="pnl-btn-primary" disabled={busy} onClick={submit}>{busy ? "Gönderiliyor…" : "Videoyu oluştur"}</button>

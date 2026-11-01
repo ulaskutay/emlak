@@ -3,7 +3,7 @@ import { templateList } from "@arsa/shared";
 import { site } from "@/lib/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const pages = ["", "/sablonlar", "/nasil-yapilir", "/ornekler", "/sss", ...templateList.map((t) => `/sablonlar/${t.id}`), "/iletisim", "/kvkk", "/gizlilik", "/cerez", "/kullanim-kosullari"];
+  const pages = ["", "/sablonlar", "/nasil-yapilir", "/ornekler", "/sss", ...templateList.map((t) => `/sablonlar/${t.id}`), "/iletisim", "/kvkk", "/gizlilik", "/cerez", "/kullanim-kosullari", "/mesafeli-satis"];
   return pages.map((p) => ({
     url: `${site.url}${p}`,
     changeFrequency: p === "" ? "weekly" : "yearly",

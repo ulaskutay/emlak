@@ -252,17 +252,49 @@ body:has(.panel) {
   transform-origin: bottom;
   animation: konut-ses 0.8s ease-in-out infinite;
 }
-/* Proje çizimi: katlar alttan yükselir, vinç kancası iner kalkar */
-@keyframes proje-kat {
-  0%, 100% { transform: scaleY(0); }
-  12%, 82% { transform: scaleY(1); }
-  90% { transform: scaleY(0); }
+/* Proje görseli: inşaat videosunun gerçek kareleri sırayla belirir (14 sn döngü), aşama adları tek tek görünür */
+@keyframes proje-k2 {
+  0%, 25% { opacity: 0; }
+  28%, 94% { opacity: 1; }
+  100% { opacity: 0; }
 }
-.proje-kat {
-  transform-box: fill-box;
-  transform-origin: bottom;
-  animation: proje-kat 10s ease-in-out infinite;
+@keyframes proje-k3 {
+  0%, 50% { opacity: 0; }
+  53%, 94% { opacity: 1; }
+  100% { opacity: 0; }
 }
+@keyframes proje-k4 {
+  0%, 75% { opacity: 0; }
+  78%, 94% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes proje-a1 {
+  0%, 23% { opacity: 1; }
+  26%, 96% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes proje-a2 {
+  0%, 25% { opacity: 0; }
+  28%, 48% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+@keyframes proje-a3 {
+  0%, 50% { opacity: 0; }
+  53%, 73% { opacity: 1; }
+  76%, 100% { opacity: 0; }
+}
+@keyframes proje-a4 {
+  0%, 75% { opacity: 0; }
+  78%, 94% { opacity: 1; }
+  97%, 100% { opacity: 0; }
+}
+.proje-k2 { animation: proje-k2 14s ease-in-out infinite; }
+.proje-k3 { animation: proje-k3 14s ease-in-out infinite; }
+.proje-k4 { animation: proje-k4 14s ease-in-out infinite; }
+.proje-a1 { animation: proje-a1 14s ease-in-out infinite; }
+.proje-a2 { animation: proje-a2 14s ease-in-out infinite; }
+.proje-a3 { animation: proje-a3 14s ease-in-out infinite; }
+.proje-a4 { animation: proje-a4 14s ease-in-out infinite; }
 @keyframes proje-kanca {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(70px); }
@@ -294,10 +326,22 @@ body:has(.panel) {
   .konut-doseli,
   .konut-bos,
   .konut-ses,
-  .proje-kat,
+  .proje-k2,
+  .proje-k3,
+  .proje-k4,
+  .proje-a1,
+  .proje-a2,
+  .proje-a3,
+  .proje-a4,
   .proje-kanca,
   .suzul,
   .serit {
     animation: none;
+  }
+  /* Hareketsizde bitmiş hali ve adı kalır */
+  .proje-a1,
+  .proje-a2,
+  .proje-a3 {
+    opacity: 0;
   }
 }

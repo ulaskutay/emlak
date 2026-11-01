@@ -12,6 +12,12 @@ export const user = pgTable("user", {
   role: text("role").$type<"user" | "admin">().notNull().default("user"),
   /** Engelli kullanıcı oturum açsa da panele ve API'ye giremez. */
   banned: boolean("banned").notNull().default(false),
+  /** Kayıtta kullanım koşulları ve KVKK aydınlatma metninin onaylandığı an (Google kaydında karşılama ekranında alınır). */
+  termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
+  /** Karşılamada seçilen ilan türleri (şablon kategorileri); panel galerisi bunları öne alır. */
+  segments: text("segments").array().$type<string[]>(),
+  /** Karşılama ekranı tamamlandı. */
+  onboardedAt: timestamp("onboarded_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -120,8 +126,30 @@ export const parcelContexts = pgTable("parcel_contexts", {
 
 export type Video = typeof videos.$inferSelect;
 
+// ---- Emlakçılar ----
+/** Kullanıcının kayıtlı emlakçıları: şablon formunda seçilir, videonun kapanış kartına basılır (görseller kullanıcının yüklemeleri). */
+export const agents = pgTable(
+  "agents",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    officeName: text("office_name"),
+    phone: text("phone"),
+    /** R2 anahtarları (uploads/<userId>/...): yuvarlak kırpılan fotoğraf ve ofis logosu. */
+    photoKey: text("photo_key"),
+    logoKey: text("logo_key"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("agents_user_idx").on(t.userId, t.createdAt)],
+);
+export type Agent = typeof agents.$inferSelect;
+
 // ---- Kredi ve ödeme ----
-export type CreditReason = "admin" | "purchase" | "video" | "refund";
+/** welcome: kayıtta verilen hoş geldin kredisi. */
+export type CreditReason = "admin" | "purchase" | "video" | "refund" | "welcome";
 
 /** Kredi hareketleri: bakiye = delta toplamı (eksiye düşebilir, CREDITS_ENFORCED açık değilse). */
 export const creditLedger = pgTable(
@@ -143,10 +171,11 @@ export const creditLedger = pgTable(
   (t) => [index("credit_ledger_user_idx").on(t.userId, t.createdAt)],
 );
 
-export type PaymentStatus = "paid" | "pending" | "refunded";
+/** failed: kartla ödeme denendi, PayTR reddetti (kredi verilmez). */
+export type PaymentStatus = "paid" | "pending" | "refunded" | "failed";
 export type PaymentMethod = "havale" | "kart" | "nakit" | "diger";
 
-/** Ödemeler: ödeme altyapısı gelene kadar yönetici elle girer (havale/EFT). */
+/** Ödemeler: kartla olanlar PayTR'den gelir (merchantOid), havale/EFT'yi yönetici elle girer. */
 export const payments = pgTable(
   "payments",
   {
@@ -161,6 +190,10 @@ export const payments = pgTable(
     /** Ödeme sağlayıcısındaki işlem numarası ya da dekont no. */
     reference: text("reference"),
     note: text("note"),
+    /** PayTR sipariş numarası (yalnız harf/rakam); bildirim bu numarayla eşlenir. */
+    merchantOid: text("merchant_oid").unique(),
+    /** Satın alınan paket (ayarlardaki CreditPackage.id). */
+    packageId: text("package_id"),
     createdBy: text("created_by"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

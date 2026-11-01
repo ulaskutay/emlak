@@ -12,6 +12,7 @@ export function TemplateGallery({
   showSoon = true,
   cta = false,
   howTo = [],
+  prefer = [],
 }: {
   tone?: "light" | "dark";
   /** Kart bağlantısının öneki: sitede şablon sayfası, panelde sipariş formu. */
@@ -21,9 +22,13 @@ export function TemplateGallery({
   cta?: boolean;
   /** "Nasıl yapılır" kaydı olan şablonlar: kartın altında o sekmeye bağlantı. */
   howTo?: string[];
+  /** Kullanıcının karşılamada seçtiği kategoriler: o şablonlar başa gelir. */
+  prefer?: string[];
 }) {
   const [cat, setCat] = useState<TemplateCategory | null>(null);
-  const live = templateList.filter((t) => !cat || t.category === cat);
+  const live = templateList
+    .filter((t) => !cat || t.category === cat)
+    .sort((a, b) => Number(prefer.includes(b.category)) - Number(prefer.includes(a.category)));
   const soon = showSoon ? SOON_TEMPLATES.filter((t) => !cat || t.category === cat) : [];
   const chip = (on: boolean) =>
     `rounded-full px-4 py-2 text-sm font-semibold transition-colors ${

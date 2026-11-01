@@ -65,6 +65,8 @@ export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number; 
   let hoodHeights: number[] = [];
   let cur: FrameState | null = null;
   const ents: Record<string, any> = {};
+  /** Parsel başına varlıklar (yan yana / parçalı arsada birden çok). */
+  let parts: Record<"fill" | "outline" | "scanFill" | "scanLine" | "fence" | "fenceTop", any>[] = [];
   let rings: any[] = [];
   let grid: any[] = [];
 
@@ -193,9 +195,10 @@ export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number; 
       const cpos = p.centroid;
       lookAt({ lat: cpos.lat, lng: cpos.lng, altitude: 0, range: Math.max(400, p.radiusM * 8), tilt: 30, heading: 0 } as any);
       log(`parsel karoları: ${await settle(60000)}`);
-      const hs = await sampleHeights([cpos, ...p.ring], 30000);
+      const corners = g.rings.flat();
+      const hs = await sampleHeights([cpos, ...corners], 30000);
       groundH = hs[0] ?? (p.elevation ?? 0) + 37;
-      const samples = [{ q: { x: 0, y: 0 }, h: groundH }, ...p.ring.map((q, i) => ({ q: g.toXY(q), h: hs[i + 1] ?? groundH }))];
+      const samples = [{ q: { x: 0, y: 0 }, h: groundH }, ...corners.map((q, i) => ({ q: g.toXY(q), h: hs[i + 1] ?? groundH }))];
       heightAt = (q) => {
         let w = 0;
         let s = 0;
@@ -222,18 +225,26 @@ export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number; 
 
       const E = viewer.entities;
       const tile = C.ClassificationType.CESIUM_3D_TILE;
-      // Parsel dolgusu ve kontur
-      ents.fill = E.add({
-        polygon: { hierarchy: p.ring.map((q) => pos(q, 0)), classificationType: tile, material: new C.ColorMaterialProperty(cb(() => color(rgba(GOLD, 0.3 * (cur?.fill ?? 0))))) },
-      });
-      ents.outline = E.add({
-        polyline: {
-          positions: cb(() => g.parcelPath(cur && cur.neon > 0 ? easeOut(cur.neon) : 0).map((q) => posXY(g.toXY(q), 1.8))),
-          width: 14,
-          material: glow(() => GOLD, 0.3),
-          depthFailMaterial: glow(() => rgba(GOLD, 0.55), 0.3),
-        },
-      });
+      // Parsel dolgusu ve kontur (konturlar aynı anda çizilir)
+      let pathCache: { p: number; paths: LL[][] } | null = null;
+      const paths = () => {
+        const np = cur && cur.neon > 0 ? easeOut(cur.neon) : 0;
+        if (!pathCache || pathCache.p !== np) pathCache = { p: np, paths: g.parcelPaths(np) };
+        return pathCache.paths;
+      };
+      parts = g.rings.map((ring, i) => ({
+        fill: E.add({
+          polygon: { hierarchy: ring.map((q) => pos(q, 0)), classificationType: tile, material: new C.ColorMaterialProperty(cb(() => color(rgba(GOLD, 0.3 * (cur?.fill ?? 0))))) },
+        }),
+        outline: E.add({
+          polyline: {
+            positions: cb(() => paths()[i]!.map((q) => posXY(g.toXY(q), 1.8))),
+            width: 14,
+            material: glow(() => GOLD, 0.3),
+            depthFailMaterial: glow(() => rgba(GOLD, 0.55), 0.3),
+          },
+        }),
+      })) as typeof parts;
       // Mahalle sınırı
       if (p.hood?.ring.length && g.hoodPath) {
         const hood = p.hood.ring;
@@ -286,25 +297,28 @@ export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number; 
         if (!scanCache || scanCache.p !== sp) scanCache = { p: sp, f: g.scanFrame(sp) };
         return scanCache.f;
       };
-      ents.scanFill = E.add({
-        polygon: {
-          hierarchy: cb(() => new C.PolygonHierarchy((scanF().scanned.length ? scanF().scanned : g.ringXY).map((q) => posXY(q, 1.6)))),
-          perPositionHeight: true,
-          material: new C.ColorMaterialProperty(cb(() => color(rgba(GOLD, scanF().scanned.length ? 0.32 * (cur?.scan?.grid ?? 0) : 0)))),
-        },
+      g.ringsXY.forEach((ringXY, i) => {
+        parts[i]!.scanFill = E.add({
+          polygon: {
+            hierarchy: cb(() => new C.PolygonHierarchy((scanF().scanned[i]!.length ? scanF().scanned[i]! : ringXY).map((q) => posXY(q, 1.6)))),
+            perPositionHeight: true,
+            material: new C.ColorMaterialProperty(cb(() => color(rgba(GOLD, scanF().scanned[i]!.length ? 0.32 * (cur?.scan?.grid ?? 0) : 0)))),
+          },
+        });
+        parts[i]!.scanLine = E.add({
+          polyline: {
+            positions: cb(() => (scanF().lines[i] ?? [ringXY[0]!, ringXY[0]!]).map((q) => posXY(q, 2.5))),
+            width: 18,
+            material: glow(() => rgba(CYAN, cur?.scan?.line ?? 0), 0.35),
+            depthFailMaterial: glow(() => rgba(CYAN, 0.8 * (cur?.scan?.line ?? 0)), 0.35),
+          },
+        });
       });
-      ents.scanLine = E.add({
-        polyline: {
-          positions: cb(() => (scanF().line ?? [g.ringXY[0]!, g.ringXY[0]!]).map((q) => posXY(q, 2.5))),
-          width: 18,
-          material: glow(() => rgba(CYAN, cur?.scan?.line ?? 0), 0.35),
-          depthFailMaterial: glow(() => rgba(CYAN, 0.8 * (cur?.scan?.line ?? 0)), 0.35),
-        },
-      });
+      const origin = g.ringsXY[0]![0]!;
       grid = Array.from({ length: g.gridMax }, (_, i) =>
         E.add({
           polyline: {
-            positions: cb(() => (scanF().grid[i] ?? [g.ringXY[0]!, g.ringXY[0]!]).map((q) => posXY(q, 2))),
+            positions: cb(() => (scanF().grid[i] ?? [origin, origin]).map((q) => posXY(q, 2))),
             width: 2.5,
             material: new C.ColorMaterialProperty(cb(() => color(rgba("#ffecbe", 0.8 * (cur?.scan?.grid ?? 0))))),
             depthFailMaterial: new C.ColorMaterialProperty(cb(() => color(rgba("#ffecbe", 0.5 * (cur?.scan?.grid ?? 0))))),
@@ -313,22 +327,24 @@ export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number; 
       );
       // Çit duvarı: yerden yükselir, üst kenarında parlak çizgi.
       const fenceH = Math.min(30, Math.max(9, p.radiusM * 0.22));
-      const ringClosed = [...g.ringXY, g.ringXY[0]!];
       const fenceTop = () => fenceH * easeOut(cur?.fence ?? 0);
-      ents.fence = E.add({
-        wall: {
-          positions: ringClosed.map((q) => posXY(q, 0)),
-          minimumHeights: ringClosed.map((q) => heightAt(q) - 1),
-          maximumHeights: cb(() => ringClosed.map((q) => heightAt(q) + Math.max(0.5, fenceTop()))),
-          material: new C.ImageMaterialProperty({ image: fenceTexture(), transparent: true, color: cb(() => C.Color.WHITE.withAlpha(Math.min(1, (cur?.fence ?? 0) * 1.5))) }),
-        },
-      });
-      ents.fenceTop = E.add({
-        polyline: {
-          positions: cb(() => ringClosed.map((q) => posXY(q, fenceTop()))),
-          width: 7,
-          material: glow(() => rgba(GOLD, cur?.fence ?? 0), 0.3),
-        },
+      g.ringsXY.forEach((ringXY, i) => {
+        const ringClosed = [...ringXY, ringXY[0]!];
+        parts[i]!.fence = E.add({
+          wall: {
+            positions: ringClosed.map((q) => posXY(q, 0)),
+            minimumHeights: ringClosed.map((q) => heightAt(q) - 1),
+            maximumHeights: cb(() => ringClosed.map((q) => heightAt(q) + Math.max(0.5, fenceTop()))),
+            material: new C.ImageMaterialProperty({ image: fenceTexture(), transparent: true, color: cb(() => C.Color.WHITE.withAlpha(Math.min(1, (cur?.fence ?? 0) * 1.5))) }),
+          },
+        });
+        parts[i]!.fenceTop = E.add({
+          polyline: {
+            positions: cb(() => ringClosed.map((q) => posXY(q, fenceTop()))),
+            width: 7,
+            material: glow(() => rgba(GOLD, cur?.fence ?? 0), 0.3),
+          },
+        });
       });
 
       log(`hazır: ${await settle(60000)}`);
@@ -344,18 +360,21 @@ export function cesiumEngine(opts: { sse?: number; fov?: number; msaa?: number; 
       const pinOn = !!s.pin && s.pin.opacity > 0;
       show(ents.pin, pinOn);
       rings.forEach((r, k) => show(r, pinOn && (s.pin?.drop ?? 0) >= 1 && (s.pin?.pulse ?? 0) - k / 3 >= 0));
-      show(ents.scanFill, !!s.scan);
-      show(ents.scanLine, !!s.scan && s.scan.line > 0.02);
       const nGrid = s.scan && s.scan.grid > 0.02 ? g.scanFrame(s.scan.progress).grid.length : 0;
       grid.forEach((e, i) => show(e, i < nGrid));
-      show(ents.fence, (s.fence ?? 0) > 0.01);
-      show(ents.fenceTop, (s.fence ?? 0) > 0.01);
-      show(ents.outline, s.neon > 0);
+      for (const part of parts) {
+        show(part.scanFill, !!s.scan);
+        show(part.scanLine, !!s.scan && s.scan.line > 0.02);
+        show(part.fence, (s.fence ?? 0) > 0.01);
+        show(part.fenceTop, (s.fence ?? 0) > 0.01);
+        show(part.outline, s.neon > 0);
+      }
       return settle(timeoutMs);
     },
 
     async clean(keepNeon: boolean) {
-      for (const e of viewer.entities.values) e.show = keepNeon && (e === ents.outline || e === ents.fill);
+      const neon = new Set(parts.flatMap((part) => [part.outline, part.fill]));
+      for (const e of viewer.entities.values) e.show = keepNeon && neon.has(e);
       return settle();
     },
 

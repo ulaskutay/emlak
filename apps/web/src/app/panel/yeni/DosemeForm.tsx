@@ -4,7 +4,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ListingFields, listingPayload, type ListingValues } from "./ListingFields";
 import { uploadPhotoWithFocus } from "./photoUpload";
+import { AgentSelect, agentPayload, type CardAgent } from "@/components/panel/agents";
 import { VoiceStep } from "./Wizard";
+import { OrderError } from "@/components/panel/ui";
 
 /** text: sunuculu turda kullanıcının düzenlediği sahne metni (boşsa otomatik senaryo). */
 type Photo = { id: string; key?: string; preview: string; room?: RoomType; title: string; focusX: number; text?: string; error?: string };
@@ -54,7 +56,6 @@ type IlanPayload = {
 };
 type Asset = { key: string; url: string };
 type ImportedPhoto = Asset & { focusX: number };
-type Agent = { name: string; photo?: Asset; logo?: Asset };
 
 /**
  * İlan sayfasında Ctrl+A / Ctrl+C ile kopyalanan içerikten aktarma verisi: panodaki HTML'de ilanın fotoğrafları,
@@ -138,7 +139,9 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
   const [voice, setVoice] = useState(true);
   const [voiceId, setVoiceId] = useState<string | null>(null);
   const [imported, setImported] = useState<ImportedPhoto[]>([]);
-  const [agent, setAgent] = useState<Agent>({ name: "" });
+  const [agent, setAgent] = useState<CardAgent>({ name: "" });
+  /** İlandan aktarılan emlakçı: seçicide ayrı seçenek olarak çıkar ve seçilir. */
+  const [importedAgent, setImportedAgent] = useState<CardAgent | null>(null);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [link, setLink] = useState("");
   const linkOk = /^https:\/\/(www\.)?sahibinden\.com\/ilan\//.test(link.trim());
@@ -215,7 +218,7 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return setImportMsg(data.error ?? "Fotoğraflar aktarılamadı");
     setImported(data.photos);
-    setAgent({ name: a.name?.slice(0, 60) ?? "", photo: data.agent?.photo, logo: data.agent?.logo });
+    setImportedAgent({ name: a.name?.slice(0, 60) ?? "", photo: data.agent?.photo, logo: data.agent?.logo });
     setImportMsg(`İlandan ${data.photos.length} fotoğraf geldi. Kullanmak istediğiniz ${ilan ? "fotoğraflara" : "boş odalara"} tıklayın (en fazla ${max}).`);
   }
 
@@ -327,7 +330,7 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
         ...(style ? { style } : {}),
         ...(sunucu ? { presenter, quality } : {}),
         details: detailsPayload(details),
-        agent: { ...(agent.name.trim() && { name: agent.name.trim() }), ...(agent.photo && { photoKey: agent.photo.key }), ...(agent.logo && { logoKey: agent.logo.key }) },
+        agent: agentPayload(agent),
         listing: listingPayload(listing),
         ...(sunucu ? {} : { voice, ...(voice && voiceId ? { voiceId } : {}) }),
         music,
@@ -649,33 +652,12 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
       <div className="pnl-kart space-y-4 p-5 sm:p-6">
         <div>
           <div className="font-semibold">Kapanış kartı</div>
-          <p className="mt-1 text-sm text-gri">Videonun son 3,5 saniyesi: fiyat, emlakçı, telefon ve ofis logosu. İlandan aktarınca kendiliğinden dolar.</p>
+          <p className="mt-1 text-sm text-gri">Videonun son 3,5 saniyesi: fiyat, emlakçının fotoğrafı ve adı, telefon ve ofis logosu. İlandan aktarınca ilandaki emlakçı seçilir.</p>
         </div>
-        {(agent.photo || agent.logo) && (
-          <div className="flex flex-wrap items-center gap-4">
-            {agent.photo && (
-              <span className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={agent.photo.url} alt="Emlakçı" className="h-16 w-16 rounded-full object-cover" />
-                <button type="button" aria-label="Fotoğrafı kaldır" onClick={() => setAgent({ ...agent, photo: undefined })}
-                  className="absolute -top-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-ayrac text-xs hover:bg-mercan hover:text-white">✕</button>
-              </span>
-            )}
-            {agent.logo && (
-              <span className="relative rounded-lg border border-ayrac bg-white p-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={agent.logo.url} alt="Ofis logosu" className="h-12 w-auto" />
-                <button type="button" aria-label="Logoyu kaldır" onClick={() => setAgent({ ...agent, logo: undefined })}
-                  className="absolute -top-2 -right-2 grid h-5 w-5 place-items-center rounded-full bg-black/60 text-xs text-white hover:bg-mercan hover:text-white">✕</button>
-              </span>
-            )}
-          </div>
-        )}
-        <div className="max-w-xs">
-          <label className="pnl-label" htmlFor="agent">Emlakçı adı</label>
-          <input id="agent" className="pnl-input" maxLength={60} placeholder="Örn. Ümit G." value={agent.name}
-            onChange={(e) => setAgent({ ...agent, name: e.target.value })} />
-        </div>
+        <AgentSelect imported={importedAgent} onChange={(a, contact) => {
+          setAgent(a);
+          if (contact) setListing((l) => ({ ...l, ...contact }));
+        }} />
         <ListingFields value={listing} onChange={setListing} />
         <label className="flex cursor-pointer items-center justify-between border-t border-ayrac pt-4">
           <span>
@@ -686,7 +668,7 @@ export function DosemeForm({ template = "dosenmis-ev", tourCredits }: { template
         </label>
       </div>
 
-      {error && <p className="rounded-lg bg-mercan-acik px-3 py-2 text-sm text-mercan-koyu">{error}</p>}
+      {error && <OrderError error={error} />}
       <div className="flex items-center justify-end gap-4">
         {ready.length < min ? (
           <span className="text-sm text-gri">En az {min} fotoğraf gerekli</span>

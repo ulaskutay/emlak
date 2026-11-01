@@ -6,7 +6,7 @@ import { formatDate, formatInt, formatTry } from "@/lib/format";
 import { requireAdmin } from "@/lib/auth";
 
 const METHOD: Record<string, string> = { havale: "Havale/EFT", kart: "Kart", nakit: "Nakit", diger: "Diğer" };
-const STATUS: Record<string, string> = { paid: "Ödendi", pending: "Bekliyor", refunded: "İade edildi" };
+const STATUS: Record<string, string> = { paid: "Ödendi", pending: "Bekliyor", refunded: "İade edildi", failed: "Başarısız" };
 
 export default async function PaymentsPage() {
   // Yerleşim de denetler; sayfa yerleşimle paralel çalıştığı için veri sorgusundan önce burada da.

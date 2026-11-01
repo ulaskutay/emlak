@@ -4,6 +4,8 @@
  *
  *   kısmi çizim    halka uzunluk boyunca p oranında (neon kontur, mahalle sınırı)
  *   tarama         tarama ekseni u (en uzun kenar yönü), taranan bölge, tarama çizgisi, ızgara (parsele kırpılmış)
+ *
+ * Birden çok parselde (yan yana ya da parçalı arsa) her halka ayrı çizilir ve taranır; dizi sırası parcel.rings ile aynı.
  */
 import type { ParcelInfo } from "./types.js";
 
@@ -18,14 +20,18 @@ export function makeGeometry(parcel: ParcelInfo) {
   const toXY = (q: LL): XY => ({ x: (q.lng - c.lng) * 111_320 * K, y: (q.lat - c.lat) * 111_320 });
   const toLL = (q: XY): LL => ({ lat: c.lat + q.y / 111_320, lng: c.lng + q.x / (111_320 * K) });
 
-  const ringXY = parcel.ring.map(toXY);
+  const rings = parcel.rings?.length ? parcel.rings : [parcel.ring];
+  const ringsXY = rings.map((r) => r.map(toXY));
   const h = (parcel.longestEdgeHeading * Math.PI) / 180;
   const axisU = { x: Math.sin(h), y: Math.cos(h) };
   const axisV = { x: Math.cos(h), y: -Math.sin(h) };
-  const us = ringXY.map((q) => dot(q, axisU));
-  const [uMin, uMax] = [Math.min(...us), Math.max(...us)];
-  const vs = ringXY.map((q) => dot(q, axisV));
-  const extent = Math.max(uMax - uMin, Math.max(...vs) - Math.min(...vs));
+  const span = (pts: XY[], axis: XY) => {
+    const d = pts.map((q) => dot(q, axis));
+    return [Math.min(...d), Math.max(...d)] as const;
+  };
+  const [uMin, uMax] = span(ringsXY.flat(), axisU);
+  const [vMin, vMax] = span(ringsXY.flat(), axisV);
+  const extent = Math.max(uMax - uMin, vMax - vMin);
   // Yuvarlak ızgara aralığı: 5, 10, 20, 25, 50 m (parsel başına ~10–14 çizgi).
   const gridStep = [5, 10, 20, 25, 50, 100].find((s) => extent / s <= 14) ?? 100;
 
@@ -65,29 +71,42 @@ export function makeGeometry(parcel: ParcelInfo) {
     return [hits[0]!, hits[hits.length - 1]!];
   }
 
-  /** Taramanın bir anı (progress 0..1): ekranın üstünden (uzak uç) alta. */
+  /**
+   * Taramanın bir anı (progress 0..1): ekranın üstünden (uzak uç) alta; tüm parsellerden tek çizgi geçer.
+   * scanned ve lines halka başına (taranmamış halkada boş / null), grid hepsinin çizgileri.
+   */
   function scanFrame(progress: number) {
     const cut = uMax - (uMax - uMin) * Math.max(0, Math.min(1, progress));
-    const scanned = clipAbove(ringXY, cut);
-    const line = chord(ringXY, axisU, Math.min(uMax - 0.01, Math.max(uMin + 0.01, cut)));
+    const scanned: XY[][] = [];
+    const lines: ([XY, XY] | null)[] = [];
     const grid: [XY, XY][] = [];
-    for (let u = Math.ceil(uMin / gridStep) * gridStep; u <= uMax; u += gridStep) {
-      if (u < cut) continue;
-      const ch = chord(ringXY, axisU, u);
-      if (ch) grid.push(ch);
-    }
-    if (scanned.length > 2) {
-      const sv = scanned.map((q) => dot(q, axisV));
-      for (let v = Math.ceil(Math.min(...sv) / gridStep) * gridStep; v <= Math.max(...sv); v += gridStep) {
-        const ch = chord(scanned, axisV, v);
+    for (const ringXY of ringsXY) {
+      const [ru0, ru1] = span(ringXY, axisU);
+      const part = clipAbove(ringXY, cut);
+      scanned.push(part.length > 2 ? part : []);
+      lines.push(cut > ru0 && cut < ru1 ? chord(ringXY, axisU, cut) : null);
+      for (let u = Math.ceil(ru0 / gridStep) * gridStep; u <= ru1; u += gridStep) {
+        if (u < cut) continue;
+        const ch = chord(ringXY, axisU, u);
         if (ch) grid.push(ch);
       }
+      if (part.length > 2) {
+        const [sv0, sv1] = span(part, axisV);
+        for (let v = Math.ceil(sv0 / gridStep) * gridStep; v <= sv1; v += gridStep) {
+          const ch = chord(part, axisV, v);
+          if (ch) grid.push(ch);
+        }
+      }
     }
-    return { scanned: scanned.length > 2 ? scanned : [], line, grid };
+    return { scanned, lines, grid };
   }
 
   /** En fazla kaç ızgara çizgisi olabilir (nesne havuzu boyutu). */
-  const gridMax = Math.ceil((uMax - uMin) / gridStep) + Math.ceil(extent / gridStep) + 4;
+  const gridMax = ringsXY.reduce((n, r) => {
+    const [u0, u1] = span(r, axisU);
+    const [v0, v1] = span(r, axisV);
+    return n + Math.ceil((u1 - u0) / gridStep) + Math.ceil(Math.max(u1 - u0, v1 - v0) / gridStep) + 4;
+  }, 0);
 
   /** Halkayı (kapalı) uzunluk boyunca p oranında çizen yol. */
   function progressive(ring: LL[]) {
@@ -123,10 +142,12 @@ export function makeGeometry(parcel: ParcelInfo) {
   return {
     toXY,
     toLL,
-    ringXY,
+    rings,
+    ringsXY,
     scanFrame,
     gridMax,
-    parcelPath: progressive(parcel.ring),
+    /** Parsel konturları: hepsi aynı anda p oranında çizilir. */
+    parcelPaths: ((paths) => (p: number) => paths.map((f) => f(p)))(rings.map(progressive)),
     hoodPath: parcel.hood?.ring.length ? progressive(parcel.hood.ring) : null,
     circle,
   };

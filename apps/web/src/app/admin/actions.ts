@@ -1,7 +1,7 @@
 "use server";
 import { randomUUID } from "node:crypto";
-import { and, appSettings, creditLedger, eq, inArray, getDb, payments, session, user, videos, type PaymentMethod, type PaymentStatus } from "@arsa/db";
-import { mergePricing } from "@arsa/shared";
+import { and, appSettings, eq, inArray, getDb, payments, rechargeVideoCredits, refundVideoCredits, session, user, videos, type PaymentMethod, type PaymentStatus } from "@arsa/db";
+import { mergePricing, type CreditPackage } from "@arsa/shared";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { addCredits, PRICING_KEY } from "@/lib/credits";
@@ -43,7 +43,7 @@ export async function setPaymentStatus(f: FormData) {
   const admin = await requireAdmin();
   const id = str(f, "id");
   const status = str(f, "status") as PaymentStatus;
-  if (!["paid", "pending", "refunded"].includes(status)) throw new Error("Geçersiz durum");
+  if (!["paid", "pending", "refunded", "failed"].includes(status)) throw new Error("Geçersiz durum");
   const db = getDb();
   const [p] = await db.select().from(payments).where(eq(payments.id, id));
   if (!p || p.status === status) return;
@@ -74,15 +74,17 @@ export async function setUserFlags(f: FormData) {
   revalidatePath("/admin/kullanicilar");
 }
 
-/** Sıradaki ya da süren videoyu durdurur (kuyruktaki iş silinir; süren iş biter ama sonuç yazılmaz). */
+/** Sıradaki ya da süren videoyu durdurur (kuyruktaki iş silinir; süren iş biter ama sonuç yazılmaz). Kredi iade edilir. */
 export async function cancelVideo(f: FormData) {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const id = str(f, "id");
   const db = getDb();
-  await db
+  const cancelled = await db
     .update(videos)
     .set({ status: "failed", error: "Yönetici tarafından iptal edildi", finishedAt: new Date() })
-    .where(and(eq(videos.id, id), inArray(videos.status, ["queued", "running"])));
+    .where(and(eq(videos.id, id), inArray(videos.status, ["queued", "running"])))
+    .returning({ id: videos.id });
+  if (cancelled.length) await refundVideoCredits(db, id, { note: "İptal", createdBy: admin.id });
   const q = reelQueue();
   for (const job of await q.getJobs(["waiting", "delayed", "prioritized"]))
     if (job.data?.videoId === id) await job.remove().catch(() => {});
@@ -90,28 +92,22 @@ export async function cancelVideo(f: FormData) {
   revalidatePath("/admin/uretimler");
 }
 
+/** Yeniden üretim: hata/iptalde iade edilen kredi yeniden düşülür. */
 export async function retryVideo(f: FormData) {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const id = str(f, "id");
+  await rechargeVideoCredits(getDb(), id, admin.id);
   await getDb().update(videos).set({ status: "queued", stage: null, progress: 0, error: null }).where(eq(videos.id, id));
   await enqueueReel(id);
   revalidatePath(`/admin/uretimler/${id}`);
   revalidatePath("/admin/uretimler");
 }
 
-/** Videoda düşülen krediyi iade eder (bir kez). */
+/** Videoda düşülen krediyi iade eder (zaten iade edildiyse bir şey yapmaz). */
 export async function refundVideo(f: FormData) {
   const admin = await requireAdmin();
   const id = str(f, "id");
-  const db = getDb();
-  const [v] = await db.select({ userId: videos.userId, credits: videos.credits }).from(videos).where(eq(videos.id, id));
-  if (!v) return;
-  const done = await db
-    .select({ id: creditLedger.id })
-    .from(creditLedger)
-    .where(and(eq(creditLedger.videoId, id), eq(creditLedger.reason, "refund")));
-  if (done.length || !v.credits) return;
-  await addCredits({ userId: v.userId, delta: v.credits, reason: "refund", videoId: id, note: str(f, "note") || undefined, createdBy: admin.id });
+  await refundVideoCredits(getDb(), id, { note: str(f, "note") || undefined, createdBy: admin.id });
   revalidatePath(`/admin/uretimler/${id}`);
 }
 
@@ -125,12 +121,28 @@ export async function setVideoCost(f: FormData) {
   revalidatePath(`/admin/uretimler/${id}`);
 }
 
+/** Paket satırları "packages.0.name" …; kredisi ya da fiyatı boş satır silinmiş sayılır. */
+function readPackages(f: FormData): CreditPackage[] {
+  const out: CreditPackage[] = [];
+  for (let i = 0; f.has(`packages.${i}.name`); i++) {
+    const name = str(f, `packages.${i}.name`);
+    const credits = Math.trunc(num(f, `packages.${i}.credits`));
+    const priceTry = num(f, `packages.${i}.priceTry`);
+    if (!name && !credits && !priceTry) continue;
+    if (!name || !(credits > 0) || !(priceTry > 0)) throw new Error(`Paket ${i + 1}: ad, kredi ve fiyat gerekli`);
+    const slug = name.toLocaleLowerCase("tr-TR").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ı/g, "i").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    out.push({ id: str(f, `packages.${i}.id`) || slug || `paket-${i + 1}`, name, credits, priceTry });
+  }
+  if (new Set(out.map((p) => p.id)).size !== out.length) throw new Error("Paket adları farklı olmalı");
+  return out.sort((a, b) => a.credits - b.credits);
+}
+
 /** Fiyatlandırma ayarları: formdaki alan adları ayar yoluyla aynı ("costUsd.ilan-videosu.perPhoto"). */
 export async function savePricing(f: FormData) {
   await requireAdmin();
-  const out: Record<string, unknown> = {};
+  const out: Record<string, unknown> = { packages: readPackages(f) };
   for (const [k, v] of f.entries()) {
-    if (k.startsWith("$")) continue; // Next.js'in eylem alanları
+    if (k.startsWith("$") || k.startsWith("packages.")) continue; // Next.js'in eylem alanları; paketler ayrı okunur
     const n = Number(String(v).replace(",", "."));
     if (!Number.isFinite(n) || n < 0) throw new Error(`Geçersiz değer: ${k}`);
     const path = k.split(".");

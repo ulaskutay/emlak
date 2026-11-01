@@ -10,7 +10,7 @@
  *
  * Seslendirme (voice) eklenince kurgu ona göre uzar ve altyazı kelime kelime vurgulanır.
  */
-import { fixDotlessI, halves, locative, numberWords, spokenPrice } from "@arsa/shared";
+import { fixDotlessI, halves, locative, numberWords, parcelNoShort, parcelNoText, spokenPrice } from "@arsa/shared";
 import type { ParcelInfo } from "../src/types.js";
 
 export { locative, numberWords, spokenPrice };
@@ -146,9 +146,12 @@ export function buildStory(p: ParcelInfo, listing: StoryListing = {}): Story {
   const hoodLine = hoodRaw ? `${/köyü$/i.test(hoodRaw) ? hoodRaw : `${hoodShort} Mahallesi`} sınırları içinde.` : "";
   const seaLine = sea ? (sea.distanceM < 150 ? "Denize sıfır!" : `Denize sadece ${spokenDistance(sea.distanceM)}.`) : "";
   if (hoodLine || seaLine) scenes.push({ id: "region", text: [hoodLine, seaLine].filter(Boolean).join(" ") });
-  scenes.push({ id: "scan", text: `Tam ${area}.` });
+  // Birden çok parsel (yan yana / parçalı): alan hepsinin toplamı.
+  const multi = (p.rings?.length ?? 1) > 1;
+  scenes.push({ id: "scan", text: `${multi ? "Toplam" : "Tam"} ${area}.` });
   // Özellikler: ada/parsel, imar, en yakın yer.
-  const parcelNo = prop.Ada && prop.ParselNo ? `${num(prop.Ada)} ada, ${num(prop.ParselNo)} parsel.` : "";
+  const spokenNo = parcelNoText(prop.Ada, prop.ParselNo, num);
+  const parcelNo = spokenNo ? `${spokenNo}.` : "";
   const zoning = speakable(listing.zoning);
   const nearLine = near[0] ? poiLine(near[0]) : "";
   const feat = [parcelNo, zoning ? `${cap(zoning)}.` : "", nearLine].filter(Boolean).join(" ");
@@ -164,7 +167,8 @@ export function buildStory(p: ParcelInfo, listing: StoryListing = {}): Story {
   const hookLines = [areaShort, (prop.Nitelik ?? "ARSA").toLocaleUpperCase("tr")];
   const features: NonNullable<Story["features"]> = [];
   if (prop.Nitelik) features.push({ icon: "🌿", label: "Nitelik", value: prop.Nitelik });
-  if (prop.Ada && prop.ParselNo) features.push({ icon: "📄", label: "Ada / Parsel", value: `${prop.Ada} / ${prop.ParselNo}` });
+  const shortNo = parcelNoShort(prop.Ada, prop.ParselNo);
+  if (shortNo) features.push({ icon: "📄", label: "Ada / Parsel", value: shortNo });
   if (listing.zoning) features.push({ icon: "🏗️", label: "İmar", value: listing.zoning });
   if (sea) features.push({ icon: "🌊", label: "Denize", value: sea.distanceM < 150 ? "Sıfır" : fmtKm(sea.distanceM) });
   for (const x of near.slice(0, 2)) features.push({ icon: x.emoji, label: x.name ?? x.label, value: fmtKm(x.distanceM) });

@@ -22,6 +22,39 @@
         "node_modules/vite/bin/vite.js"
       ],
       "port": 5178
+    },
+    {
+      "name": "drone-studio-5179",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "apps/drone-studio",
+        "exec",
+        "tsx",
+        "node_modules/vite/bin/vite.js",
+        "--port",
+        "5179",
+        "--strictPort"
+      ],
+      "port": 5179
+    },
+    {
+      "name": "web-3101",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd apps/web && NEXT_DIST_DIR=.next-3101 exec pnpm exec next dev --webpack --port 3101"
+      ],
+      "port": 3101
+    },
+    {
+      "name": "web-3102",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd apps/web && BETTER_AUTH_URL=http://localhost:3102 NEXT_PUBLIC_SITE_URL=http://localhost:3102 NEXT_DIST_DIR=.next-3102 exec pnpm exec next dev --webpack --port 3102"
+      ],
+      "port": 3102
     }
   ]
 }

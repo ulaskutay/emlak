@@ -51,3 +51,18 @@ export function ProgressBar({ value, className = "" }: { value: number; classNam
     </div>
   );
 }
+
+/** Sipariş hatası; bakiye yetmediyse kredi sayfasına bağlantıyla. */
+export function OrderError({ error }: { error: string }) {
+  return (
+    <p className="rounded-lg bg-mercan-acik px-3 py-2 text-sm text-mercan-koyu">
+      {error}
+      {/bakiye/i.test(error) ? (
+        <>
+          {" · "}
+          <Link href="/panel/kredi" className="font-bold underline underline-offset-2">Kredi yükleyin</Link>
+        </>
+      ) : null}
+    </p>
+  );
+}

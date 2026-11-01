@@ -3,8 +3,9 @@ import postgres from "postgres";
 import * as schema from "./schema.js";
 
 export * from "./schema.js";
+export * from "./credits.js";
 export { schema };
-export { and, count, desc, eq, gte, ilike, inArray, ne, or, sql, sum } from "drizzle-orm";
+export { and, asc, count, desc, eq, gte, ilike, inArray, ne, or, sql, sum } from "drizzle-orm";
 
 /** Tek bağlantı havuzu (Next.js geliştirme modunda sıcak yeniden yüklemede çoğalmasın). */
 const g = globalThis as unknown as { __arsaSql?: ReturnType<typeof postgres> };

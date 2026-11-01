@@ -83,7 +83,7 @@ export async function prepareParcel(
   opts: { googleKey?: string; placesKey?: string; cached?: ParcelContext | null; pois?: Poi[] } = {},
 ): Promise<PreparedParcel> {
   const parsed = parseParcelFile(fileText);
-  const geo = analyzeParcel(parsed.ring);
+  const geo = analyzeParcel(parsed.rings);
   // Seçili noktalar verildiyse önbellekteki rakım/adres kullanılır, çevre listesi seçimle değişir.
   // Eski (OpenStreetMap dönemi, kaynaksız) önbellek kullanılmaz: deniz/plaj mesafeleri yanlıştı.
   const cached = opts.cached?.pois.every((p) => p.source && (p.source as string) !== "osm") ? opts.cached : null;

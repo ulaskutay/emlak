@@ -29,6 +29,27 @@
       "when": 1793108959241,
       "tag": "0003_admin",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793564419872,
+      "tag": "0004_credits",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793564554833,
+      "tag": "0005_agents",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793564756305,
+      "tag": "0006_hesap",
+      "breakpoints": true
     }
   ]
 }

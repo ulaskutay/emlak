@@ -28,7 +28,7 @@ export const formatDistance = (m: number) =>
 
 export function PoiStep({
   center,
-  ring,
+  rings,
   district,
   province,
   neighbourhood,
@@ -38,7 +38,7 @@ export function PoiStep({
   onNext,
 }: {
   center: { lat: number; lng: number };
-  ring: { lat: number; lng: number }[];
+  rings: { lat: number; lng: number }[][];
   district?: string;
   province?: string;
   neighbourhood?: string;
@@ -93,7 +93,7 @@ export function PoiStep({
           gestureHandling: "cooperative", // tekerlek sayfayı kaydırır; yakınlaştırma Ctrl+tekerlek ya da +/-
           clickableIcons: false,
         });
-        new Polygon({ map: map.current, paths: ring, strokeColor: "#ffc24d", strokeWeight: 3, fillColor: "#ffc24d", fillOpacity: 0.25 });
+        new Polygon({ map: map.current, paths: rings, strokeColor: "#ffc24d", strokeWeight: 3, fillColor: "#ffc24d", fillOpacity: 0.25 });
         map.current.addListener("click", (e: any) =>
           setDraft({ position: { lat: e.latLng.lat(), lng: e.latLng.lng() }, category: "custom", name: "" }),
         );
@@ -131,7 +131,7 @@ export function PoiStep({
       if (markers.current.length && !fitted.current) {
         fitted.current = true;
         const b = new gm.LatLngBounds();
-        ring.forEach((q) => b.extend(q));
+        rings.flat().forEach((q) => b.extend(q));
         // Uzak noktalar (havalimanı vb.) kadrajı büyütüp yakındakileri üst üste bindirmesin: 20 km içi.
         (chosen.length ? chosen : candidates.slice(0, 6)).filter((p) => p.distanceM <= 20_000).forEach((p) => b.extend(p.position));
         map.current.fitBounds(b, 40);

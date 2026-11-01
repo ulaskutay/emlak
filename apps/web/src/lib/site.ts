@@ -5,11 +5,16 @@ export const site = {
   description:
     "Emlak için şablonlu tanıtım videoları: parsel dosyasından drone turu, ilan fotoğraflarından sinematik video, boş arsadan inşaat timelapse'i.",
   email: "info@eticajans.com",
-  // TODO(yayın öncesi): veri sorumlusunun resmi bilgileri — KVKK metni bunları gösterir.
+  // TODO(yayın öncesi): şirketin resmi bilgileri. Yasal metinler (KVKK, mesafeli satış) yalnız dolu alanları gösterir.
   company: {
+    /** Ticari unvan, sicildeki haliyle (ör. "Etic Ajans Reklam ve Danışmanlık Ltd. Şti."). */
     title: "Etic Ajans",
-    address: "Adres bilgisi eklenecek",
+    address: "",
+    phone: "",
     mersis: "",
+    taxOffice: "",
+    taxNo: "",
+    kep: "",
   },
 };
 
@@ -26,4 +31,5 @@ export const legal = [
   { href: "/gizlilik", label: "Gizlilik politikası" },
   { href: "/cerez", label: "Çerez politikası" },
   { href: "/kullanim-kosullari", label: "Kullanım koşulları" },
+  { href: "/mesafeli-satis", label: "Mesafeli satış sözleşmesi" },
 ];

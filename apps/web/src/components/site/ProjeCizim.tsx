@@ -1,121 +1,68 @@
 /**
- * Çizim proje: sarı sınırlı boş arsadan bina kat kat yükselir (hızlandırılmış inşaat), yanda vinç kancasını indirip kaldırır.
- * Katlar `proje-kat` ile alttan büyür; döngü sonunda bina kaybolup yeniden yükselir.
+ * Proje görseli: "Arsadan inşaat videosu" örneğimizin (public/media/sablon-insaat.mp4) gerçek kareleri — boş arsa → kazı →
+ * kaba yapı → bitmiş bina (public/media/insaat-1..4.webp) — sırayla belirir. Üstte videodaki gibi imar etiketi, altta aşama adı
+ * ve dört parçalı ilerleme; kartın arkasında çizim vinç kancasını indirip kaldırır.
  */
-const KAT_SAYISI = 4;
-const KAT_YUK = 68;
-const TABAN_Y = 400;
-
-function Kat({ i }: { i: number }) {
-  const y = TABAN_Y - KAT_YUK * (i + 1);
-  const x = 210;
-  const w = 180;
-  const d = 56; // sağ yüzün derinliği
-  return (
-    <g className="proje-kat" style={{ animationDelay: `${i * 0.55}s` }}>
-      {/* Ön yüz */}
-      <rect x={x} y={y} width={w} height={KAT_YUK} fill="url(#pj-on)" />
-      {/* Sağ yüz */}
-      <path d={`M${x + w} ${y} L${x + w + d} ${y - d / 2} L${x + w + d} ${y + KAT_YUK - d / 2} L${x + w} ${y + KAT_YUK} Z`} fill="url(#pj-yan)" />
-      {/* Kat çizgisi */}
-      <path d={`M${x} ${y + KAT_YUK} L${x + w} ${y + KAT_YUK} L${x + w + d} ${y + KAT_YUK - d / 2}`} stroke="#9aa3b5" strokeWidth="1.5" fill="none" />
-      {/* Ön pencereler */}
-      {[0, 1, 2].map((k) => (
-        <rect key={k} x={x + 18 + k * 52} y={y + 16} width="36" height="34" rx="3" fill="#2b6cff" opacity="0.8" />
-      ))}
-      {[0, 1, 2].map((k) => (
-        <rect key={k} x={x + 18 + k * 52} y={y + 16} width="36" height="12" rx="3" fill="#ffffff" opacity="0.35" />
-      ))}
-      {/* Yan pencereler */}
-      {[0, 1].map((k) => (
-        <path
-          key={k}
-          d={`M${x + w + 10 + k * 22} ${y + 12 - (10 + k * 22) / 2} l14 -7 v34 l-14 7 Z`}
-          fill="#1b3d8f"
-          opacity="0.8"
-        />
-      ))}
-    </g>
-  );
-}
+const ASAMALAR = ["Boş arsa", "Kazı ve temel", "Kaba inşaat", "Bitmiş hali"];
+const yazi = { paintOrder: "stroke", stroke: "#0d1b3e", strokeWidth: 4, strokeLinejoin: "round" } as const;
 
 export function ProjeCizim({ className = "" }: { className?: string }) {
-  const catY = TABAN_Y - KAT_YUK * KAT_SAYISI;
   return (
     <svg viewBox="0 0 640 520" className={className} aria-hidden>
       <defs>
-        <linearGradient id="pj-on" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#f4f6fa" />
-          <stop offset="1" stopColor="#dde2eb" />
+        <clipPath id="pj-kart">
+          <rect x="120" y="10" width="400" height="500" rx="28" />
+        </clipPath>
+        <linearGradient id="pj-alt" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#0d1b3e" stopOpacity="0" />
+          <stop offset="1" stopColor="#0d1b3e" stopOpacity="0.7" />
         </linearGradient>
-        <linearGradient id="pj-yan" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#b9c0d0" />
-          <stop offset="1" stopColor="#8f98ab" />
-        </linearGradient>
-        <linearGradient id="pj-cati" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#e3e7ef" />
-          <stop offset="1" stopColor="#c3c9d6" />
-        </linearGradient>
-        <radialGradient id="pj-golge">
-          <stop offset="0" stopColor="#0d1b3e" stopOpacity="0.28" />
-          <stop offset="1" stopColor="#0d1b3e" stopOpacity="0" />
-        </radialGradient>
       </defs>
 
-      {/* Zemin ve parsel sınırı (drone çizimiyle aynı dil) */}
-      <ellipse cx="330" cy="455" rx="230" ry="26" fill="url(#pj-golge)" />
-      <g stroke="#c3c9d6" strokeWidth="1.5" opacity="0.6" fill="none">
-        <path d="M60 480 L600 480" />
-        <path d="M100 452 L560 452" />
-      </g>
-      <path d="M140 430 L470 404 L560 462 L190 492 Z" fill="#ffd166" fillOpacity="0.16" stroke="#f2b705" strokeWidth="3" strokeLinejoin="round" />
-      {[
-        [140, 430],
-        [470, 404],
-        [560, 462],
-        [190, 492],
-      ].map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r="4.5" fill="#ffffff" stroke="#f2b705" strokeWidth="2.5" />
-      ))}
-
-      {/* Vinç */}
+      {/* Kartın arkasında çizim vinç: drone ve konut çizimleriyle aynı dil */}
       <g stroke="#f2b705" strokeWidth="6" strokeLinecap="round" fill="none">
-        <path d="M118 440 L118 96" />
-        <path d="M60 96 L380 96" />
-        <path d="M96 118 L118 96 L140 118" />
-        <path d="M118 96 L200 70 L320 96" strokeWidth="3" />
+        <path d="M72 500 L72 70" />
+        <path d="M30 70 L200 70" />
+        <path d="M50 92 L72 70 L94 92" />
+        <path d="M72 70 L110 48 L170 70" strokeWidth="3" />
       </g>
-      <rect x="62" y="90" width="40" height="18" rx="3" fill="#1b2a52" />
-      <rect x="104" y="420" width="28" height="22" rx="3" fill="#1b2a52" />
+      <rect x="28" y="64" width="30" height="16" rx="3" fill="#1b2a52" />
       <g className="proje-kanca">
-        <path d="M330 96 L330 160" stroke="#1b2a52" strokeWidth="2.5" />
-        <path d="M330 160 c-9 0 -9 14 0 14 c6 0 7 -5 7 -8" stroke="#1b2a52" strokeWidth="4" strokeLinecap="round" fill="none" />
-        <rect x="314" y="176" width="32" height="20" rx="3" fill="#ff6b4a" />
+        <path d="M100 70 L100 150" stroke="#1b2a52" strokeWidth="2.5" />
+        <path d="M100 150 c-9 0 -9 14 0 14 c6 0 7 -5 7 -8" stroke="#1b2a52" strokeWidth="4" strokeLinecap="round" fill="none" />
       </g>
 
-      {/* Bina: zemin plakası sabit, katlar sırayla yükselir, çatı en son */}
-      <path d="M200 404 L400 404 L456 376 L256 376 Z" fill="#9aa3b5" />
-      {Array.from({ length: KAT_SAYISI }, (_, i) => (
-        <Kat key={i} i={i} />
-      ))}
-      <g className="proje-kat" style={{ animationDelay: `${KAT_SAYISI * 0.55}s` }}>
-        <path d={`M210 ${catY} L390 ${catY} L446 ${catY - 28} L266 ${catY - 28} Z`} fill="url(#pj-cati)" />
-        <rect x="300" y={catY - 48} width="22" height="22" fill="#6b7488" />
-        <path d={`M322 ${catY - 48} l12 -6 v22 l-12 6 Z`} fill="#4a5368" />
-      </g>
+      <rect x="120" y="10" width="400" height="500" rx="28" fill="#0d1b3e" />
+      <g clipPath="url(#pj-kart)">
+        {/* Gerçek kareler: her aşama bir öncekinin üstünde belirir */}
+        <image href="/media/insaat-1.webp" x="120" y="10" width="400" height="500" preserveAspectRatio="xMidYMid slice" />
+        {[2, 3, 4].map((n) => (
+          <image key={n} className={`proje-k${n}`} href={`/media/insaat-${n}.webp`} x="120" y="10" width="400" height="500" preserveAspectRatio="xMidYMid slice" />
+        ))}
 
-      {/* Ağaçlar */}
-      {[
-        [520, 470],
-        [560, 440],
-        [160, 470],
-      ].map(([x, y], i) => (
-        <g key={i}>
-          <path d={`M${x} ${y} L${x} ${y - 14}`} stroke="#8a5a3c" strokeWidth="3" />
-          <circle cx={x} cy={y - 22} r="12" fill="#2fa36b" />
-          <circle cx={x - 7} cy={y - 16} r="8" fill="#3fbf7f" />
-        </g>
-      ))}
+        {/* Videodaki imar etiketi: koyu kutu, sarı şerit */}
+        <rect x="140" y="30" width="196" height="54" rx="8" fill="#0d1b3e" opacity="0.82" />
+        <rect x="140" y="30" width="5" height="54" rx="2" fill="#ffc93c" />
+        <text x="156" y="54" fill="#ffffff" fontSize="18" fontWeight="800" fontFamily="inherit">11.091 m²</text>
+        <text x="156" y="73" fill="#ffffff" fontSize="11.5" fontWeight="600" fontFamily="inherit" opacity="0.8">Konut imarlı · Emsal 1,20</text>
+
+        {/* Alt karartma, aşama adı ve dört parçalı ilerleme */}
+        <rect x="120" y="340" width="400" height="170" fill="url(#pj-alt)" />
+        {ASAMALAR.map((a, i) => (
+          <text key={a} className={`proje-a${i + 1}`} x="320" y="458" textAnchor="middle" fill="#ffffff" fontSize="24" fontWeight="800" fontFamily="inherit" style={yazi}>
+            {i === 3 ? <tspan fill="#ffd166">{a}</tspan> : a}
+          </text>
+        ))}
+        {ASAMALAR.map((a, i) => (
+          <g key={a}>
+            <rect x={164 + i * 80} y="476" width="72" height="5" rx="2.5" fill="#ffffff" opacity="0.3" />
+            <rect className={i ? `proje-k${i + 1}` : undefined} x={164 + i * 80} y="476" width="72" height="5" rx="2.5" fill="#ffc93c" />
+          </g>
+        ))}
+        <text x="504" y="500" textAnchor="end" fill="#ffffff" fontSize="10" fontFamily="inherit" opacity="0.75">
+          Görüntü temsilidir
+        </text>
+      </g>
     </svg>
   );
 }

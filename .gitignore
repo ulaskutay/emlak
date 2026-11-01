@@ -8,6 +8,7 @@ __pycache__
 assets/
 bench/compare
 .next
+.next-*
 *.tsbuildinfo
 next-env.d.ts
 !apps/web/public/media/**/*.mp4

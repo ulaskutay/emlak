@@ -39,7 +39,9 @@ export function googleEngine() {
   let map: any;
   let parcel: ParcelInfo;
   let g: Geometry;
-  let fillEl: any, outlineEl: any, hoodLineEl: any, hoodFillEl: any, pinEl: any, scanLineEl: any, scanFillEl: any;
+  let hoodLineEl: any, hoodFillEl: any, pinEl: any;
+  // Parsel başına (yan yana / parçalı arsada birden çok): dolgu, kontur, taranan bölge, tarama çizgisi.
+  let fillEls: any[] = [], outlineEls: any[] = [], scanFillEls: any[] = [], scanLineEls: any[] = [];
   let ringEls: any[] = [];
   let gridEls: any[] = [];
   const shown = new Set<any>();
@@ -97,9 +99,9 @@ export function googleEngine() {
 
       const poly = (path: LL[], alt: number, mode = "RELATIVE_TO_MESH") =>
         new Polygon3DElement({ path: path.map((q) => at(q, alt)), altitudeMode: AltitudeMode[mode], fillColor: "rgba(0,0,0,0)", strokeColor: "rgba(0,0,0,0)", strokeWidth: 0, drawsOccludedSegments: true });
-      fillEl = poly(p.ring, 1.5);
-      outlineEl = glowLine({ color: GOLD, width: 16, outer: 0.62 });
-      map.append(fillEl, outlineEl);
+      fillEls = g.rings.map((r) => poly(r, 1.5));
+      outlineEls = g.rings.map(() => glowLine({ color: GOLD, width: 16, outer: 0.62 }));
+      map.append(...fillEls, ...outlineEls);
       if (p.hood?.ring.length) {
         hoodFillEl = poly(p.hood.ring, 4, "RELATIVE_TO_GROUND");
         hoodLineEl = glowLine({ color: CYAN, core: "#effcff", width: 12, outer: 0.65, mode: "RELATIVE_TO_GROUND" });
@@ -107,8 +109,8 @@ export function googleEngine() {
       pinEl = new Marker3DElement({ position: at(p.centroid, 0), altitudeMode: AltitudeMode.RELATIVE_TO_GROUND, sizePreserved: true, drawsWhenOccluded: true });
       pinEl.append(template(labelCanvas("📍 ARSA", GOLD, { size: 44, stem: 46 })));
       ringEls = [0, 1, 2].map(() => glowLine({ color: GOLD, core: "#fff3d6", width: 7, outer: 0.5, mode: "RELATIVE_TO_GROUND" }));
-      scanFillEl = poly(p.ring, 1.6);
-      scanLineEl = glowLine({ color: CYAN, core: "#ffffff", width: 18, outer: 0.7 });
+      scanFillEls = g.rings.map((r) => poly(r, 1.6));
+      scanLineEls = g.rings.map(() => glowLine({ color: CYAN, core: "#ffffff", width: 18, outer: 0.7 }));
       gridEls = Array.from({ length: g.gridMax }, () =>
         new lib.Polyline3DElement({ path: [at(p.centroid, 1), at(p.centroid, 1)], altitudeMode: AltitudeMode.RELATIVE_TO_MESH, strokeColor: "rgba(255,236,190,.75)", strokeWidth: 3, drawsOccludedSegments: true }),
       );
@@ -123,8 +125,8 @@ export function googleEngine() {
       map.tilt = c.tilt;
       map.heading = c.heading;
       if (map.mode !== lib.MapMode[s.mode]) map.mode = lib.MapMode[s.mode];
-      outlineEl.path = g.parcelPath(s.neon <= 0 ? 0 : easeOut(s.neon)).map((q) => at(q, 1.5));
-      fillEl.fillColor = rgba(GOLD, 0.22 * s.fill);
+      g.parcelPaths(s.neon <= 0 ? 0 : easeOut(s.neon)).forEach((path, i) => (outlineEls[i].path = path.map((q) => at(q, 1.5))));
+      fillEls.forEach((el) => (el.fillColor = rgba(GOLD, 0.22 * s.fill)));
 
       const h = s.hood;
       toggle(hoodLineEl, !!h && h.draw > 0 && h.opacity > 0);
@@ -155,28 +157,35 @@ export function googleEngine() {
       } else ringEls.forEach((el) => toggle(el, false));
 
       const sc = s.scan;
-      toggle(scanFillEl, !!sc);
+      scanFillEls.forEach((el) => toggle(el, !!sc));
       if (sc) {
         const f = g.scanFrame(sc.progress);
-        if (f.scanned.length) scanFillEl.path = f.scanned.map((q) => at(g.toLL(q), 1.6));
-        scanFillEl.fillColor = rgba(GOLD, f.scanned.length ? 0.3 * sc.grid : 0);
-        toggle(scanLineEl, sc.line > 0.02 && !!f.line);
-        if (f.line) scanLineEl.path = f.line.map((q) => at(g.toLL(q), 2.2));
-        scanLineEl.outerColor = rgba(CYAN, 0.9 * sc.line);
-        scanLineEl.strokeColor = rgba("#ffffff", sc.line);
+        scanFillEls.forEach((el, i) => {
+          const part = f.scanned[i]!;
+          if (part.length) el.path = part.map((q) => at(g.toLL(q), 1.6));
+          el.fillColor = rgba(GOLD, part.length ? 0.3 * sc.grid : 0);
+        });
+        scanLineEls.forEach((el, i) => {
+          const line = f.lines[i];
+          toggle(el, sc.line > 0.02 && !!line);
+          if (line) el.path = line.map((q) => at(g.toLL(q), 2.2));
+          el.outerColor = rgba(CYAN, 0.9 * sc.line);
+          el.strokeColor = rgba("#ffffff", sc.line);
+        });
         gridEls.forEach((el, i) => {
           const seg = f.grid[i];
           toggle(el, !!seg && sc.grid > 0.02);
           if (seg) (el.path = seg.map((q) => at(g.toLL(q), 1.7))), (el.strokeColor = rgba("#ffecbe", 0.7 * sc.grid));
         });
-      } else [scanLineEl, ...gridEls].forEach((el) => toggle(el, false));
+      } else [...scanLineEls, ...gridEls].forEach((el) => toggle(el, false));
       return waitSteady(timeoutMs);
     },
 
     async clean(keepNeon: boolean) {
-      [...shown].forEach((el) => el !== fillEl && el !== outlineEl && (el.remove(), shown.delete(el)));
+      const neonEls = new Set([...fillEls, ...outlineEls]);
+      [...shown].forEach((el) => !neonEls.has(el) && (el.remove(), shown.delete(el)));
       if (map.mode !== lib.MapMode.SATELLITE) map.mode = lib.MapMode.SATELLITE;
-      if (!keepNeon) [fillEl, outlineEl].forEach((el) => el.remove());
+      if (!keepNeon) neonEls.forEach((el) => el.remove());
       return waitSteady();
     },
   };

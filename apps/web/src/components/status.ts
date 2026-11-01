@@ -1,4 +1,4 @@
-import { TEMPLATES, type ReelStatus, type TemplateId } from "@arsa/shared";
+import { TEMPLATES, parcelNoText, type ReelStatus, type TemplateId } from "@arsa/shared";
 
 const stagesOf = (template: TemplateId) => TEMPLATES[template]?.stages ?? TEMPLATES["arsa-drone"].stages;
 
@@ -56,7 +56,7 @@ export function videoTitle(v: {
     return `Sunuculu ev turu · ${n} oda`;
   }
   const s = v.parcelSummary;
-  const parcel = s?.ada && s.parsel ? `${s.ada} ada ${s.parsel} parsel` : "Parsel";
+  const parcel = parcelNoText(s?.ada, s?.parsel) ?? "Parsel";
   if (v.template === "insaat-videosu") return `${parcel} · inşaat videosu`;
   return v.template === "bitmis-hali" ? `${parcel} · bitmiş hali` : [parcel, s?.nitelik].filter(Boolean).join(" · ");
 }

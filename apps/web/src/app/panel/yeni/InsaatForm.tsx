@@ -1,10 +1,11 @@
 "use client";
 import { BUILDING_LABELS, BuildingType } from "@arsa/shared";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { ListingFields, listingPayload, type ListingValues } from "./ListingFields";
-import { uploadAgentPhoto, uploadLogo } from "./photoUpload";
 import { ParcelStep, VoiceStep, type Parsed } from "./Wizard";
+import { AgentSelect, agentPayload, type CardAgent } from "@/components/panel/agents";
+import { OrderError } from "@/components/panel/ui";
 
 const TYPES = BuildingType.options;
 const HINTS: Record<BuildingType, string> = {
@@ -20,56 +21,6 @@ const decimal = (t: string) => {
   const n = Number(t.trim().replace(",", "."));
   return t.trim() && Number.isFinite(n) ? n : null;
 };
-type Asset = { key: string; url: string };
-
-/** Görsel seçici: önizleme, yükleniyor durumu ve kaldırma düğmesi. */
-function AssetPicker({ label, hint, value, round, upload, onChange }: {
-  label: string;
-  hint: string;
-  value?: Asset;
-  round?: boolean;
-  upload: (f: File) => Promise<Asset>;
-  onChange: (a?: Asset) => void;
-}) {
-  const input = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  return (
-    <div className="flex items-center gap-4">
-      <button type="button" onClick={() => input.current?.click()} disabled={busy}
-        className={`grid h-20 w-20 shrink-0 place-items-center overflow-hidden border border-dashed border-ayrac text-xs text-gri transition hover:border-gok/60 ${round ? "rounded-full" : "rounded-xl bg-white"}`}>
-        {value ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={value.url} alt={label} className={round ? "h-full w-full object-cover" : "max-h-16 max-w-16 object-contain"} />
-        ) : busy ? "Yükleniyor…" : "Seç"}
-      </button>
-      <div className="min-w-0">
-        <div className="font-semibold">{label}</div>
-        <div className="text-sm text-gri">{hint}</div>
-        {value && (
-          <button type="button" className="mt-1 text-sm text-gri underline hover:text-mercan-koyu" onClick={() => onChange(undefined)}>Kaldır</button>
-        )}
-        {error && <div className="mt-1 text-sm text-mercan-koyu">{error}</div>}
-      </div>
-      <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
-        onChange={async (e) => {
-          const f = e.target.files?.[0];
-          e.target.value = "";
-          if (!f) return;
-          setBusy(true);
-          setError(null);
-          try {
-            onChange(await upload(f));
-          } catch (err) {
-            setError(err instanceof Error ? err.message : String(err));
-          } finally {
-            setBusy(false);
-          }
-        }} />
-    </div>
-  );
-}
-
 export function InsaatForm() {
   const router = useRouter();
   const [parcel, setParcel] = useState<Parsed | null>(null);
@@ -79,9 +30,7 @@ export function InsaatForm() {
   const [use, setUse] = useState("Konut");
   const [emsal, setEmsal] = useState("");
   const [taks, setTaks] = useState("");
-  const [agentName, setAgentName] = useState("");
-  const [photo, setPhoto] = useState<Asset>();
-  const [logo, setLogo] = useState<Asset>();
+  const [agent, setAgent] = useState<CardAgent>({ name: "" });
   const [listing, setListing] = useState<ListingValues>({ price: "", officeName: "", phone: "" });
   const [voiceId, setVoiceId] = useState<string | null>(null);
   const [music, setMusic] = useState(true);
@@ -109,7 +58,7 @@ export function InsaatForm() {
         building,
         floors,
         zoning: { use: use.trim(), emsal: e, ...(t !== null && taks.trim() ? { taks: t } : {}) },
-        agent: { ...(agentName.trim() && { name: agentName.trim() }), ...(photo && { photoKey: photo.key }), ...(logo && { logoKey: logo.key }) },
+        agent: agentPayload(agent),
         listing: listingPayload(listing),
         ...(voiceId ? { voiceId } : {}),
         music,
@@ -197,16 +146,12 @@ export function InsaatForm() {
           <div className="pnl-kart space-y-5 p-5 sm:p-6">
             <div>
               <div className="font-semibold">Kapanış kartı</div>
-              <p className="mt-1 text-sm text-gri">Videonun son 4 saniyesi: fiyat, emlakçı, telefon ve ofis logosu. Hepsi isteğe bağlı.</p>
+              <p className="mt-1 text-sm text-gri">Videonun son 4 saniyesi: fiyat, emlakçının fotoğrafı ve adı, telefon ve ofis logosu.</p>
             </div>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <AssetPicker label="Emlakçı fotoğrafı" hint="Yuvarlak kırpılır" round value={photo} upload={uploadAgentPhoto} onChange={setPhoto} />
-              <AssetPicker label="Ofis logosu" hint="Saydam PNG en iyisi" value={logo} upload={uploadLogo} onChange={setLogo} />
-            </div>
-            <div className="max-w-xs">
-              <label className="pnl-label" htmlFor="agent">Emlakçı adı</label>
-              <input id="agent" className="pnl-input" maxLength={60} placeholder="Örn. Ümit G." value={agentName} onChange={(ev) => setAgentName(ev.target.value)} />
-            </div>
+            <AgentSelect onChange={(a, contact) => {
+              setAgent(a);
+              if (contact) setListing((l) => ({ ...l, ...contact }));
+            }} />
             <ListingFields value={listing} onChange={setListing} />
             <label className="flex cursor-pointer items-center justify-between border-t border-ayrac pt-4">
               <span>
@@ -219,7 +164,7 @@ export function InsaatForm() {
 
           <VoiceStep hook={`${place ? `${place}, ` : ""}${fmt(area)} metrekare, ${use.toLocaleLowerCase("tr")} imarlı arsa.`} voiceId={voiceId} onSelect={setVoiceId} />
 
-          {error && <p className="rounded-lg bg-mercan-acik px-3 py-2 text-sm text-mercan-koyu">{error}</p>}
+          {error && <OrderError error={error} />}
           <div className="flex items-center justify-between gap-4">
             <button className="pnl-btn-ghost" onClick={() => setStep(0)}>Geri</button>
             <div className="flex items-center gap-4">

@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { PanelNav, PanelTabBar } from "@/components/panel/PanelNav";
+import { VerifyBanner } from "@/components/panel/VerifyBanner";
 import { SignOut } from "@/components/SignOut";
 import { SiteLogo } from "@/components/site/SiteLogo";
 import { isSuperAdmin, requireUser } from "@/lib/auth";
+import { creditBalance } from "@/lib/credits";
+import { formatInt } from "@/lib/format";
 
 export default async function PanelLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   const name = user.name || user.email;
   // Yönetim bağlantısı yalnız süper yöneticiye; rolle yönetici olanlar adresi bilerek girer.
   const admin = isSuperAdmin(user);
+  const balance = await creditBalance(user.id);
   return (
     <div className="panel min-h-dvh bg-zemin font-site text-lacivert lg:grid lg:grid-cols-[16.5rem_minmax(0,1fr)]">
       <aside className="sticky top-0 z-20 border-b border-ayrac bg-white/90 backdrop-blur lg:flex lg:h-dvh lg:flex-col lg:border-b-0 lg:border-r lg:bg-white">
@@ -17,6 +21,9 @@ export default async function PanelLayout({ children }: { children: React.ReactN
             <SiteLogo />
           </Link>
           <div className="flex items-center gap-1 lg:hidden">
+            <Link href="/panel/kredi" className={`rounded-full px-3 py-2 text-sm font-bold tabular-nums ${balance < 0 ? "text-mercan-koyu" : "text-lacivert"}`}>
+              {formatInt(balance)} kredi
+            </Link>
             {admin ? <Link href="/admin" className="rounded-full px-3 py-2 text-sm font-bold text-gok">Yönetim</Link> : null}
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gok text-sm font-extrabold uppercase text-white" title={name}>
               {name.slice(0, 1)}
@@ -29,6 +36,13 @@ export default async function PanelLayout({ children }: { children: React.ReactN
             Yeni video
           </Link>
           <PanelNav />
+          <Link href="/panel/kredi" className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-gok-acik px-3 py-3 hover:bg-gok-acik/70">
+            <span>
+              <span className="block text-xs font-semibold text-gok-koyu/80">Kredi bakiyesi</span>
+              <span className={`block text-lg font-extrabold tabular-nums ${balance < 0 ? "text-mercan-koyu" : "text-lacivert"}`}>{formatInt(balance)}</span>
+            </span>
+            <span className="text-sm font-bold text-gok">Yükle</span>
+          </Link>
         </div>
         <div className="mt-auto hidden border-t border-ayrac p-3 lg:block">
           {admin ? (
@@ -50,6 +64,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
         </div>
       </aside>
       <main className="mx-auto w-full max-w-[84rem] px-4 pb-28 pt-6 sm:px-8 lg:py-10">
+        {!user.emailVerified && <VerifyBanner email={user.email} />}
         {children}
         <div className="mt-12 flex items-center justify-between gap-4 border-t border-ayrac pt-5 text-sm lg:hidden">
           <span className="min-w-0 truncate text-gri">{user.email}</span>

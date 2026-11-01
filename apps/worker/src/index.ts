@@ -9,7 +9,7 @@
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { and, eq, getDb, videos } from "@arsa/db";
+import { and, eq, getDb, refundVideoCredits, videos } from "@arsa/db";
 import { r2FromEnv } from "@arsa/providers";
 import type { TemplateId } from "@arsa/shared";
 import { Worker } from "bullmq";
@@ -94,6 +94,8 @@ const worker = new Worker<{ videoId: string }>(
       const msg = e instanceof Error ? e.message : String(e);
       console.error(`[${job.data.videoId.slice(0, 8)}] HATA: ${msg}`);
       await db.update(videos).set({ status: "failed", error: msg.slice(0, 1000), finishedAt: new Date() }).where(eq(videos.id, job.data.videoId));
+      // Video çıkmadı: kredi kullanıcıya döner (yönetici yeniden üretirse yeniden düşülür).
+      await refundVideoCredits(db, job.data.videoId, { note: "Üretim hatası" }).catch((err) => console.error(`İade yapılamadı: ${err}`));
       throw e;
     }
   },

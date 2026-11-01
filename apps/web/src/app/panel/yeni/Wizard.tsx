@@ -6,6 +6,8 @@ import { ParcelShape } from "@/components/ParcelShape";
 import { formatArea, parcelPlace, parcelTitle } from "@/lib/format";
 import { PoiStep, type PoiItem } from "./PoiStep";
 import { ParcelMap, TkgmQuery } from "./TkgmQuery";
+import { AgentSelect, agentPayload, type CardAgent } from "@/components/panel/agents";
+import { OrderError } from "@/components/panel/ui";
 
 type Summary = {
   areaM2: number;
@@ -17,7 +19,8 @@ type Summary = {
   mahalle?: string;
   centroid: { lat: number; lng: number };
 };
-export type Parsed = { fileName: string; text: string; summary: Summary; ring: { lat: number; lng: number }[]; hook: string };
+/** rings: parsel(ler)in sınırları — yan yana ya da parçalı arsada birden çok; text hepsini içeren dosya. */
+export type Parsed = { fileName: string; text: string; summary: Summary; rings: { lat: number; lng: number }[][]; hook: string };
 
 const STEPS = ["Parsel", "Yakın noktalar", "İlan bilgileri", "Ses ve müzik"];
 export const OFFICE_KEY = "arsa-video:office";
@@ -27,6 +30,7 @@ export function Wizard() {
   const [step, setStep] = useState(0);
   const [parcel, setParcel] = useState<Parsed | null>(null);
   const [listing, setListing] = useState({ price: "", zoning: "", officeName: "", phone: "" });
+  const [agent, setAgent] = useState<CardAgent>({ name: "" });
   const [voiceId, setVoiceId] = useState<string | null>(null);
   // Videoya yalnızca kullanıcının seçtiği noktalar girer (boşsa yalnızca parsel anlatılır).
   const [pois, setPois] = useState<PoiItem[]>([]);
@@ -64,6 +68,7 @@ export function Wizard() {
           ...(listing.phone.trim() ? { phone: listing.phone.trim() } : {}),
           pois,
         },
+        agent: agentPayload(agent),
         ...(voiceId ? { voiceId } : {}),
         music,
       }),
@@ -103,7 +108,7 @@ export function Wizard() {
         <PoiStep
           key={parcel.fileName + parcel.summary.centroid.lat}
           center={parcel.summary.centroid}
-          ring={parcel.ring}
+          rings={parcel.rings}
           district={parcel.summary.ilce}
           province={parcel.summary.il}
           neighbourhood={parcel.summary.mahalle}
@@ -118,7 +123,12 @@ export function Wizard() {
         <div className="pnl-kart space-y-5 p-5 sm:p-6">
           <p className="text-sm text-gri">
             Hepsi isteğe bağlı. Fiyat videonun sonunda okunur ve kapanış kartında yazar; telefon yalnızca kartta görünür.
+            Emlakçı seçerseniz videonun sonuna fotoğraflı emlakçı kartı eklenir.
           </p>
+          <AgentSelect onChange={(a, contact) => {
+            setAgent(a);
+            if (contact) setListing((l) => ({ ...l, ...contact }));
+          }} />
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="pnl-label" htmlFor="price">Fiyat (TL)</label>
@@ -161,7 +171,7 @@ export function Wizard() {
             </span>
             <input type="checkbox" className="h-5 w-5 accent-[#2b6cff]" checked={music} onChange={(e) => setMusic(e.target.checked)} />
           </label>
-          {error && <p className="rounded-lg bg-mercan-acik px-3 py-2 text-sm text-mercan-koyu">{error}</p>}
+          {error && <OrderError error={error} />}
           <div className="flex justify-between gap-3">
             <button className="pnl-btn-ghost" onClick={() => setStep(2)}>← Geri</button>
             <button className="pnl-btn-primary" disabled={busy} onClick={submit}>{busy ? "Gönderiliyor…" : "Videoyu oluştur"}</button>
@@ -179,17 +189,21 @@ export function ParcelStep({ parcel, onParsed, onNext }: { parcel: Parsed | null
   const [mode, setMode] = useState<"tkgm" | "dosya">("tkgm");
   const input = useRef<HTMLInputElement>(null);
 
-  async function load(file: File) {
+  /** Bir ya da birden çok parsel dosyası (yan yana / parçalı arsa): sunucu tek dosyada birleştirir. */
+  async function load(files: File[]) {
     setError(null);
-    if (!/\.(geojson|json|kml)$/i.test(file.name)) return setError("TKGM'den indirilen .geojson, .json ya da .kml dosyası seçin");
-    if (file.size > 2_000_000) return setError("Dosya çok büyük (en fazla 2 MB)");
+    if (!files.length) return;
+    if (files.some((f) => !/\.(geojson|json|kml)$/i.test(f.name))) return setError("TKGM'den indirilen .geojson, .json ya da .kml dosyası seçin");
+    if (files.length > 10) return setError("Bir videoda en fazla 10 parsel dosyası olabilir");
+    if (files.reduce((n, f) => n + f.size, 0) > 2_000_000) return setError("Dosyalar çok büyük (toplam en fazla 2 MB)");
     setBusy(true);
-    const text = await file.text();
-    const res = await fetch("/api/parcel/parse", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+    const texts = await Promise.all(files.map((f) => f.text()));
+    const res = await fetch("/api/parcel/parse", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texts }) });
     const data = await res.json();
     setBusy(false);
     if (!res.ok) return (setError(data.error ?? "Dosya okunamadı"), onParsed(null));
-    onParsed({ fileName: file.name, text, ...data });
+    const fileName = files.length > 1 ? `${files.length} parsel (${files.map((f) => f.name).join(", ")})` : files[0]!.name;
+    onParsed({ fileName, ...data });
   }
 
   return (
@@ -212,26 +226,29 @@ export function ParcelStep({ parcel, onParsed, onNext }: { parcel: Parsed | null
           onDrop={(e) => {
             e.preventDefault();
             setDrag(false);
-            const f = e.dataTransfer.files[0];
-            if (f) load(f);
+            load([...e.dataTransfer.files]);
           }}
         >
-          <input ref={input} type="file" accept=".geojson,.json,.kml" hidden onChange={(e) => e.target.files?.[0] && load(e.target.files[0])} />
+          <input ref={input} type="file" accept=".geojson,.json,.kml" multiple hidden onChange={(e) => load([...(e.target.files ?? [])])} />
           <span className="grid h-12 w-12 place-items-center rounded-2xl bg-gok-acik text-2xl">📍</span>
           <div className="mt-3 font-semibold">{busy ? "Okunuyor…" : "Parsel dosyasını sürükleyin ya da seçin"}</div>
           <div className="mt-1 text-sm text-gri">TKGM Parsel Sorgu → Dışa aktar → GeoJSON veya KML</div>
+          <div className="mt-1 text-xs text-gri">Yan yana ya da parçalı arsada her parselin dosyasını birlikte seçebilirsiniz.</div>
         </div>
       )}
       {error && <p className="rounded-lg bg-mercan-acik px-3 py-2 text-sm text-mercan-koyu">{error}</p>}
       {parcel && (
         <div className="pnl-kart space-y-4 p-5">
-          <ParcelMap key={parcel.fileName} ring={parcel.ring} />
+          <ParcelMap key={parcel.fileName} rings={parcel.rings} />
           <div className="flex flex-wrap items-center gap-4 sm:flex-nowrap sm:gap-5">
-            <ParcelShape ring={parcel.ring} className="h-24 w-24 shrink-0 sm:h-28 sm:w-28" />
+            <ParcelShape rings={parcel.rings} className="h-24 w-24 shrink-0 sm:h-28 sm:w-28" />
             <div className="min-w-0 flex-1">
               <div className="text-lg font-extrabold">{parcelTitle(parcel.summary)}</div>
               <div className="text-sm text-gri">{parcelPlace(parcel.summary)}</div>
-              <div className="mt-2 text-2xl font-extrabold text-gok">{formatArea(parcel.summary.areaM2)}</div>
+              <div className="mt-2 text-2xl font-extrabold text-gok">
+                {formatArea(parcel.summary.areaM2)}
+                {parcel.rings.length > 1 && <span className="ml-2 text-sm font-semibold text-gri">toplam · {parcel.rings.length} parça</span>}
+              </div>
               <div className="mt-1 truncate text-xs text-gri">{parcel.fileName}</div>
             </div>
             <button className="pnl-btn-primary w-full sm:w-auto" onClick={onNext}>Devam →</button>

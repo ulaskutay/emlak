@@ -276,9 +276,9 @@ export const OUTRO_SECONDS = 4;
  * Sonuna emlakçı kapanış kartı ekler (eşya yerleştirme şablonundaki kart: bulanık son kare üstünde fiyat,
  * emlakçı, telefon, "Hemen arayın", logo). Kartın başladığı saniyeyi döndürür (seslendirme ve kartlar ona göre).
  */
-export async function appendOutro(video: string, out: string, workDir: string, card: Omit<AgentCardInput, "background" | "seconds">) {
+export async function appendOutro(video: string, out: string, workDir: string, card: Omit<AgentCardInput, "background" | "seconds">, frameFromEnd = 0.1) {
   const lastFrame = join(workDir, "son-kare.png");
-  await run("ffmpeg", ["-v", "error", "-y", "-sseof", "-0.1", "-i", video, "-frames:v", "1", "-update", "1", lastFrame]);
+  await run("ffmpeg", ["-v", "error", "-y", "-sseof", `-${frameFromEnd}`, "-i", video, "-frames:v", "1", "-update", "1", lastFrame]);
   const outro = await agentCard(workDir, { ...card, background: lastFrame, seconds: OUTRO_SECONDS });
   const outroAt = Number((await run("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", video])).stdout.trim());
   await run("ffmpeg", [

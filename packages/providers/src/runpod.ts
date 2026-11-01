@@ -54,6 +54,25 @@ export interface VideoWorkerInput {
   output_height?: number;
 }
 
+/** Konuşan emlakçı worker'ının input'u (gpu/talk-worker/handler.py ile birebir aynı tutulmalı). */
+export interface TalkWorkerInput {
+  /** Odada duran kişinin fotoğrafı; en-boy oranına en yakın kova seçilir (9:16 → 448x832 / 704x1280). */
+  image_url: string;
+  /** Seslendirme (mp3/wav); video süresi sesle aynı olur. */
+  audio_url: string;
+  prompt: string;
+  negative_prompt?: string;
+  resolution?: "480" | "720";
+  seed?: number;
+  /** lightx2v LoRA ile 4 adım yeterli; text 1 / audio 2 resmi önerilen değerler. */
+  num_steps?: number;
+  text_guide_scale?: number;
+  audio_guide_scale?: number;
+  shift?: number;
+  /** Verilirse R2'ye yüklenir, yoksa video base64 döner. */
+  output_key?: string;
+}
+
 const STATE_MAP: Record<string, JobState> = {
   IN_QUEUE: "queued",
   IN_PROGRESS: "running",

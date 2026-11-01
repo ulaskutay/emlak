@@ -11,7 +11,7 @@ import { isAdmin, requireAdmin } from "@/lib/auth";
 import { creditBalance, getPricing } from "@/lib/credits";
 import { formatDate, formatInt, formatTry } from "@/lib/format";
 
-const REASON: Record<string, string> = { admin: "Elle", purchase: "Satın alma", video: "Video", refund: "İade" };
+const REASON: Record<string, string> = { admin: "Elle", purchase: "Satın alma", video: "Video", refund: "İade", welcome: "Hoş geldin" };
 const METHOD: Record<string, string> = { havale: "Havale/EFT", kart: "Kart", nakit: "Nakit", diger: "Diğer" };
 
 export default async function UserDetail({ params }: { params: Promise<{ id: string }> }) {

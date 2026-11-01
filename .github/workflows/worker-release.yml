@@ -9,6 +9,7 @@ on:
       - "gpu/video-worker/**"
       - "gpu/drone-worker/**"
       - "apps/drone-studio/**"
+      - "gpu/talk-worker/**"
       - ".github/workflows/worker-release.yml"
   workflow_dispatch:
 
