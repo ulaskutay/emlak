@@ -78,7 +78,7 @@ export const TEMPLATES: Record<TemplateId, TemplateInfo> = {
     includes: ["Parselin drone çekimi", "İnşaat timelapse'i (temsili)", "Proje ve fiyat kartı", "Müzik"],
     duration: "20–30 sn",
     preview: { poster: "/media/sablon-bitmis-poster.jpg" },
-    badge: "Yeni",
+    hidden: true,
     stages: [
       { id: "parcel", label: "Parsel" },
       { id: "render", label: "Drone çekimi" },

@@ -34,7 +34,7 @@ export function ProjeAnlatim() {
         { baslik: "Bitmiş hali arsaya oturtulur", text: "Bina, drone çekimindeki gerçek arsanın üstüne doğru ölçekte yerleştirilir." },
         { baslik: "İnşaat sahnesi kurgulanır", text: "Boş arsadan bitmiş binaya hızlandırılmış geçiş; seslendirme, müzik ve iletişim kartıyla." },
       ]}
-      birincil={{ href: createHref("bitmis-hali"), label: "Proje videosu oluşturun" }}
+      birincil={{ href: createHref("insaat-videosu"), label: "Proje videosu oluşturun" }}
       ikincil={{ href: "/sablonlar/insaat-videosu", label: "Örneği izleyin" }}
       cizim={<ProjeCizim className="w-full" />}
     />

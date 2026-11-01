@@ -186,7 +186,7 @@ export default function Home() {
           baslik="Temel atılmadan, bitmiş binayı arsada gösterin."
           text="Parselin drone çekimi üstüne binanın bitmiş hali yerleştirilir; inşaat hızlandırılmış sahneyle kat kat yükselir."
           adimlar={PROJE}
-          olustur={createHref("bitmis-hali")}
+          olustur={createHref("insaat-videosu")}
           ornek="/sablonlar/insaat-videosu"
           gorsel={
             <ol className="mx-auto grid max-w-[560px] grid-cols-4 gap-2" aria-label="İnşaat aşamaları">
