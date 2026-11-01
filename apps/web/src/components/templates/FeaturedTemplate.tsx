@@ -2,7 +2,7 @@ import { templateList } from "@arsa/shared";
 import Link from "next/link";
 
 /** Panelin üstündeki öne çıkan şablon: kullanıcının ilan türünden yeni bir şablon, yoksa en yeni şablon. */
-export function FeaturedTemplate({ prefer = [] }: { prefer?: string[] }) {
+export function FeaturedTemplate({ prefer = [], credits = {} }: { prefer?: string[]; credits?: Record<string, string> }) {
   const mine = templateList.filter((t) => prefer.includes(t.category));
   const t = mine.find((x) => x.badge) ?? mine[0] ?? templateList.find((x) => x.badge) ?? templateList[0];
   if (!t) return null;
@@ -45,7 +45,10 @@ export function FeaturedTemplate({ prefer = [] }: { prefer?: string[] }) {
           <Link href={`/panel/yeni/${t.id}`} className="pnl-btn bg-gunes px-6 text-lacivert hover:bg-[#ffbf1a]">
             Hemen oluşturun
           </Link>
-          <span className="text-sm text-white/60 tabular-nums">{t.duration}</span>
+          <span className="text-sm text-white/60 tabular-nums">
+            {t.duration}
+            {credits[t.id] && <> · <span className="font-bold text-gunes">{credits[t.id]}</span></>}
+          </span>
         </div>
       </div>
     </section>

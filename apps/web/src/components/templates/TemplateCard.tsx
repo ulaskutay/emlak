@@ -11,7 +11,20 @@ const text = (tone: Tone) =>
     : { title: "text-lacivert group-hover:text-gok", body: "text-gri", meta: "text-gri/80", box: "bg-gok-acik" };
 
 /** Galeri kartı: kapak görünür, üzerine gelince (ya da odakta) örnek video sessiz oynar. */
-export function TemplateCard({ t, href, tone = "dark", priority = false }: { t: TemplateInfo; href: string; tone?: Tone; priority?: boolean }) {
+export function TemplateCard({
+  t,
+  href,
+  tone = "dark",
+  priority = false,
+  credit,
+}: {
+  t: TemplateInfo;
+  href: string;
+  tone?: Tone;
+  priority?: boolean;
+  /** "150 kredi" gibi; verilirse sürenin yanında gösterilir. */
+  credit?: string;
+}) {
   const video = useRef<HTMLVideoElement>(null);
   const c = text(tone);
   const play = () => {
@@ -66,6 +79,13 @@ export function TemplateCard({ t, href, tone = "dark", priority = false }: { t: 
       <p className={`mt-1.5 text-[0.8125rem] ${c.meta}`}>
         {t.category} <span className="tabular-nums">{t.duration}</span>
       </p>
+      {credit && (
+        <p
+          className={`mt-2 inline-flex rounded-full px-2.5 py-0.5 text-[0.8125rem] font-bold tabular-nums ${tone === "dark" ? "bg-white/10 text-sari" : "bg-gunes-acik text-lacivert"}`}
+        >
+          {credit}
+        </p>
+      )}
     </Link>
   );
 }

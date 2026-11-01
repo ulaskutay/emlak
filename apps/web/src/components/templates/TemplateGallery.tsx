@@ -13,6 +13,7 @@ export function TemplateGallery({
   cta = false,
   howTo = [],
   prefer = [],
+  credits = {},
 }: {
   tone?: "light" | "dark";
   /** Kart bağlantısının öneki: sitede şablon sayfası, panelde sipariş formu. */
@@ -24,6 +25,8 @@ export function TemplateGallery({
   howTo?: string[];
   /** Kullanıcının karşılamada seçtiği kategoriler: o şablonlar başa gelir. */
   prefer?: string[];
+  /** Şablon başına kredi yazısı (panelde). */
+  credits?: Record<string, string>;
 }) {
   const [cat, setCat] = useState<TemplateCategory | null>(null);
   const live = templateList
@@ -59,7 +62,7 @@ export function TemplateGallery({
       <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {live.map((t, i) => (
           <div key={t.id} className={`flex flex-col ${tone === "light" ? "site-kart p-2.5 pb-4" : ""}`}>
-            <TemplateCard t={t} href={`${hrefBase}${t.id}`} tone={tone} priority={i < 4} />
+            <TemplateCard t={t} href={`${hrefBase}${t.id}`} tone={tone} priority={i < 4} credit={credits[t.id]} />
             {cta && (
               <div className={`mt-auto flex flex-col items-start gap-2 pt-4 ${tone === "light" ? "px-1.5" : ""}`}>
                 <Link
