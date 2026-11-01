@@ -1,7 +1,7 @@
 "use client";
 import { TEMPLATES, type ReelListing, type ReelStatus, type TemplateId } from "@arsa/shared";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ProgressBar, StatusBadge } from "@/components/panel/ui";
 import { overallProgress, statusLabel, videoTitle } from "@/components/status";
 import { formatArea, formatDate, parcelPlace } from "@/lib/format";
@@ -21,8 +21,11 @@ type Video = {
   finishedAt: string | null;
 };
 
+type Preview = { url: string; kind: "image" | "video"; label: string };
+type Urls = { play?: string; download?: string; poster?: string; previews?: Preview[] };
+
 export function VideoStatus({ id }: { id: string }) {
-  const [data, setData] = useState<{ video: Video; urls: { play?: string; download?: string; poster?: string } } | null>(null);
+  const [data, setData] = useState<{ video: Video; urls: Urls } | null>(null);
   const [retrying, setRetrying] = useState(false);
 
   const load = useCallback(async () => {
@@ -57,6 +60,7 @@ export function VideoStatus({ id }: { id: string }) {
   const stageIndex = v.status === "done" ? stages.length : stages.findIndex((s) => s.id === v.stage);
   const working = v.status === "queued" || v.status === "running";
   const ready = v.status === "done" && data.urls.play;
+  const previews = data.urls.previews ?? [];
 
   return (
     <div>
@@ -84,10 +88,12 @@ export function VideoStatus({ id }: { id: string }) {
       </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] lg:gap-10">
-        <div className={`pnl-kart mx-auto w-full max-w-[360px] overflow-hidden p-2 ${ready ? "" : "hidden lg:block"}`}>
+        <div className={`pnl-kart mx-auto w-full max-w-[360px] overflow-hidden p-2 ${ready || previews.length ? "" : "hidden lg:block"}`}>
           <div className={`relative aspect-[9/16] overflow-hidden rounded-xl ${v.status === "failed" ? "bg-mercan-acik/60" : "bg-gradient-to-b from-gok-acik to-[#dbe6ff]"}`}>
             {ready ? (
               <video src={data.urls.play} poster={data.urls.poster} controls playsInline className="h-full w-full bg-lacivert object-cover" />
+            ) : previews.length ? (
+              <PreviewStage previews={previews} pct={pct} label={statusLabel(v.status, v.stage, v.template)} failed={v.status === "failed"} />
             ) : (
               <>
                 {data.urls.poster && (
@@ -193,5 +199,71 @@ export function VideoStatus({ id }: { id: string }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Üretim sürerken ara çıktılar (arsa karesi, bitmiş hali, klipler…): son geleni büyük gösterir, alttaki şeritten
+ * öncekiler seçilir. İmzalı linkler her sorguda değiştiği için ilk gelen link tutulur (video baştan yüklenmesin).
+ */
+function PreviewStage({ previews, pct, label, failed }: { previews: Preview[]; pct: number; label: string; failed: boolean }) {
+  const urls = useRef<string[]>([]);
+  previews.forEach((p, i) => (urls.current[i] ??= p.url));
+  const [pick, setPick] = useState<number | null>(null);
+  const i = pick ?? previews.length - 1;
+  const p = previews[i]!;
+  const src = urls.current[i]!;
+
+  return (
+    <>
+      {p.kind === "video" ? (
+        <video key={src} src={src} autoPlay muted loop playsInline className="absolute inset-0 h-full w-full bg-lacivert object-cover" />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={src} src={src} alt={p.label} className="absolute inset-0 h-full w-full bg-lacivert object-cover" />
+      )}
+      <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/55 to-transparent p-3">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-xs font-bold text-white backdrop-blur-md">
+          <span className={`h-1.5 w-1.5 rounded-full ${failed ? "bg-mercan" : "bg-gunes"}`} aria-hidden />
+          Önizleme · {p.label}
+        </span>
+      </div>
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-3 pt-10 pb-3">
+        {!failed && (
+          <div className="mb-2.5 flex items-center gap-2 text-white">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" aria-hidden />
+            <span className="text-sm font-bold">{label}</span>
+            <span className="ml-auto text-lg font-extrabold tabular-nums">%{pct}</span>
+          </div>
+        )}
+        {previews.length > 1 && (
+          <div role="group" aria-label="Ara çıktılar" className="flex gap-1.5 overflow-x-auto">
+            {previews.map((x, k) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={k === i}
+                aria-label={x.label}
+                title={x.label}
+                onClick={() => setPick(k === previews.length - 1 ? null : k)}
+                className={`relative aspect-[9/16] w-9 shrink-0 overflow-hidden rounded-md bg-lacivert transition ${k === i ? "ring-2 ring-gunes" : "opacity-70 hover:opacity-100"}`}
+              >
+                {x.kind === "video" ? (
+                  <video src={urls.current[k]} muted playsInline preload="metadata" className="absolute inset-0 h-full w-full object-cover" />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={urls.current[k]} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                )}
+                {x.kind === "video" && (
+                  <svg viewBox="0 0 20 20" className="absolute inset-0 m-auto h-3.5 w-3.5 text-white drop-shadow" aria-hidden>
+                    <path d="M7 5l8 5-8 5z" fill="currentColor" />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
   );
 }

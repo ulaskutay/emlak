@@ -111,6 +111,7 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
         height: EDIT_H,
       });
       await ctx.stage("staging", ++done / photos.length);
+      await ctx.preview?.(file, `${i + 1}. oda döşendi`);
       return file;
     }),
   );
@@ -130,6 +131,7 @@ export async function dosenmisEv(ctx: JobContext): Promise<JobResult> {
         log: ctx.log,
       });
       await ctx.stage("clips", ++done / photos.length);
+      await ctx.preview?.(file, `${i + 1}. oda klibi`);
       return file;
     }),
   );

@@ -120,7 +120,7 @@ export async function sunucuEv(ctx: JobContext): Promise<JobResult> {
 }
 
 /** Üretim hattının kendisi (yerel dosyalarla): worker şablonu ve deneme betiği kullanır. */
-export async function presenterTour(ctx: Pick<JobContext, "workDir" | "cacheDir" | "log" | "stage">, rooms: TourRoom[], o: TourOptions): Promise<JobResult> {
+export async function presenterTour(ctx: Pick<JobContext, "workDir" | "cacheDir" | "log" | "stage" | "preview">, rooms: TourRoom[], o: TourOptions): Promise<JobResult> {
   const hf = new HiggsfieldCli();
   const who = PRESENTERS[o.presenter];
   const refs = presenterRefs(o.presenter);
@@ -140,6 +140,7 @@ export async function presenterTour(ctx: Pick<JobContext, "workDir" | "cacheDir"
         if (r.room === "dis_cephe") return (await ctx.stage("staging", ++done / rooms.length), r.file);
         const file = await furnishRoom(hf, r.file, r.room, o.style!, join(ctx.workDir, `dosenmis-${i + 1}.png`), { seed: 11 + i, label: `döşeme ${i + 1}`, log: ctx.log });
         await ctx.stage("staging", ++done / rooms.length);
+        await ctx.preview?.(file, `${i + 1}. oda döşendi`);
         return file;
       }),
     );
@@ -161,6 +162,7 @@ export async function presenterTour(ctx: Pick<JobContext, "workDir" | "cacheDir"
       );
       const stillFile = await download(still.url, join(ctx.workDir, `sunucu-${i + 1}.jpg`));
       await ctx.stage("presenter", ++placed / rooms.length);
+      await ctx.preview?.(stillFile, `${i + 1}. sahne`);
       // Orta kalite 360p üretilip büyütülür (720p'nin üçte biri fiyatına, 2026-10-25 denemesi); yüksek kalite 720p'den.
       const raw = await hf.generate(
         VIDEO_MODEL,
@@ -177,6 +179,7 @@ export async function presenterTour(ctx: Pick<JobContext, "workDir" | "cacheDir"
       );
       const file = await download(clip.url, join(ctx.workDir, `sahne-${i + 1}.mp4`));
       await ctx.stage("clips", ++filmed / rooms.length);
+      await ctx.preview?.(file, `${i + 1}. sahne klibi`);
       // Altyazı için kelime zamanları (yazım senaryodan); alınamazsa sahne altyazısız.
       const words = await clipWords(file, lines[i]!, join(ctx.workDir, `altyazi-${i + 1}.mp3`)).catch((e) => {
         ctx.log(`! [sahne ${i + 1}] altyazı çıkarılamadı: ${String(e).slice(0, 160)}`);

@@ -3,7 +3,9 @@
  * açılışı. Kamera mahallenin yukarısından parsele iner ve yan karenin (side.ts) kamerasında durur. Çizim ve kodlama
  * panelde kullanılan kodla aynı (src/approach.ts, WebCodecs); burada GPU'lu Chrome'da, tam çözünürlükte çalışır.
  *
- *   tsx scripts/worker-approach.ts --in /tmp/job/parcel.geojson --out /tmp/job [--context ctx.json] [--seconds 6]
+ * Kurgu 60 FPS olduğu için 60 FPS çizilir (sunucuda büyütme/ara kare yok).
+ *
+ *   tsx scripts/worker-approach.ts --in /tmp/job/parcel.geojson --out /tmp/job [--context ctx.json] [--seconds 6] [--fps 60]
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -23,6 +25,7 @@ const { values: args } = parseArgs({
     out: { type: "string" },
     context: { type: "string" },
     seconds: { type: "string", default: "6" },
+    fps: { type: "string", default: "60" },
   },
 });
 if (!args.in || !args.out) throw new Error("--in <parsel dosyası> --out <klasör> gerekli");
@@ -54,7 +57,7 @@ try {
     page.evaluate(`(async () => {
       let last = -1;
       const blob = await window.studio.recordApproach({
-        seconds: ${Number(args.seconds)}, width: 1080, height: 1920,
+        seconds: ${Number(args.seconds)}, fps: ${Number(args.fps)}, width: 1080, height: 1920,
         onProgress: (d) => { const s = Math.floor(d * 10); if (s !== last) { last = s; window.__progress(d); } },
       });
       const buf = new Uint8Array(await blob.arrayBuffer());

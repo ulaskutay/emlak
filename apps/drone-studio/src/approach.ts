@@ -177,8 +177,10 @@ export async function recordApproach(host: ApproachHost, p: ParcelInfo, o: Appro
   const muxer = new Muxer({ target, video: { codec: "avc", width: W, height: H, frameRate: fps }, fastStart: "in-memory" });
   let failure: unknown = null;
   const encoder = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: (e) => (failure = e) });
-  const config: VideoEncoderConfig = { codec: "avc1.640028", width: W, height: H, bitrate: 12_000_000, framerate: fps };
-  if (!(await VideoEncoder.isConfigSupported(config)).supported) config.codec = "avc1.4d0028";
+  // Seviye 4.0 1080p'de 30 FPS'e kadar; 60 FPS (sunucu kurgusu) için 4.2.
+  const level = W * H * fps > 1920 * 1088 * 30 ? "2a" : "28";
+  const config: VideoEncoderConfig = { codec: `avc1.6400${level}`, width: W, height: H, bitrate: fps > 30 ? 20_000_000 : 12_000_000, framerate: fps };
+  if (!(await VideoEncoder.isConfigSupported(config)).supported) config.codec = `avc1.4d00${level}`;
   if (!(await VideoEncoder.isConfigSupported(config)).supported) throw new Error("Bu tarayıcı H.264 kodlamayı desteklemiyor");
   encoder.configure(config);
 

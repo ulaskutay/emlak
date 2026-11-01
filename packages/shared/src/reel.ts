@@ -55,3 +55,10 @@ export const REEL_STAGES = [
 export type ReelStage = (typeof REEL_STAGES)[number]["id"];
 
 export type ReelStatus = "queued" | "running" | "done" | "failed";
+
+/** Üretim sürerken panelde gösterilen ara çıktı (videos.stats.previews; R2 anahtarı, link her istekte imzalanır). */
+export interface VideoPreview {
+  key: string;
+  kind: "image" | "video";
+  label: string;
+}

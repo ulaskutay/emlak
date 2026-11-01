@@ -220,28 +220,33 @@ export async function buildConstruction(o: {
   name: (x: string) => string;
   end?: string;
   onStage?: (stage: "build" | "timelapse" | "compose", progress?: number) => Promise<void> | void;
+  /** Ara çıktı hazır olunca (panel önizlemesi). */
+  onPreview?: (file: string, label: string) => Promise<void> | void;
 }): Promise<string> {
   const { gen, start, name } = o;
   const spec = buildingSpec(o.type, o.floors);
 
   await o.onStage?.("build");
   const end = o.end ?? (await pickEnd(gen, start, endPrompt(o.type, o.floors), name("bitis.png"), o.seed));
+  await o.onPreview?.(end, "Bitmiş hali");
   const kaziHam = await editImage(gen, end, KAZI_PROMPT, name("kazi-ham.png"), "kazı", o.seed);
   const kazi = name("kazi.png");
   if (!existsSync(kazi)) await compositeSite(start, kaziHam, kazi, W, H, name("kazi-maske.png"));
+  await o.onPreview?.(kazi, "Kazı");
 
   // İki klip paralel; uçları ortak kazı karesi.
   await o.onStage?.("timelapse", 0);
   const buildSeconds = (o.clips - 1) * SEGMENT_SECONDS;
   let done = 0;
-  const step = async (p: Promise<string>) => {
+  const step = async (p: Promise<string>, label: string) => {
     const f = await p;
     await o.onStage?.("timelapse", ++done / 2);
+    await o.onPreview?.(f, label);
     return f;
   };
   const parts = await Promise.all([
-    step(clip(gen, start, kazi, digPrompt(), SEGMENT_SECONDS, name("klip-kazi.mp4"), "kazı klibi")),
-    step(clip(gen, kazi, end, buildPrompt(spec.edit, buildSeconds), buildSeconds, name("klip-yapi.mp4"), "yapı klibi")),
+    step(clip(gen, start, kazi, digPrompt(), SEGMENT_SECONDS, name("klip-kazi.mp4"), "kazı klibi"), "Kazı klibi"),
+    step(clip(gen, kazi, end, buildPrompt(spec.edit, buildSeconds), buildSeconds, name("klip-yapi.mp4"), "yapı klibi"), "İnşaat klibi"),
   ]);
   await o.onStage?.("compose");
   return joinClips(parts, name(`${o.clips * SEGMENT_SECONDS}sn.mp4`));
@@ -251,16 +256,16 @@ export async function buildConstruction(o: {
 export const APPROACH_FADE = 0.7;
 
 /**
- * Drone yaklaşma çekimini (kullanıcının tarayıcısında çizilmiş, 720p 30 FPS) 1080p 60 FPS büyütüp inşaat videosunun
- * başına ekler. Yaklaşma inşaatın başlangıç karesinin kamerasında bittiği için geçiş yalnız görüntü dokusunu değiştirir.
- * Döndürdüğü offset: inşaatın (ve seslendirmenin) videoda başladığı saniye.
+ * Drone yaklaşma çekimini (RunPod drone worker'ında 1080×1920 60 FPS çizilmiş harita) inşaat videosunun başına ekler.
+ * Higgsfield'a gitmez: çekim zaten tam çözünürlükte, yapay zekâ büyütmesi haritayı uydurmaya başlıyordu. Eski worker
+ * sürümünün 30 FPS çekimi kare tekrarıyla 60 FPS'e çıkar. Yaklaşma inşaatın başlangıç karesinin kamerasında bittiği
+ * için geçiş yalnız görüntü dokusunu değiştirir. Döndürdüğü offset: inşaatın (ve seslendirmenin) videoda başladığı saniye.
  */
-export async function prependApproach(gen: Gen, approach: string, video: string, out: string) {
-  const big = await upscale(gen.hf, approach, approach.replace(/\.mp4$/, "-buyuk.mp4"), "büyütme: yaklaşma", gen.log);
-  const dur = Number((await run("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", big])).stdout.trim());
+export async function prependApproach(approach: string, video: string, out: string) {
+  const dur = Number((await run("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", approach])).stdout.trim());
   const offset = Math.max(0, dur - APPROACH_FADE);
   await run("ffmpeg", [
-    "-v", "error", "-y", "-i", big, "-i", video,
+    "-v", "error", "-y", "-i", approach, "-i", video,
     "-filter_complex",
     `[0:v]fps=${OUT_FPS},scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,format=yuv420p[a];` +
       `[1:v]fps=${OUT_FPS},scale=${W}:${H},setsar=1,format=yuv420p[b];[a][b]xfade=transition=fade:duration=${APPROACH_FADE}:offset=${offset.toFixed(3)}[out]`,

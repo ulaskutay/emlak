@@ -46,6 +46,7 @@ export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
       const file = name("yaklasma.mp4");
       if (r.base64) await writeFile(file, Buffer.from(r.base64, "base64"));
       else await download(r.url ?? (await ctx.r2.url(r.key!, 3600)), file);
+      await ctx.preview?.(file, "Drone çekimi");
       return file;
     })
     .catch((e) => (ctx.log(`! yaklaşma çekimi yok: ${String(e).slice(0, 200)}`), null));
@@ -54,6 +55,7 @@ export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
   else await download(still.url ?? (await ctx.r2.url(still.key!, 3600)), side);
   // Cesium karosu yakında bulanık: aynı kadrajda fotogerçekçi drone fotoğrafına.
   const start = await editImage(gen, await stripAttribution(side, name("yan-kirpik.png")), ENHANCE_PROMPT, name("yan-net.png"), "netleştirme", SEED);
+  await ctx.preview?.(start, "Arsa");
 
   // 2) İnşaat timelapse'i
   const final = await buildConstruction({
@@ -65,6 +67,7 @@ export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
     seed: SEED,
     name,
     onStage: (s, p) => ctx.stage(s, p),
+    onPreview: ctx.preview,
   });
 
   // Drone yaklaşma çekimi başa eklenir; inşaat, ses ve kartlar o kadar kayar. Gelmezse ya da bozuksa video yaklaşmasız çıkar.
@@ -73,7 +76,7 @@ export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
   let construction = final;
   let offset = 0;
   if (raw) {
-    const r = await prependApproach(gen, raw, final, name("yaklasmali.mp4")).catch((e) => {
+    const r = await prependApproach(raw, final, name("yaklasmali.mp4")).catch((e) => {
       ctx.log(`! yaklaşma çekimi eklenemedi: ${String(e).slice(0, 200)}`);
       return null;
     });

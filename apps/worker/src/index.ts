@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { and, eq, getDb, refundVideoCredits, videos } from "@arsa/db";
 import { r2FromEnv } from "@arsa/providers";
-import type { TemplateId } from "@arsa/shared";
+import type { TemplateId, VideoPreview } from "@arsa/shared";
 import { Worker } from "bullmq";
 import { arsaDrone } from "./templates/arsa-drone.js";
 import { bitmisHali } from "./templates/bitmis-hali.js";
@@ -51,7 +51,10 @@ async function processVideo(videoId: string) {
   const pipeline = PIPELINES[v.template];
   if (!pipeline) throw new Error(`Bilinmeyen şablon: ${v.template}`);
   const log = (m: string) => console.log(`[${videoId.slice(0, 8)} ${v.template}] ${m}`);
-  await db.update(videos).set({ status: "running", stage: null, progress: 0, error: null, startedAt: new Date(), attempts: v.attempts + 1 }).where(eq(videos.id, videoId));
+  await db
+    .update(videos)
+    .set({ status: "running", stage: null, progress: 0, error: null, stats: null, startedAt: new Date(), attempts: v.attempts + 1 })
+    .where(eq(videos.id, videoId));
 
   // Aşama değişimi hemen, aşama içi ilerleme en fazla 2 sn'de bir yazılır.
   let lastWrite = 0;
@@ -66,8 +69,29 @@ async function processVideo(videoId: string) {
   const workDir = join(tmpdir(), "arsa-reel", videoId);
   await mkdir(workDir, { recursive: true });
   await mkdir(CACHE_DIR, { recursive: true });
+
+  // Panelde üretim sürerken gösterilen ara çıktılar (stats.previews): küçük JPEG ya da 8 sn'lik sessiz 360p klip.
+  const previews: VideoPreview[] = [];
+  let previewNo = 0;
+  const preview = async (file: string, label: string) => {
+    const n = ++previewNo;
+    const kind = file.endsWith(".mp4") ? "video" : "image";
+    const small = join(workDir, `onizleme-${n}.${kind === "video" ? "mp4" : "jpg"}`);
+    try {
+      if (kind === "video")
+        await ffmpeg(["-t", "8", "-i", file, "-an", "-vf", "scale=360:-2,fps=30", "-c:v", "libx264", "-crf", "30", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-movflags", "+faststart", small]);
+      else await ffmpeg(["-i", file, "-frames:v", "1", "-vf", "scale=540:-2", "-q:v", "4", small]);
+      const key = `reels/${videoId}/onizleme/${n}.${kind === "video" ? "mp4" : "jpg"}`;
+      await r2!.putFile(key, small, kind === "video" ? "video/mp4" : "image/jpeg");
+      previews.push({ key, kind, label });
+      await db.update(videos).set({ stats: { previews } }).where(and(eq(videos.id, videoId), eq(videos.status, "running")));
+    } catch (e) {
+      log(`! önizleme yüklenemedi (${label}): ${String(e).slice(0, 160)}`);
+    }
+  };
+
   try {
-    const r = await pipeline({ video: v, r2: r2!, workDir, cacheDir: CACHE_DIR, log, stage });
+    const r = await pipeline({ video: v, r2: r2!, workDir, cacheDir: CACHE_DIR, log, stage, preview });
     const poster = join(workDir, "poster.jpg");
     await ffmpeg(["-ss", String(r.posterAt), "-i", r.videoPath, "-frames:v", "1", "-vf", "scale=540:-2", "-q:v", "3", poster]);
     const reelKey = `reels/${videoId}/reel.mp4`;
@@ -76,7 +100,7 @@ async function processVideo(videoId: string) {
     await r2!.putFile(keyframeKey, poster, "image/jpeg");
     await db
       .update(videos)
-      .set({ status: "done", stage: "done", progress: 1, reelKey, keyframeKey, durationSec: r.durationSec, stats: r.stats ?? null, finishedAt: new Date() })
+      .set({ status: "done", stage: "done", progress: 1, reelKey, keyframeKey, durationSec: r.durationSec, stats: { ...r.stats, previews }, finishedAt: new Date() })
       // Üretim sürerken yönetici iptal ettiyse iptal kalır.
       .where(and(eq(videos.id, videoId), eq(videos.status, "running")));
     log(`hazır (${r.durationSec.toFixed(1)} sn video)`);

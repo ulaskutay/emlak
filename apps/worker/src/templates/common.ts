@@ -17,6 +17,11 @@ export interface JobContext {
   log: (m: string) => void;
   /** Aşama (şablonun stages kimliği) ve aşama içi ilerleme 0..1. */
   stage: (stage: string, progress?: number) => Promise<void>;
+  /**
+   * Ara çıktıyı (görsel ya da klip) panelde önizleme olarak gösterir: küçültülüp R2'ye yüklenir. Hata atmaz;
+   * yerel denemelerde (CLI) yoktur.
+   */
+  preview?: (file: string, label: string) => Promise<void>;
 }
 
 export interface JobResult {

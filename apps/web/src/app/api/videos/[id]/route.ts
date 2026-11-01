@@ -1,4 +1,5 @@
 import { and, eq, getDb, videos } from "@arsa/db";
+import type { VideoPreview } from "@arsa/shared";
 import { NextResponse } from "next/server";
 import { apiUser, notFound, unauthorized } from "@/lib/api";
 import { r2 } from "@/lib/r2";
@@ -14,7 +15,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     .where(and(eq(videos.id, id), eq(videos.userId, user.id)));
   if (!v) return notFound();
   const { parcelText: _omit, ...rest } = v;
-  let urls: { play?: string; download?: string; poster?: string } = {};
+  let urls: { play?: string; download?: string; poster?: string; previews?: { url: string; kind: VideoPreview["kind"]; label: string }[] } = {};
   if (v.status === "done" && v.reelKey) {
     const s = r2();
     const name = v.parcelSummary
@@ -25,6 +26,12 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       download: await s.url(v.reelKey, 3600, name),
       poster: v.keyframeKey ? await s.url(v.keyframeKey, 6 * 3600) : undefined,
     };
+  }
+  // Üretim sürerken (ya da hata verdiyse) ara çıktılar: panelde sol tarafta önizleme.
+  const previews = (v.stats as { previews?: VideoPreview[] } | null)?.previews;
+  if (v.status !== "done" && previews?.length) {
+    const s = r2();
+    urls.previews = await Promise.all(previews.map(async (p) => ({ url: await s.url(p.key, 6 * 3600), kind: p.kind, label: p.label })));
   }
   return NextResponse.json({ video: rest, urls });
 }
