@@ -13,7 +13,7 @@
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -221,14 +221,25 @@ export async function addConstructionAudio(o: {
     return `[s${k}]`;
   });
   f.push(`${vl.join("")}amix=inputs=${vl.length}:normalize=0,volume=1.2,apad,atrim=0:${D.toFixed(2)},asplit=3[voice][sc1][sc2]`);
-  // Her efekt aynı ses yüksekliğine getirilir (loudnorm), aşamanın başlangıcından yarım geçiş önce girer.
-  const sl = sfx.map((file, k) => {
+  // Her efekt aynı ses yüksekliğine getirilir (loudnorm), aşamanın başlangıcından yarım geçiş önce girer. loudnorm ayrı
+  // ffmpeg'de, önbelleğe: çok girdili miksin içinde ffmpeg'i kilitliyordu (2026-11-01: 13. saniyede durup sonsuza dek bekledi).
+  const normed = await Promise.all(
+    sfx.map(async (file) => {
+      const out = `${file}.norm.wav`;
+      if (!existsSync(out)) {
+        await run("ffmpeg", ["-v", "error", "-y", "-i", file, "-af", "aresample=44100,aformat=channel_layouts=stereo,loudnorm=I=-24:TP=-3:LRA=9,aresample=44100", `${out}.part.wav`]);
+        await rename(`${out}.part.wav`, out);
+      }
+      return out;
+    }),
+  );
+  const sl = normed.map((file, k) => {
     inputs.push("-i", file);
     const start = Math.max(0, starts[k]! - SFX_FADE / 2);
     const ms = Math.round(start * 1000);
     const len = lens[k]!;
     f.push(
-      `[${idx++}:a]aresample=44100,aformat=channel_layouts=stereo,loudnorm=I=-24:TP=-3:LRA=9,aresample=44100,atrim=0:${len.toFixed(2)},` +
+      `[${idx++}:a]atrim=0:${len.toFixed(2)},` +
         `afade=t=in:d=${k ? SFX_FADE : 0.4},afade=t=out:st=${(len - SFX_FADE).toFixed(2)}:d=${SFX_FADE},adelay=${ms}|${ms}[e${k}]`,
     );
     return `[e${k}]`;
