@@ -31,13 +31,15 @@ export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
   await ctx.stage("parcel");
   await ctx.stage("side");
   const drone = new RunpodClient(env.RUNPOD_API_KEY, env.RUNPOD_DRONE_ENDPOINT_ID);
-  const out = await runJob(drone, { parcel: v.parcelText, still: {}, output_prefix: `reels/${v.id}/side` }, "yan kare", ctx.log);
+  // still/approach true: worker eski sürümde `if inp.get("still")` diye bakıyor, boş nesne Python'da yanlış sayılıp tam drone turu
+  // çiziliyordu (2026-11-01: 335 sn, 654 kare, yan kare yok).
+  const out = await runJob(drone, { parcel: v.parcelText, still: true, output_prefix: `reels/${v.id}/side` }, "yan kare", ctx.log);
   const still = out.still as { url?: string; key?: string; base64?: string } | undefined;
   if (!still) throw new Error("Drone worker yan kare döndürmedi (worker sürümü güncel değil olabilir)");
   // Drone yaklaşma çekimi ayrı bir RunPod işinde, inşaat üretilirken paralel çizilir. Yan kareden sonra gönderilir ki
   // uç noktada tek GPU varsa inşaatı geciktirmesin. Gelmezse video yaklaşmasız çıkar.
   // limit_frames: approach'u tanımayan eski worker sürümü tam drone turu yerine tek kare çizsin (yeni sürüm yok sayar).
-  const approach = runJob(drone, { parcel: v.parcelText, approach: {}, limit_frames: 1, output_prefix: `reels/${v.id}/approach` }, "yaklaşma", ctx.log)
+  const approach = runJob(drone, { parcel: v.parcelText, approach: true, limit_frames: 1, output_prefix: `reels/${v.id}/approach` }, "yaklaşma", ctx.log)
     .then(async (o) => {
       const r = o.video as { url?: string; key?: string; base64?: string } | undefined;
       if (!r || o.timings?.approach === undefined) throw new Error("Drone worker yaklaşma çekimi döndürmedi (worker sürümü güncel değil olabilir)");

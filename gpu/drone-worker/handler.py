@@ -212,7 +212,8 @@ def handler(job):
         return report
 
     # Yan kare (inşaat videosunun başlangıcı): yandan yakın tek kare, PNG (Qwen girdisi, JPEG kaybı olmasın).
-    if inp.get("still"):
+    # Mod anahtarı varlığıyla seçilir: {} (ayarsız) Python'da yanlış sayılır, tam drone turuna düşmesin.
+    if inp.get("still") is not None and inp.get("still") is not False:
         st = inp["still"] if isinstance(inp["still"], dict) else {}
         cmd = [*TSX, "scripts/worker-still.ts", "--in", src, "--out", work]
         if inp.get("context"):
@@ -231,7 +232,7 @@ def handler(job):
         }
 
     # Yaklaşma çekimi (inşaat videosunun açılışı): mahallenin yukarısından yan kareye inen ~6 sn'lik MP4.
-    if inp.get("approach"):
+    if inp.get("approach") is not None and inp.get("approach") is not False:
         ap = inp["approach"] if isinstance(inp["approach"], dict) else {}
         cmd = [*TSX, "scripts/worker-approach.ts", "--in", src, "--out", work]
         if inp.get("context"):
