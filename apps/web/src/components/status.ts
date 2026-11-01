@@ -22,7 +22,7 @@ const WEIGHTS: Partial<Record<TemplateId, Record<string, [number, number]>>> = {
   "arsa-drone": { parcel: [0, 0.08], script: [0.08, 0.1], voice: [0.1, 0.2], render: [0.2, 0.9], mix: [0.9, 0.99], done: [1, 1] },
   "ilan-videosu": { photos: [0, 0.5], voice: [0.5, 0.52], render: [0.52, 0.99], done: [1, 1] },
   "bitmis-hali": { parcel: [0, 0.05], render: [0.05, 0.5], build: [0.5, 0.6], timelapse: [0.6, 0.93], compose: [0.93, 0.99], done: [1, 1] },
-  "insaat-videosu": { parcel: [0, 0.02], side: [0.02, 0.12], build: [0.12, 0.3], timelapse: [0.3, 0.85], compose: [0.85, 0.93], sound: [0.93, 0.99], done: [1, 1] },
+  "insaat-videosu": { parcel: [0, 0.02], side: [0.02, 0.12], build: [0.12, 0.3], timelapse: [0.3, 0.75], approach: [0.75, 0.87], compose: [0.87, 0.94], sound: [0.94, 0.99], done: [1, 1] },
   "dosenmis-ev": { photos: [0, 0.03], staging: [0.03, 0.3], clips: [0.3, 0.93], compose: [0.93, 0.99], done: [1, 1] },
   "sunucu-ev": { photos: [0, 0.02], staging: [0.02, 0.15], presenter: [0.15, 0.3], clips: [0.3, 0.93], compose: [0.93, 0.99], done: [1, 1] },
 };
@@ -31,7 +31,10 @@ const WEIGHTS: Partial<Record<TemplateId, Record<string, [number, number]>>> = {
 export function overallProgress(status: ReelStatus, stage: string | null | undefined, progress: number, template: TemplateId = "arsa-drone") {
   if (status === "done") return 1;
   if (!stage) return 0;
-  const w = WEIGHTS[template]?.[stage];
+  // Payı yazılmamış (yeni eklenmiş) aşama %0'a düşmesin: aşamalar eşit bölünür.
+  const stages = stagesOf(template);
+  const k = stages.findIndex((s) => s.id === stage);
+  const w = WEIGHTS[template]?.[stage] ?? (k >= 0 ? ([k / stages.length, (k + 1) / stages.length] as const) : undefined);
   if (!w) return 0;
   const [a, b] = w;
   return a + (b - a) * Math.max(0, Math.min(1, progress));

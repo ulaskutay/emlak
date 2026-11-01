@@ -132,7 +132,7 @@ export const TEMPLATES: Record<TemplateId, TemplateInfo> = {
     needs: ["2–4 boş oda fotoğrafı (sahibinden.com ilanındaki fotoğraflar olur)", "Her fotoğraf için oda tipi", "Döşeme tarzı", "İlan sayfasının metni (seslendirme için, isteğe bağlı)"],
     includes: ["Oda başına döşenme sahnesi (temsili)", "İlan bilgisinden Türkçe seslendirme", "Oda başlıkları", "Fiyat ve iletişim kartı", "Müzik"],
     duration: "21 sn",
-    preview: { video: "/media/sablon-dosenmis.mp4", poster: "/media/sablon-dosenmis-poster.jpg" },
+    preview: { video: "/media/sablon-dosenmis-2.mp4", poster: "/media/sablon-dosenmis-2-poster.jpg" },
     badge: "Yeni",
     stages: [
       { id: "photos", label: "Fotoğraflar" },
