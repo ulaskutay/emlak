@@ -2,7 +2,7 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Video } from "@arsa/db";
 import { MUSIC_PROMPT } from "@arsa/drone-studio/pipeline";
@@ -109,7 +109,9 @@ export async function saveOutput(out: Record<string, any>, kind: "video" | "imag
 export async function download(url: string, path: string) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`İndirilemedi (${res.status}): ${url.split("?")[0]}`);
-  await writeFile(path, Buffer.from(await res.arrayBuffer()));
+  // Önce geçici adla: yarıda kesilen indirme, "dosya var, atla" denetiminde bitmiş sayılmasın.
+  await writeFile(`${path}.part`, Buffer.from(await res.arrayBuffer()));
+  await rename(`${path}.part`, path);
   return path;
 }
 
@@ -128,6 +130,8 @@ export async function furnishRoom(
   out: string,
   o: { seed: number; label: string; log: (m: string) => void; width?: number; height?: number },
 ) {
+  // Yeniden denemede (ara dosyalar durur) yeniden üretilmez.
+  if (existsSync(out)) return out;
   const res = await hf.generate(
     STAGING_MODEL,
     { params: { prompt: stagingEditPrompt(room, style), aspect_ratio: "9:16", resolution: "1k", seed: o.seed }, media: [["image", emptyFile]] },
@@ -136,7 +140,8 @@ export async function furnishRoom(
   const raw = await download(res.url, `${out}.ham`);
   const w = o.width ?? 720;
   const h = o.height ?? 1280;
-  await ffmpeg(["-i", raw, "-vf", `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h}`, "-frames:v", "1", out]);
+  await ffmpeg(["-i", raw, "-vf", `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h}`, "-frames:v", "1", `${out}.part.png`]);
+  await rename(`${out}.part.png`, out);
   return out;
 }
 
@@ -153,6 +158,7 @@ export async function geminiClip(
   hf: HiggsfieldCli,
   o: { prompt: string; start: string; end?: string; seconds: number; out: string; label: string; log: (m: string) => void },
 ) {
+  if (existsSync(o.out)) return o.out;
   const raw = await hf.generate(
     CLIP_MODEL,
     {

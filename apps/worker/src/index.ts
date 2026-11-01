@@ -5,8 +5,11 @@
  *
  * Akış: video satırı → şablon hattı (templates/) → kapak karesi → R2'ye yükle → satırı güncelle.
  * Aşama ve ilerleme veritabanına yazılır; panel 3 sn'de bir okur.
+ *
+ * Ara dosyalar (workDir) yalnız başarıda silinir: hatadan ya da yeniden başlatmadan sonra yeniden denemede
+ * Higgsfield/Kling çıktıları yeniden üretilmez (hat var olan dosyayı atlar). 3 günden eski klasörler açılışta silinir.
  */
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { and, eq, getDb, refundVideoCredits, videos } from "@arsa/db";
@@ -24,6 +27,7 @@ import { sunucuEv } from "./templates/sunucu-ev.js";
 const QUEUE = "reel";
 const CONCURRENCY = Number(process.env.REEL_CONCURRENCY ?? 2);
 const CACHE_DIR = process.env.REEL_CACHE_DIR ?? join(tmpdir(), "arsa-reel-cache");
+const WORK_ROOT = join(tmpdir(), "arsa-reel");
 
 const PIPELINES: Record<TemplateId, (ctx: JobContext) => Promise<JobResult>> = {
   "arsa-drone": arsaDrone,
@@ -66,7 +70,7 @@ async function processVideo(videoId: string) {
     await db.update(videos).set({ stage: s, progress }).where(eq(videos.id, videoId));
   };
 
-  const workDir = join(tmpdir(), "arsa-reel", videoId);
+  const workDir = join(WORK_ROOT, videoId);
   await mkdir(workDir, { recursive: true });
   await mkdir(CACHE_DIR, { recursive: true });
 
@@ -90,23 +94,20 @@ async function processVideo(videoId: string) {
     }
   };
 
-  try {
-    const r = await pipeline({ video: v, r2: r2!, workDir, cacheDir: CACHE_DIR, log, stage, preview });
-    const poster = join(workDir, "poster.jpg");
-    await ffmpeg(["-ss", String(r.posterAt), "-i", r.videoPath, "-frames:v", "1", "-vf", "scale=540:-2", "-q:v", "3", poster]);
-    const reelKey = `reels/${videoId}/reel.mp4`;
-    const keyframeKey = `reels/${videoId}/poster.jpg`;
-    await r2!.putFile(reelKey, r.videoPath, "video/mp4");
-    await r2!.putFile(keyframeKey, poster, "image/jpeg");
-    await db
-      .update(videos)
-      .set({ status: "done", stage: "done", progress: 1, reelKey, keyframeKey, durationSec: r.durationSec, stats: { ...r.stats, previews }, finishedAt: new Date() })
-      // Üretim sürerken yönetici iptal ettiyse iptal kalır.
-      .where(and(eq(videos.id, videoId), eq(videos.status, "running")));
-    log(`hazır (${r.durationSec.toFixed(1)} sn video)`);
-  } finally {
-    await rm(workDir, { recursive: true, force: true });
-  }
+  const r = await pipeline({ video: v, r2: r2!, workDir, cacheDir: CACHE_DIR, log, stage, preview });
+  const poster = join(workDir, "poster.jpg");
+  await ffmpeg(["-ss", String(r.posterAt), "-i", r.videoPath, "-frames:v", "1", "-vf", "scale=540:-2", "-q:v", "3", poster]);
+  const reelKey = `reels/${videoId}/reel.mp4`;
+  const keyframeKey = `reels/${videoId}/poster.jpg`;
+  await r2!.putFile(reelKey, r.videoPath, "video/mp4");
+  await r2!.putFile(keyframeKey, poster, "image/jpeg");
+  await db
+    .update(videos)
+    .set({ status: "done", stage: "done", progress: 1, reelKey, keyframeKey, durationSec: r.durationSec, stats: { ...r.stats, previews }, finishedAt: new Date() })
+    // Üretim sürerken yönetici iptal ettiyse iptal kalır.
+    .where(and(eq(videos.id, videoId), eq(videos.status, "running")));
+  log(`hazır (${r.durationSec.toFixed(1)} sn video)`);
+  await rm(workDir, { recursive: true, force: true });
 }
 
 const worker = new Worker<{ videoId: string }>(
@@ -123,7 +124,8 @@ const worker = new Worker<{ videoId: string }>(
       throw e;
     }
   },
-  { connection: redisConnection(), concurrency: CONCURRENCY, lockDuration: 60_000 },
+  // maxStalledCount: worker yeniden başlatılınca (yükleme) yarım iş baştan alınır; ara dosyalar durduğu için ucuz.
+  { connection: redisConnection(), concurrency: CONCURRENCY, lockDuration: 60_000, maxStalledCount: 3 },
 );
 worker.on("ready", () => console.log(`Video worker hazır · kuyruk "${QUEUE}" · eşzamanlı ${CONCURRENCY}`));
 // Bağlantı/kurulum hatası döngüye girerse log diski doldurmasın: art arda 20 hatada çık (Coolify yeniden başlatır).
@@ -136,6 +138,23 @@ worker.on("error", (e) => {
   }
 });
 worker.on("completed", () => (errorStreak = 0));
+// İş hattı dışında düşen iş (art arda yeniden başlatmada "stalled" sınırı): satır "running" kalıp panelde asılı durmasın.
+worker.on("failed", async (job, e) => {
+  const id = job?.data.videoId;
+  if (!id) return;
+  const [v] = await db.select({ status: videos.status }).from(videos).where(eq(videos.id, id));
+  if (v?.status !== "running" && v?.status !== "queued") return;
+  console.error(`[${id.slice(0, 8)}] kuyrukta düştü: ${e.message}`);
+  await db.update(videos).set({ status: "failed", error: `Üretim yarıda kaldı: ${e.message}`.slice(0, 1000), finishedAt: new Date() }).where(eq(videos.id, id));
+  await refundVideoCredits(db, id, { note: "Üretim hatası" }).catch((err) => console.error(`İade yapılamadı: ${err}`));
+});
+
+// Yarım kalmış işlerin eski ara dosyaları.
+for (const d of await readdir(WORK_ROOT).catch(() => [] as string[])) {
+  const p = join(WORK_ROOT, d);
+  const s = await stat(p).catch(() => null);
+  if (s && Date.now() - s.mtimeMs > 3 * 86400_000) await rm(p, { recursive: true, force: true });
+}
 
 for (const sig of ["SIGINT", "SIGTERM"] as const)
   process.on(sig, async () => {

@@ -9,6 +9,7 @@
  * Maliyet (2026-10-26, plan kredisi), 10 sn'lik sahne: orta ~16,5 kredi (kare 2,5 + 360p klip 10 + büyütme 4),
  * yüksek ~36,5 (720p klip 30); 4 sahne orta ~66, yüksek ~146.
  */
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { HiggsfieldCli } from "@arsa/providers";
@@ -152,32 +153,38 @@ export async function presenterTour(ctx: Pick<JobContext, "workDir" | "cacheDir"
   let filmed = 0;
   const clips = await Promise.all(
     rooms.map(async (r, i) => {
-      const still = await hf.generate(
-        IMAGE_MODEL,
-        {
-          params: { prompt: presenterPlacePrompt(r.room, who), aspect_ratio: "9:16", resolution: "2k" },
-          media: [["image", scenes[i]!], ...refs.map((f): [string, string] => ["image", f])],
-        },
-        { label: `sunucu ${i + 1}`, log: ctx.log },
-      );
-      const stillFile = await download(still.url, join(ctx.workDir, `sunucu-${i + 1}.jpg`));
-      await ctx.stage("presenter", ++placed / rooms.length);
-      await ctx.preview?.(stillFile, `${i + 1}. sahne`);
-      // Orta kalite 360p üretilip büyütülür (720p'nin üçte biri fiyatına, 2026-10-25 denemesi); yüksek kalite 720p'den.
-      const raw = await hf.generate(
-        VIDEO_MODEL,
-        {
-          params: { prompt: presenterVideoPrompt(r.room, lines[i]!, who), mode: "image-to-video", duration: clipSeconds(lines[i]!), resolution: TOUR_QUALITY[o.quality].resolution, aspect_ratio: "9:16" },
-          media: [["start-image", still.id]],
-        },
-        { label: `sahne ${i + 1}`, log: ctx.log },
-      );
-      const clip = await hf.generate(
-        UPSCALE_MODEL,
-        { params: { model_version: "standard", resolution: "1080p", fps: 60, preset: "aigc" }, media: [["video-references", raw.id]] },
-        { label: `büyütme ${i + 1}`, log: ctx.log },
-      );
-      const file = await download(clip.url, join(ctx.workDir, `sahne-${i + 1}.mp4`));
+      // Yeniden denemede (ara dosyalar durur) hazır sahne yeniden üretilmez.
+      const file = join(ctx.workDir, `sahne-${i + 1}.mp4`);
+      const stillFile = join(ctx.workDir, `sunucu-${i + 1}.jpg`);
+      if (existsSync(file) && existsSync(stillFile)) await ctx.stage("presenter", ++placed / rooms.length);
+      else {
+        const still = await hf.generate(
+          IMAGE_MODEL,
+          {
+            params: { prompt: presenterPlacePrompt(r.room, who), aspect_ratio: "9:16", resolution: "2k" },
+            media: [["image", scenes[i]!], ...refs.map((f): [string, string] => ["image", f])],
+          },
+          { label: `sunucu ${i + 1}`, log: ctx.log },
+        );
+        await download(still.url, stillFile);
+        await ctx.stage("presenter", ++placed / rooms.length);
+        await ctx.preview?.(stillFile, `${i + 1}. sahne`);
+        // Orta kalite 360p üretilip büyütülür (720p'nin üçte biri fiyatına, 2026-10-25 denemesi); yüksek kalite 720p'den.
+        const raw = await hf.generate(
+          VIDEO_MODEL,
+          {
+            params: { prompt: presenterVideoPrompt(r.room, lines[i]!, who), mode: "image-to-video", duration: clipSeconds(lines[i]!), resolution: TOUR_QUALITY[o.quality].resolution, aspect_ratio: "9:16" },
+            media: [["start-image", still.id]],
+          },
+          { label: `sahne ${i + 1}`, log: ctx.log },
+        );
+        const clip = await hf.generate(
+          UPSCALE_MODEL,
+          { params: { model_version: "standard", resolution: "1080p", fps: 60, preset: "aigc" }, media: [["video-references", raw.id]] },
+          { label: `büyütme ${i + 1}`, log: ctx.log },
+        );
+        await download(clip.url, file);
+      }
       await ctx.stage("clips", ++filmed / rooms.length);
       await ctx.preview?.(file, `${i + 1}. sahne klibi`);
       // Altyazı için kelime zamanları (yazım senaryodan); alınamazsa sahne altyazısız.

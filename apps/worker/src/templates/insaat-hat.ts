@@ -14,6 +14,7 @@
  */
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
+import { rename } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import type { HiggsfieldCli, RunpodClient } from "@arsa/providers";
@@ -80,7 +81,8 @@ export async function editImage(gen: Gen, image: string, prompt: string, out: st
     { label, log: gen.log },
   );
   const raw = await download(r.url, `${out}.ham`);
-  await run("ffmpeg", ["-v", "error", "-y", "-i", raw, "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`, "-frames:v", "1", "-update", "1", out]);
+  await run("ffmpeg", ["-v", "error", "-y", "-i", raw, "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`, "-frames:v", "1", "-update", "1", `${out}.part.png`]);
+  await rename(`${out}.part.png`, out);
   return out;
 }
 
