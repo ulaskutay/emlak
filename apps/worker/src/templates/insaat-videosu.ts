@@ -119,6 +119,7 @@ export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
     music: v.music,
     voiceId: v.voiceId,
     log: ctx.log,
+    onProgress: (p) => void ctx.stage("sound", p),
     script: {
       place: [s.ilce, hood].filter(Boolean).join(" ") || undefined,
       areaM2: s.areaM2,

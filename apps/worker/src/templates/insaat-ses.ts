@@ -10,7 +10,7 @@
  * cümle uzarsa sonrakiler kayar. Rakamlar seslendirmeye yazıyla gider (ElevenLabs ondalıkları bozabiliyor).
  * Üretilen sesler parsel klasöründe metin özetiyle önbelleğe alınır.
  */
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
@@ -152,6 +152,8 @@ export async function addConstructionAudio(o: {
   music?: boolean;
   voiceId?: string | null;
   log?: (m: string) => void;
+  /** Son kodlamanın ilerlemesi 0..1 (panelde "Ses" aşaması uzun süre %0'da kalmasın). */
+  onProgress?: (p: number) => void;
 }) {
   const log = o.log ?? console.log;
   const key = process.env.ELEVENLABS_API_KEY;
@@ -267,12 +269,32 @@ export async function addConstructionAudio(o: {
     vLabel = `[vc${k}]`;
   });
   f.push(`${vLabel}fade=t=out:st=${(D - 0.6).toFixed(2)}:d=0.6[vout]`);
-  await run("ffmpeg", [
-    "-v", "error", "-y", ...inputs, "-filter_complex", f.join(";"), "-map", "[vout]", "-map", "[aout]",
-    "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
-    "-movflags", "+faststart", "-t", D.toFixed(2), o.out,
-  ]);
+  // Son kodlama: 4 çekirdekte 1080p 60 FPS "medium" ~32 sn'lik videoda dakikalar sürüyordu; "veryfast" ~3 kat hızlı,
+  // kalite payı crf 17 ile.
+  await ffmpegWithProgress(
+    [
+      ...inputs, "-filter_complex", f.join(";"), "-map", "[vout]", "-map", "[aout]",
+      "-c:v", "libx264", "-crf", "17", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
+      "-movflags", "+faststart", "-t", D.toFixed(2), o.out,
+    ],
+    D,
+    o.onProgress,
+  );
   return cues;
+}
+
+/** ffmpeg'i -progress ile çalıştırır; çıktı süresine göre ilerlemeyi bildirir. */
+function ffmpegWithProgress(args: string[], seconds: number, onProgress?: (p: number) => void) {
+  return new Promise<void>((res, rej) => {
+    const err: string[] = [];
+    const p = spawn("ffmpeg", ["-v", "error", "-y", "-progress", "pipe:1", "-nostats", ...args], { stdio: ["ignore", "pipe", "pipe"] });
+    p.stdout.on("data", (d) => {
+      const us = /out_time_us=(\d+)/.exec(String(d))?.[1];
+      if (us && onProgress) onProgress(Math.min(1, Number(us) / 1e6 / seconds));
+    });
+    p.stderr.on("data", (d) => err.push(String(d)));
+    p.on("close", (c) => (c === 0 ? res() : rej(new Error(`ffmpeg ${c}: ${err.join("").slice(-600)}`))));
+  });
 }
 
 export async function readParcelInfo(dir: string) {
