@@ -31,6 +31,11 @@ export const W = 1080;
 export const H = 1920;
 /** Klipler 60 FPS büyütülür; kurgu da 60 FPS. */
 export const OUT_FPS = CLIP_FPS;
+/**
+ * Ara kodlama (dilimleri birleştirme, yaklaşma ekleme, kapanış kartı): son adımda (insaat-ses.ts) bir kez daha
+ * kodlandığı için hızlı ön ayar, kayıp payı için biraz düşük crf. 4 çekirdekte 1080p 60 FPS medium dakikalar sürüyordu.
+ */
+const INTERMEDIATE = ["-c:v", "libx264", "-crf", "16", "-preset", "veryfast", "-movflags", "+faststart"];
 /** Bir inşaat diliminin süresi (sn): ses de bu dilimlere göre yerleşir (insaat-ses.ts). */
 export const SEGMENT_SECONDS = 5;
 /** Görsel düzenleme ve video modelleri (Higgsfield). */
@@ -201,7 +206,7 @@ export async function joinClips(parts: string[], out: string) {
   await run("ffmpeg", [
     "-v", "error", "-y", ...parts.flatMap((p) => ["-i", p]),
     "-filter_complex", `${chain};${parts.map((_, i) => `[s${i}]`).join("")}concat=n=${parts.length}:v=1:a=0,fps=${OUT_FPS},scale=${W}:${H}:flags=lanczos,format=yuv420p[out]`,
-    "-map", "[out]", "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-movflags", "+faststart", out,
+    "-map", "[out]", ...INTERMEDIATE, out,
   ]);
   return out;
 }
@@ -271,7 +276,7 @@ export async function prependApproach(approach: string, video: string, out: stri
     "-filter_complex",
     `[0:v]fps=${OUT_FPS},scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,format=yuv420p[a];` +
       `[1:v]fps=${OUT_FPS},scale=${W}:${H},setsar=1,format=yuv420p[b];[a][b]xfade=transition=fade:duration=${APPROACH_FADE}:offset=${offset.toFixed(3)}[out]`,
-    "-map", "[out]", "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-movflags", "+faststart", out,
+    "-map", "[out]", ...INTERMEDIATE, out,
   ]);
   return { video: out, offset };
 }
@@ -291,7 +296,7 @@ export async function appendOutro(video: string, out: string, workDir: string, c
   await run("ffmpeg", [
     "-v", "error", "-y", "-i", video, "-i", outro,
     "-filter_complex", `[0:v]fps=${OUT_FPS},format=yuv420p,setsar=1[a];[1:v]fps=${OUT_FPS},format=yuv420p,setsar=1[b];[a][b]concat=n=2:v=1:a=0[out]`,
-    "-map", "[out]", "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-movflags", "+faststart", out,
+    "-map", "[out]", ...INTERMEDIATE, out,
   ]);
   return { video: out, outroAt };
 }

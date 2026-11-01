@@ -113,11 +113,11 @@ export const TEMPLATES: Record<TemplateId, TemplateInfo> = {
     badge: "Yeni",
     stages: [
       { id: "parcel", label: "Parsel" },
-      { id: "side", label: "Yan çekim" },
+      { id: "side", label: "Arsa çekimi" },
+      { id: "approach", label: "Drone çekimi" },
       { id: "build", label: "Bitmiş hali" },
       { id: "timelapse", label: "İnşaat sahnesi" },
       { id: "compose", label: "Kurgu" },
-      { id: "approach", label: "Drone çekimi" },
       { id: "sound", label: "Ses" },
       { id: "done", label: "Hazır" },
     ],

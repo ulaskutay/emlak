@@ -1,6 +1,6 @@
 /**
  * Arsanın yandan yakın çekimi (tek kare): inşaat videosunun başlangıç karesi.
- * Kamera alçaktan, parsele yandan bakar; neon/yazı yok (isteğe bağlı neonlu hali de alınır).
+ * Kamera parsele ~40° yukarıdan, yandan bakar; neon/yazı yok (isteğe bağlı neonlu hali de alınır).
  * Yerel CLI (still.ts) ve RunPod drone worker'ı (worker-still.ts) aynı kamerayı kullanır.
  */
 import { join, resolve } from "node:path";

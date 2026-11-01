@@ -14,12 +14,13 @@ export interface SideShot {
 }
 
 /**
- * Varsayılan açı (Ezine denemesinde seçilen): en uzun kenara dik, 1,6 yarıçap uzaktan; yükseklik uzaklığın ~%30'u
- * (yaklaşık 17° aşağı bakış). Arsa karenin alt üçte ikisini doldurur, üstte ufuk ve biraz gökyüzü kalır.
+ * Varsayılan açı: en uzun kenara dik, 1,6 yarıçap uzaktan, ~40° aşağı bakan drone açısı (yükseklik uzaklığın ~%84'ü).
+ * Arsa üstten görünür, ufuk karenin üst kenarında ince bir şerit kalır. 2026-11-01'e kadar ~17° idi; kullanıcı "çok
+ * yandan" buldu (yakın Cesium karosu da alçakta daha bulanık).
  */
 export function defaultSideShot(p: ParcelInfo): SideShot {
   const D = Math.max(25, p.radiusM) * 1.6;
-  return { heading: 90, dist: 1.6, height: Math.round(Math.min(80, Math.max(20, D * 0.3))) };
+  return { heading: 90, dist: 1.6, height: Math.round(Math.min(250, Math.max(30, D * 0.84))) };
 }
 
 /** Yandan alçak kamera: yatay uzaklık D, yükseklik H → Cesium range/tilt (tilt = 90 + pitch). */

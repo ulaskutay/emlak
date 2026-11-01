@@ -22,7 +22,7 @@ const WEIGHTS: Partial<Record<TemplateId, Record<string, [number, number]>>> = {
   "arsa-drone": { parcel: [0, 0.08], script: [0.08, 0.1], voice: [0.1, 0.2], render: [0.2, 0.9], mix: [0.9, 0.99], done: [1, 1] },
   "ilan-videosu": { photos: [0, 0.5], voice: [0.5, 0.52], render: [0.52, 0.99], done: [1, 1] },
   "bitmis-hali": { parcel: [0, 0.05], render: [0.05, 0.5], build: [0.5, 0.6], timelapse: [0.6, 0.93], compose: [0.93, 0.99], done: [1, 1] },
-  "insaat-videosu": { parcel: [0, 0.02], side: [0.02, 0.12], build: [0.12, 0.3], timelapse: [0.3, 0.8], compose: [0.8, 0.85], approach: [0.85, 0.94], sound: [0.94, 0.99], done: [1, 1] },
+  "insaat-videosu": { parcel: [0, 0.02], side: [0.02, 0.08], approach: [0.08, 0.14], build: [0.14, 0.3], timelapse: [0.3, 0.8], compose: [0.8, 0.94], sound: [0.94, 0.99], done: [1, 1] },
   "dosenmis-ev": { photos: [0, 0.03], staging: [0.03, 0.3], clips: [0.3, 0.93], compose: [0.93, 0.99], done: [1, 1] },
   "sunucu-ev": { photos: [0, 0.02], staging: [0.02, 0.15], presenter: [0.15, 0.3], clips: [0.3, 0.93], compose: [0.93, 0.99], done: [1, 1] },
 };

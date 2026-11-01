@@ -1,8 +1,9 @@
 /**
- * Arsadan inşaat videosu: arsanın yandan yakın çekimi (RunPod drone worker, Cesium) → Higgsfield ile netleştirme →
- * kazıdan bitmiş yapıya ~20 sn timelapse (insaat-hat.ts, Higgsfield); başta drone yaklaşma çekimi (aynı worker, paralel)
+ * Arsadan inşaat videosu: arsanın ~40° yukarıdan çekimi ve drone yaklaşma çekimi (RunPod drone worker, Cesium, aynı anda)
+ * → Higgsfield ile netleştirme → kazıdan bitmiş yapıya ~20 sn timelapse (insaat-hat.ts, Higgsfield) → yaklaşma başa eklenir
  * → emlakçı kapanış kartı → inşaat sesleri, imar bilgisini okuyan seslendirme, veri kartları ve müzik (insaat-ses.ts).
  */
+import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { HiggsfieldCli, RunpodClient } from "@arsa/providers";
@@ -27,35 +28,46 @@ export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
   const gen: Gen = { hf: new HiggsfieldCli(), log: ctx.log };
   const name = (x: string) => join(ctx.workDir, `insaat-${x}`);
 
-  // 1) Yan kare: RunPod drone worker'ında Cesium ile tek kare (sunucuda GPU ve Chrome yok).
+  // 1) Yan kare ve drone yaklaşma çekimi: RunPod drone worker'ında Cesium ile (sunucuda GPU ve Chrome yok). İkisi aynı
+  // anda gönderilir; panelde "Drone çekimi" aşaması geçilmeden çekim biter, inşaat ondan sonra başlar. Yeniden denemede
+  // (ara dosyalar durur) hazır olan tekrar çizilmez.
   await ctx.stage("parcel");
   await ctx.stage("side");
   const drone = new RunpodClient(env.RUNPOD_API_KEY, env.RUNPOD_DRONE_ENDPOINT_ID);
+  const fetchOut = async (r: { url?: string; key?: string; base64?: string }, file: string) => {
+    if (r.base64) await writeFile(file, Buffer.from(r.base64, "base64"));
+    else await download(r.url ?? (await ctx.r2.url(r.key!, 3600)), file);
+    return file;
+  };
+  const side = name("yan.png");
   // still/approach true: worker eski sürümde `if inp.get("still")` diye bakıyor, boş nesne Python'da yanlış sayılıp tam drone turu
   // çiziliyordu (2026-11-01: 335 sn, 654 kare, yan kare yok).
-  const out = await runJob(drone, { parcel: v.parcelText, still: true, output_prefix: `reels/${v.id}/side` }, "yan kare", ctx.log);
-  const still = out.still as { url?: string; key?: string; base64?: string } | undefined;
-  if (!still) throw new Error("Drone worker yan kare döndürmedi (worker sürümü güncel değil olabilir)");
-  // Drone yaklaşma çekimi ayrı bir RunPod işinde, inşaat üretilirken paralel çizilir. Yan kareden sonra gönderilir ki
-  // uç noktada tek GPU varsa inşaatı geciktirmesin. Gelmezse video yaklaşmasız çıkar.
-  // limit_frames: approach'u tanımayan eski worker sürümü tam drone turu yerine tek kare çizsin (yeni sürüm yok sayar).
-  const approach = runJob(drone, { parcel: v.parcelText, approach: true, limit_frames: 1, output_prefix: `reels/${v.id}/approach` }, "yaklaşma", ctx.log)
-    .then(async (o) => {
-      const r = o.video as { url?: string; key?: string; base64?: string } | undefined;
-      if (!r || o.timings?.approach === undefined) throw new Error("Drone worker yaklaşma çekimi döndürmedi (worker sürümü güncel değil olabilir)");
-      const file = name("yaklasma.mp4");
-      if (r.base64) await writeFile(file, Buffer.from(r.base64, "base64"));
-      else await download(r.url ?? (await ctx.r2.url(r.key!, 3600)), file);
-      await ctx.preview?.(file, "Drone çekimi");
-      return file;
-    })
-    .catch((e) => (ctx.log(`! yaklaşma çekimi yok: ${String(e).slice(0, 200)}`), null));
-  const side = name("yan.png");
-  if (still.base64) await writeFile(side, Buffer.from(still.base64, "base64"));
-  else await download(still.url ?? (await ctx.r2.url(still.key!, 3600)), side);
+  const sideJob = existsSync(side)
+    ? Promise.resolve(side)
+    : runJob(drone, { parcel: v.parcelText, still: true, output_prefix: `reels/${v.id}/side` }, "yan kare", ctx.log).then((o) => {
+        const r = o.still as { url?: string; key?: string; base64?: string } | undefined;
+        if (!r) throw new Error("Drone worker yan kare döndürmedi (worker sürümü güncel değil olabilir)");
+        return fetchOut(r, side);
+      });
+  // Gelmezse video yaklaşmasız çıkar. limit_frames: approach'u tanımayan eski worker tam tur yerine tek kare çizsin.
+  const approachFile = name("yaklasma.mp4");
+  const approachJob = (
+    existsSync(approachFile)
+      ? Promise.resolve(approachFile)
+      : runJob(drone, { parcel: v.parcelText, approach: true, limit_frames: 1, output_prefix: `reels/${v.id}/approach` }, "yaklaşma", ctx.log).then((o) => {
+          const r = o.video as { url?: string; key?: string; base64?: string } | undefined;
+          if (!r || o.timings?.approach === undefined) throw new Error("Drone worker yaklaşma çekimi döndürmedi (worker sürümü güncel değil olabilir)");
+          return fetchOut(r, approachFile);
+        })
+  ).catch((e) => (ctx.log(`! yaklaşma çekimi yok: ${String(e).slice(0, 200)}`), null));
+
   // Cesium karosu yakında bulanık: aynı kadrajda fotogerçekçi drone fotoğrafına.
-  const start = await editImage(gen, await stripAttribution(side, name("yan-kirpik.png")), ENHANCE_PROMPT, name("yan-net.png"), "netleştirme", SEED);
+  const start = await editImage(gen, await stripAttribution(await sideJob, name("yan-kirpik.png")), ENHANCE_PROMPT, name("yan-net.png"), "netleştirme", SEED);
   await ctx.preview?.(start, "Arsa");
+
+  await ctx.stage("approach");
+  const raw = await approachJob;
+  if (raw) await ctx.preview?.(raw, "Drone çekimi");
 
   // 2) İnşaat timelapse'i
   const final = await buildConstruction({
@@ -70,9 +82,7 @@ export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
     onPreview: ctx.preview,
   });
 
-  // Drone yaklaşma çekimi başa eklenir; inşaat, ses ve kartlar o kadar kayar. Gelmezse ya da bozuksa video yaklaşmasız çıkar.
-  await ctx.stage("approach");
-  const raw = await approach;
+  // Kurgu: drone yaklaşma çekimi başa eklenir; inşaat, ses ve kartlar o kadar kayar. Bozuksa video yaklaşmasız çıkar.
   let construction = final;
   let offset = 0;
   if (raw) {
@@ -82,6 +92,7 @@ export async function insaatVideosu(ctx: JobContext): Promise<JobResult> {
     });
     if (r) ({ video: construction, offset } = r);
   }
+  await ctx.stage("compose", 0.5);
 
   // 3) Emlakçı kapanış kartı (döşeme şablonundaki kart; fotoğraf ve logo kullanıcının yüklemeleri)
   const fetchAsset = (key: string | undefined, file: string) =>
